@@ -580,6 +580,12 @@
                         <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
                         <h4 class="modal-title" id="mySmallModalLabel">Products
                         </h4>
+                        <button id="bulkRemoveModal" data-toggle="modal" data-target="#bulkRemove" type="button" class="btn btn-danger waves-effect waves-light pull-right" title="Bulk Remove Products (Ctrl+0)" style="margin-left: 10px;">
+                            <i class="fa fa-trash"></i> Bulk Remove
+                        </button>
+                        <button id="bulkImportModal" data-toggle="modal" data-target="#bulkImport" type="button" class="btn btn-info waves-effect waves-light pull-right" title="Bulk Import Products (Ctrl+9)" style="margin-left: 10px;">
+                            <i class="fa fa-upload"></i> Bulk Import
+                        </button>
                     </div>
                     <div class="modal-body p-20 p-r-40" id="all_products">
                         <table class="table table-bordered" id="productList">
@@ -643,6 +649,142 @@
                             </thead>
                             <tbody id="category_list"></tbody>
                         </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="bulkImport" class="modal fade bs-example-modal-lg" tabindex="-1" role="dialog" aria-labelledby="bulkImportModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
+                        <h4 class="modal-title" id="bulkImportModalLabel">Bulk Product Import</h4>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-12">
+                                                                    <div class="alert alert-info">
+                                        <h5><i class="fa fa-info-circle"></i> Import Instructions</h5>
+                                        <p>Upload a CSV file with the following columns:</p>
+                                        <ul>
+                                            <li><strong>Name</strong> - Product name (required)</li>
+                                            <li><strong>Barcode</strong> - Product barcode (required)</li>
+                                            <li><strong>Price</strong> - Product price (required)</li>
+                                            <li><strong>Category</strong> - Product category (optional, will use default if not specified)</li>
+                                            <li><strong>Quantity</strong> - Initial stock quantity (optional, default: 0)</li>
+                                            <li><strong>MinStock</strong> - Minimum stock level (optional, default: 1)</li>
+                                            <li><strong>ExpirationDate</strong> - Expiry date in DD/MM/YYYY format (optional)</li>
+                                        </ul>
+                                        <p><strong>Note:</strong> The first row should contain column headers. New categories will be created automatically if they don't exist.</p>
+                                    </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <form id="bulkImportForm" encType="multipart/form-data">
+                                    <div class="form-group">
+                                        <label for="csvFile">Select CSV File</label>
+                                        <input type="file" name="csvFile" id="csvFile" accept=".csv" required class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="defaultCategory">Default Category (if not specified in CSV)</label>
+                                        <select name="defaultCategory" class="form-control" id="defaultCategory"></select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label><input type="checkbox" name="skipDuplicates" id="skipDuplicates" checked> Skip duplicate barcodes</label>
+                                    </div>
+                                    <div class="form-group">
+                                        <label><input type="checkbox" name="updateExisting" id="updateExisting"> Update existing products</label>
+                                    </div>
+                                    <button type="submit" id="submitBulkImport" class="btn btn-primary btn-block waves-effect waves-light">
+                                        <i class="fa fa-upload"></i> Import Products
+                                    </button>
+                                </form>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label>Download Sample CSV Template</label>
+                                    <button type="button" id="downloadTemplate" class="btn btn-success btn-block waves-effect waves-light">
+                                        <i class="fa fa-download"></i> Download Template
+                                    </button>
+                                </div>
+                                <div class="form-group">
+                                    <label>Import Progress</label>
+                                    <div id="importProgress" style="display: none;">
+                                        <div class="progress">
+                                            <div class="progress-bar progress-bar-striped active" role="progressbar" style="width: 0%">
+                                                <span id="progressText">0%</span>
+                                            </div>
+                                        </div>
+                                        <div id="importStatus" class="text-muted small mt-2"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-default" data-toggle="modal" data-target="#Products" data-dismiss="modal">
+                            <i class="fa fa-arrow-left"></i> Back to Products
+                        </button>
+                        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="bulkRemove" class="modal fade bs-example-modal-lg" tabindex="-1" role="dialog" aria-labelledby="bulkRemoveModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
+                        <h4 class="modal-title" id="bulkRemoveModalLabel">Bulk Product Removal</h4>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="alert alert-warning">
+                                    <h5><i class="fa fa-exclamation-triangle"></i> Warning</h5>
+                                    <p>This action will permanently delete the selected products. This cannot be undone.</p>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label>Select Products to Remove:</label>
+                                    <div class="table-responsive">
+                                        <table class="table table-bordered table-hover" id="bulkRemoveTable">
+                                            <thead>
+                                                <tr>
+                                                    <th width="50">
+                                                        <input type="checkbox" id="selectAllProducts" title="Select All">
+                                                    </th>
+                                                    <th>Barcode</th>
+                                                    <th>Name</th>
+                                                    <th>Price</th>
+                                                    <th>Stock</th>
+                                                    <th>Category</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="bulkRemoveProductList">
+                                                <!-- Products will be loaded here -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <div class="alert alert-info">
+                                        <strong>Selected:</strong> <span id="selectedCount">0</span> products
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-default" data-toggle="modal" data-target="#Products" data-dismiss="modal">
+                            <i class="fa fa-arrow-left"></i> Back to Products
+                        </button>
+                        <button type="button" class="btn btn-danger" id="confirmBulkRemove" disabled>
+                            <i class="fa fa-trash"></i> Remove Selected Products
+                        </button>
+                        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
                     </div>
                 </div>
             </div>

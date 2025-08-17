@@ -226,6 +226,39 @@ if (auth == undefined) {
     loadProducts();
     loadCustomers();
 
+    // Keyboard shortcuts
+    $(document).on('keydown', function(e) {
+      if (e.ctrlKey && e.keyCode === 57) { // Ctrl+9
+        e.preventDefault();
+        // Check if Products modal is open, if so trigger bulk import
+        if ($('#Products').hasClass('in')) {
+          $('#bulkImportModal').click();
+        } else {
+          // If Products modal is not open, open it first
+          $('#productModal').click();
+          // Wait for modal to open then trigger bulk import
+          setTimeout(function() {
+            $('#bulkImportModal').click();
+          }, 500);
+        }
+      }
+      
+      if (e.ctrlKey && e.keyCode === 48) { // Ctrl+0
+        e.preventDefault();
+        // Check if Products modal is open, if so trigger bulk remove
+        if ($('#Products').hasClass('in')) {
+          $('#bulkRemoveModal').click();
+        } else {
+          // If Products modal is not open, open it first
+          $('#productModal').click();
+          // Wait for modal to open then trigger bulk remove
+          setTimeout(function() {
+            $('#bulkRemoveModal').click();
+          }, 500);
+        }
+      }
+    });
+
     if (settings && validator.unescape(settings.symbol)) {
       $("#price_curr, #payment_curr, #change_curr").text(validator.unescape(settings.symbol));
     }
@@ -247,9 +280,6 @@ if (auth == undefined) {
       }, 1000);
     });
 
-    if (0 == user.perm_products) {
-      $(".p_one").hide();
-    }
     if (0 == user.perm_categories) {
       $(".p_two").hide();
     }
@@ -261,6 +291,9 @@ if (auth == undefined) {
     }
     if (0 == user.perm_settings) {
       $(".p_five").hide();
+    }
+    if (0 == user.perm_products) {
+      $(".p_one").hide();
     }
 
     function loadProducts() {
@@ -359,6 +392,14 @@ if (auth == undefined) {
         $("#category,#categories").html(`<option value="0">Select</option>`);
         allCategories.forEach((category) => {
           $("#category,#categories").append(
+            `<option value="${category._id}">${category.name}</option>`,
+          );
+        });
+        
+        // Also populate the defaultCategory dropdown in bulk import form
+        $("#defaultCategory").html(`<option value="">Select Default Category</option>`);
+        allCategories.forEach((category) => {
+          $("#defaultCategory").append(
             `<option value="${category._id}">${category.name}</option>`,
           );
         });
@@ -1481,7 +1522,296 @@ if (auth == undefined) {
       loadCategoryList();
     });
 
-    function loadUserList() {
+    // Bulk Import Modal
+    $("#bulkImportModal").on("click", function () {
+      // Load categories for default category dropdown
+      loadCategories();
+      $("#bulkImportForm").get(0).reset();
+      $("#importProgress").hide();
+      $("#importStatus").text("");
+      // Close the Products modal when opening bulk import
+      $("#Products").modal("hide");
+    });
+
+    // Bulk Remove Modal
+    $("#bulkRemoveModal").on("click", function () {
+      // Test API connection first
+      testAPIConnection();
+      // Load products for bulk removal selection
+      loadBulkRemoveProducts();
+      // Close the Products modal when opening bulk remove
+      $("#Products").modal("hide");
+    });
+
+    // Download CSV Template
+    $("#downloadTemplate").on("click", function () {
+      const csvContent = "Name,Barcode,Price,Category,Quantity,MinStock,ExpirationDate\nParacetamol 500mg,123456789,5.99,Medicines,100,10,31/12/2025\nIbuprofen 400mg,987654321,4.99,Medicines,50,5,30/06/2025\nAspirin 100mg,456789123,3.99,,75,8,31/03/2026";
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'pharmaspot_products_template.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    });
+
+    // Bulk Import Form Submission
+    $("#bulkImportForm").submit(function (e) {
+      e.preventDefault();
+      
+      const formData = new FormData(this);
+      formData.append('skipDuplicates', $("#skipDuplicates").is(':checked'));
+      formData.append('updateExisting', $("#updateExisting").is(':checked'));
+      
+      // Get the selected default category value
+      const defaultCategory = $("#defaultCategory").val();
+      if (defaultCategory) {
+        formData.append('defaultCategory', defaultCategory);
+      }
+      
+      console.log("Bulk import parameters:");
+      console.log("- Skip Duplicates:", $("#skipDuplicates").is(':checked'));
+      console.log("- Update Existing:", $("#updateExisting").is(':checked'));
+      console.log("- Default Category:", defaultCategory);
+      
+      $("#submitBulkImport").prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Importing...');
+      $("#importProgress").show();
+      $("#importStatus").text("Starting import...");
+      
+      $.ajax({
+        url: api + "inventory/bulk-import",
+        type: "POST",
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function (response) {
+          $("#submitBulkImport").prop('disabled', false).html('<i class="fa fa-upload"></i> Import Products');
+          $("#importProgress").hide();
+          
+          if (response.success) {
+            let message = response.message;
+            if (response.errors && response.errors.length > 0) {
+              message += `\n\nErrors encountered:\n`;
+              response.errors.forEach(error => {
+                message += `Row ${error.row}: ${error.error}\n`;
+              });
+            }
+            
+            notiflix.Report.success(
+              "Import Completed",
+              message,
+              "OK"
+            );
+            
+                         // Refresh products list
+             loadProducts();
+             
+             // Close modal
+             $("#bulkImport").modal("hide");
+             
+             // Reopen Products modal to show updated list
+             $("#Products").modal("show");
+          }
+        },
+        error: function (jqXHR, textStatus, errorThrown) {
+          $("#submitBulkImport").prop('disabled', false).html('<i class="fa fa-upload"></i> Import Products');
+          $("#importProgress").hide();
+          
+          let errorMessage = "An error occurred during import.";
+          if (jqXHR.responseJSON && jqXHR.responseJSON.message) {
+            errorMessage = jqXHR.responseJSON.message;
+          }
+          
+          notiflix.Report.failure(
+            "Import Failed",
+            errorMessage,
+            "OK"
+          );
+        }
+            });
+     });
+
+     // Bulk Remove Functions
+     function loadBulkRemoveProducts() {
+       $("#bulkRemoveProductList").empty();
+       $("#selectedCount").text("0");
+       $("#confirmBulkRemove").prop('disabled', true);
+       
+       let product_list = "";
+       allProducts.forEach((product, index) => {
+         let category = allCategories.filter(function (category) {
+           return category._id == product.category;
+         });
+         
+         product_list += `<tr>
+           <td>
+             <input type="checkbox" class="product-checkbox" value="${product._id}" data-product-name="${product.name}">
+           </td>
+           <td>${product.barcode || product._id}</td>
+           <td>${product.name}</td>
+           <td>${validator.unescape(settings.symbol)}${product.price}</td>
+           <td>${product.stock == 1 ? product.quantity : "N/A"}</td>
+           <td>${category.length > 0 ? category[0].name : ""}</td>
+         </tr>`;
+       });
+       
+       $("#bulkRemoveProductList").html(product_list);
+       
+       // Initialize checkboxes
+       initializeBulkRemoveCheckboxes();
+     }
+
+     function initializeBulkRemoveCheckboxes() {
+       // Select all checkbox
+       $("#selectAllProducts").on("change", function() {
+         const isChecked = $(this).is(":checked");
+         $(".product-checkbox").prop("checked", isChecked);
+         updateSelectedCount();
+       });
+
+       // Individual product checkboxes
+       $(document).on("change", ".product-checkbox", function() {
+         updateSelectedCount();
+         
+         // Update select all checkbox
+         const totalCheckboxes = $(".product-checkbox").length;
+         const checkedCheckboxes = $(".product-checkbox:checked").length;
+         
+         if (checkedCheckboxes === 0) {
+           $("#selectAllProducts").prop("indeterminate", false).prop("checked", false);
+         } else if (checkedCheckboxes === totalCheckboxes) {
+           $("#selectAllProducts").prop("indeterminate", false).prop("checked", true);
+         } else {
+           $("#selectAllProducts").prop("indeterminate", true).prop("checked", false);
+         }
+       });
+     }
+
+     function updateSelectedCount() {
+       const selectedCount = $(".product-checkbox:checked").length;
+       $("#selectedCount").text(selectedCount);
+       $("#confirmBulkRemove").prop('disabled', selectedCount === 0);
+     }
+
+     // Confirm Bulk Remove
+     $("#confirmBulkRemove").on("click", function() {
+       const selectedProducts = $(".product-checkbox:checked");
+       
+       if (selectedProducts.length === 0) {
+         notiflix.Report.warning("No Selection", "Please select at least one product to remove.", "OK");
+         return;
+       }
+
+       const productIds = [];
+       const productNames = [];
+       
+       selectedProducts.each(function() {
+         productIds.push($(this).val());
+         productNames.push($(this).data("product-name"));
+       });
+
+       const confirmMessage = `Are you sure you want to permanently delete ${productIds.length} product(s)?\n\nThis action cannot be undone.`;
+       
+       notiflix.Confirm.show(
+         "Confirm Bulk Removal",
+         confirmMessage,
+         "Yes, Remove All",
+         "Cancel",
+         function() {
+           // User confirmed, proceed with bulk removal
+           performBulkRemove(productIds, productNames);
+         },
+         function() {
+           // User cancelled
+         }
+       );
+     });
+
+     // Test API connection
+     function testAPIConnection() {
+       console.log("Testing API connection...");
+       $.ajax({
+         url: api + "inventory/test",
+         type: "POST",
+         data: JSON.stringify({ test: "data" }),
+         contentType: "application/json; charset=utf-8",
+         success: function (response) {
+           console.log("API test successful:", response);
+         },
+         error: function (jqXHR, textStatus, errorThrown) {
+           console.error("API test failed:", jqXHR, textStatus, errorThrown);
+         }
+       });
+     }
+
+     function performBulkRemove(productIds, productNames) {
+       $("#confirmBulkRemove").prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Removing...');
+       
+       console.log("Sending bulk remove request with product IDs:", productIds);
+       console.log("Product names:", productNames);
+       
+       $.ajax({
+         url: api + "inventory/bulk-remove",
+         type: "POST",
+         data: JSON.stringify({ productIds: productIds }),
+         contentType: "application/json; charset=utf-8",
+         cache: false,
+         processData: false,
+         success: function (response) {
+           console.log("Bulk remove success response:", response);
+           $("#confirmBulkRemove").prop('disabled', false).html('<i class="fa fa-trash"></i> Remove Selected Products');
+           
+           if (response.success) {
+             let message = response.message;
+             if (response.errors && response.errors.length > 0) {
+               message += `\n\nErrors encountered:\n`;
+               response.errors.forEach(error => {
+                 message += `${error.productName || error.productId}: ${error.error}\n`;
+               });
+             }
+             
+             notiflix.Report.success(
+               "Bulk Removal Completed",
+               message,
+               "OK"
+             );
+             
+             // Refresh products list
+             loadProducts();
+             
+             // Close modal
+             $("#bulkRemove").modal("hide");
+             
+             // Reopen Products modal to show updated list
+             $("#Products").modal("show");
+           }
+         },
+         error: function (jqXHR, textStatus, errorThrown) {
+           $("#confirmBulkRemove").prop('disabled', false).html('<i class="fa fa-trash"></i> Remove Selected Products');
+           
+           console.log("Bulk remove error details:");
+           console.log("jqXHR:", jqXHR);
+           console.log("textStatus:", textStatus);
+           console.log("errorThrown:", errorThrown);
+           console.log("Response text:", jqXHR.responseText);
+           
+           let errorMessage = "An error occurred during bulk removal.";
+           if (jqXHR.responseJSON && jqXHR.responseJSON.message) {
+             errorMessage = jqXHR.responseJSON.message;
+           }
+           
+           notiflix.Report.failure(
+             "Bulk Removal Failed",
+             errorMessage,
+             "OK"
+           );
+         }
+       });
+     }
+
+     function loadUserList() {
       let counter = 0;
       let user_list = "";
       $("#user_list").empty();
@@ -2237,10 +2567,10 @@ $.fn.viewTransaction = function (index) {
               validator.unescape(settings.contact) != "" ? "Tel: " + validator.unescape(settings.contact) + "<br>" : ""
             } 
             ${validator.unescape(settings.tax) != "" ? "Vat No: " + validator.unescape(settings.tax) + "<br>" : ""} 
-    </p>
-    <hr>
-    <left>
-        <p>
+        </p>
+        <hr>
+        <left>
+            <p>
         Invoice : ${orderNumber} <br>
         Ref No : ${refNumber} <br>
         Customer : ${

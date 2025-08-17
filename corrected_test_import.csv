@@ -1,0 +1,12 @@
+Name,Barcode,Price,Category,Quantity,MinStock,ExpirationDate
+Antiseptic Cream 30g,101122334,4.79,First Aid,85,8,13-Oct-25
+Aspirin 325mg,112233445,3.49,Medicines,80,8,14-Dec-25
+Hand Sanitizer 50ml,112233446,2.99,Personal Care,150,15,28-Sep-26
+Toothpaste 100g,123344556,3.29,Personal Care,100,10,29-Jan-26
+Paracetamol 500mg,123456789,5.99,Medicines,100,10,31-Mar-26
+Shampoo 250ml,134455667,5.49,Personal Care,60,6,28-Feb-26
+Ibuprofen Gel 50g,145566778,6.99,Medicines,40,4,01-May-26
+Antihistamine Cream 30g,156677889,5.29,Medicines,50,5,29-May-25
+Zinc 50mg,167788990,4.99,Supplements,80,8,29-Jul-26
+Calcium 600mg,178899001,6.49,Supplements,70,7,29-Jun-25
+Gauze Pads 10ct,189900112,3.19,First Aid,100,10,31-Mar-26

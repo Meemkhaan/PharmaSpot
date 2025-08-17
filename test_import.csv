@@ -1,0 +1,4 @@
+Name,Barcode,Price,Category,Quantity,MinStock,ExpirationDate
+Test Product 1,111111111,9.99,Test Category,50,5,31/12/2026
+Test Product 2,222222222,19.99,Test Category,25,3,31/12/2027
+Test Product 3,333333333,29.99,Test Category,75,10,31/12/2028

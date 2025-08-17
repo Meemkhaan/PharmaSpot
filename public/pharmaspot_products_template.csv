@@ -1,0 +1,7 @@
+Name,Barcode,Price,Category,Quantity,MinStock,ExpirationDate
+Paracetamol 500mg,123456789,5.99,Medicines,100,10,31/12/2025
+Ibuprofen 400mg,987654321,4.99,Medicines,50,5,30/06/2025
+Aspirin 100mg,456789123,3.99,Medicines,75,8,31/03/2026
+Vitamin C 1000mg,789123456,12.99,Supplements,200,20,31/12/2026
+Bandage 5cm,321654987,2.49,First Aid,150,15,31/12/2027
+Thermometer Digital,147258369,25.99,Medical Devices,30,5,31/12/2028
