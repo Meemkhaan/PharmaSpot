@@ -486,14 +486,69 @@ if (auth == undefined) {
                 </div>
                 <div class="row mt-3">
                   <div class="col-md-6">
-                    <h5>Forms & Modals</h5>
+                    <h5>Quick Actions</h5>
                     <ul class="list-unstyled">
-                      <li><kbd>Enter</kbd> Submit Form</li>
-                      <li><kbd>Ctrl+Enter</kbd> Submit Modal</li>
-                      <li><kbd>Escape</kbd> Close Modal</li>
-                      <li><kbd>Tab</kbd> Navigate Fields</li>
+                      <li><kbd>Alt+I</kbd> Quick Inventory Menu</li>
+                      <li><kbd>Alt+S</kbd> Quick Search</li>
+                      <li><kbd>Alt+N</kbd> Quick New Item</li>
+                      <li><kbd>Alt+C</kbd> Quick Close Modal</li>
+                      <li><kbd>Alt+1-6</kbd> Quick Section Jump</li>
                     </ul>
                   </div>
+                  <div class="col-md-6">
+                    <h5>POS (Point of Sale)</h5>
+                    <ul class="list-unstyled">
+                      <li><kbd>Alt+P</kbd> Open POS</li>
+                      <li><kbd>Alt+Q</kbd> Quick Product Search</li>
+                      <li><kbd>Alt+C</kbd> Clear Cart</li>
+                      <li><kbd>Alt+H</kbd> Hold Order</li>
+                      <li><kbd>Alt+N</kbd> New Transaction</li>
+                    </ul>
+                  </div>
+                </div>
+                <div class="row mt-3">
+                  <div class="col-md-6">
+                    <h5>POS Product Navigation</h5>
+                    <ul class="list-unstyled">
+                      <li><kbd>Arrow Keys</kbd> Navigate Product Grid</li>
+                      <li><kbd>Enter/Space</kbd> Add to Cart</li>
+                      <li><kbd>Alt+1-5</kbd> Filter by Category</li>
+                      <li><kbd>Tab</kbd> Move Between Products</li>
+                    </ul>
+                  </div>
+                  <div class="col-md-6">
+                    <h5>POS Cart Management</h5>
+                    <ul class="list-unstyled">
+                      <li><kbd>↑↓</kbd> Navigate Cart Items</li>
+                      <li><kbd>←→</kbd> Navigate Item Fields</li>
+                      <li><kbd>↑↓</kbd> Change Quantity</li>
+                      <li><kbd>Delete</kbd> Remove Item</li>
+                      <li><kbd>Enter</kbd> Edit Quantity</li>
+                    </ul>
+                  </div>
+                </div>
+                <div class="row mt-3">
+                  <div class="col-md-6">
+                    <h5>POS Payment</h5>
+                    <ul class="list-unstyled">
+                      <li><kbd>1</kbd> Cash Payment</li>
+                      <li><kbd>2</kbd> Card Payment</li>
+                      <li><kbd>C</kbd> Calculate Change</li>
+                      <li><kbd>P</kbd> Process Payment</li>
+                      <li><kbd>H</kbd> Hold Order</li>
+                    </ul>
+                  </div>
+                  <div class="col-md-6">
+                    <h5>POS Form Navigation</h5>
+                    <ul class="list-unstyled">
+                      <li><kbd>Enter</kbd> Next Field / Submit</li>
+                      <li><kbd>Shift+Enter</kbd> Previous Field</li>
+                      <li><kbd>Tab</kbd> Next Field</li>
+                      <li><kbd>Shift+Tab</kbd> Previous Field</li>
+                    </ul>
+                  </div>
+                </div>
+                <div class="row mt-3">
                   <div class="col-md-6">
                     <h5>Data Operations</h5>
                     <ul class="list-unstyled">
@@ -502,6 +557,16 @@ if (auth == undefined) {
                       <li><kbd>Alt+F</kbd> Find/Search</li>
                       <li><kbd>Alt+R</kbd> Refresh</li>
                       <li><kbd>Alt+H</kbd> This Help</li>
+                    </ul>
+                  </div>
+                  <div class="col-md-6">
+                    <h5>Form Navigation</h5>
+                    <ul class="list-unstyled">
+                      <li><kbd>Tab</kbd> Next Field</li>
+                      <li><kbd>Shift+Tab</kbd> Previous Field</li>
+                      <li><kbd>Enter</kbd> Next Field / Submit</li>
+                      <li><kbd>Shift+Enter</kbd> Previous Field</li>
+                      <li><kbd>Escape</kbd> Close Modal</li>
                     </ul>
                   </div>
                 </div>
@@ -513,8 +578,21 @@ if (auth == undefined) {
                       <li><kbd>Double-Click</kbd> Edit Row</li>
                       <li><kbd>Alt+A</kbd> Select All</li>
                       <li><kbd>Alt+D</kbd> Deselect All</li>
+                      <li><kbd>Arrow Keys</kbd> Navigate Cells</li>
+                      <li><kbd>Space</kbd> Toggle Checkbox</li>
                     </ul>
                   </div>
+                  <div class="col-md-6">
+                    <h5>Auto-Complete</h5>
+                    <ul class="list-unstyled">
+                      <li><kbd>Type</kbd> Show Suggestions</li>
+                      <li><kbd>↑↓</kbd> Navigate Suggestions</li>
+                      <li><kbd>Enter</kbd> Select Suggestion</li>
+                      <li><kbd>Escape</kbd> Close Suggestions</li>
+                    </ul>
+                  </div>
+                </div>
+                <div class="row mt-3">
                   <div class="col-md-6">
                     <h5>System Reserved (Do Not Use)</h5>
                     <ul class="list-unstyled text-muted">
@@ -3028,3 +3106,783 @@ $("#quit").on("click", function () {
 ipcRenderer.on("click-element", (event, elementId) => {
   document.getElementById(elementId).click();
 });
+
+// Enhanced keyboard navigation and focus management
+function enhanceKeyboardNavigation() {
+  // Tab navigation enhancement
+  $(document).on('keydown', function(e) {
+    // Enhanced Tab navigation with Shift+Tab for reverse
+    if (e.keyCode === 9) { // Tab key
+      const activeElement = document.activeElement;
+      const focusableElements = getFocusableElements();
+      
+      if (focusableElements.length === 0) return;
+      
+      let currentIndex = focusableElements.indexOf(activeElement);
+      if (currentIndex === -1) currentIndex = 0;
+      
+      if (e.shiftKey) {
+        // Shift+Tab: Move backwards
+        currentIndex = currentIndex > 0 ? currentIndex - 1 : focusableElements.length - 1;
+      } else {
+        // Tab: Move forwards
+        currentIndex = currentIndex < focusableElements.length - 1 ? currentIndex + 1 : 0;
+      }
+      
+      focusableElements[currentIndex].focus();
+      e.preventDefault();
+    }
+    
+    // Arrow key navigation in tables and lists
+    if (e.keyCode >= 37 && e.keyCode <= 40) { // Arrow keys
+      const activeElement = document.activeElement;
+      if (activeElement.tagName === 'TD' || activeElement.tagName === 'TR' || 
+          activeElement.closest('.table') || activeElement.closest('.dataTable')) {
+        navigateWithArrows(e, activeElement);
+      }
+    }
+    
+    // Enter key to activate buttons and links
+    if (e.keyCode === 13) { // Enter key
+      const activeElement = document.activeElement;
+      if (activeElement.tagName === 'BUTTON' || activeElement.tagName === 'A' || 
+          activeElement.closest('button') || activeElement.closest('a')) {
+        activeElement.click();
+        e.preventDefault();
+      }
+    }
+    
+    // Space key to toggle checkboxes and buttons
+    if (e.keyCode === 32) { // Space key
+      const activeElement = document.activeElement;
+      if (activeElement.type === 'checkbox' || activeElement.type === 'radio') {
+        activeElement.checked = !activeElement.checked;
+        $(activeElement).trigger('change');
+        e.preventDefault();
+      }
+    }
+  });
+  
+  // Focus management for modals
+  $(document).on('shown.bs.modal', function(e) {
+    const modal = $(e.target);
+    const firstFocusable = modal.find(getFocusableSelector()).first();
+    if (firstFocusable.length > 0) {
+      firstFocusable.focus();
+    }
+  });
+  
+  // Trap focus within modals
+  $(document).on('keydown', function(e) {
+    if (e.keyCode === 9) { // Tab key
+      const activeModal = $('.modal.in');
+      if (activeModal.length > 0) {
+        const focusableElements = activeModal.find(getFocusableSelector());
+        if (focusableElements.length > 0) {
+          const firstElement = focusableElements.first()[0];
+          const lastElement = focusableElements.last()[0];
+          
+          if (e.shiftKey && document.activeElement === firstElement) {
+            // Shift+Tab on first element: focus last element
+            lastElement.focus();
+            e.preventDefault();
+          } else if (!e.shiftKey && document.activeElement === lastElement) {
+            // Tab on last element: focus first element
+            firstElement.focus();
+            e.preventDefault();
+          }
+        }
+      }
+    }
+  });
+  
+  // Quick navigation between major sections
+  $(document).on('keydown', function(e) {
+    if (e.altKey) {
+      switch(e.keyCode) {
+        case 49: // Alt+1: Quick jump to Products
+          $('#productModal').focus();
+          break;
+        case 50: // Alt+2: Quick jump to Categories
+          $('#categoryModal').focus();
+          break;
+        case 51: // Alt+3: Quick jump to Transactions
+          $('#viewRefOrders').focus();
+          break;
+        case 52: // Alt+4: Quick jump to Settings
+          $('#settings').focus();
+          break;
+        case 53: // Alt+5: Quick jump to Users
+          $('#usersModal').focus();
+          break;
+        case 73: // Alt+I: Quick Inventory Actions
+          if ($('#Products').hasClass('in')) {
+            // If Products modal is open, show quick actions
+            showQuickInventoryActions();
+          }
+          break;
+        case 83: // Alt+S: Quick Search
+          const activeModal = $('.modal.in');
+          if (activeModal.length > 0) {
+            const searchField = activeModal.find('input[type="search"], input[placeholder*="search"], input[placeholder*="Search"]').first();
+            if (searchField.length > 0) {
+              searchField.focus();
+            }
+          }
+          break;
+        case 78: // Alt+N: Quick New Item
+          const activeModal2 = $('.modal.in');
+          if (activeModal2.length > 0) {
+            const modalId = activeModal2.attr('id');
+            switch(modalId) {
+              case 'Products':
+                $('#newProductModal').click();
+                break;
+              case 'Categories':
+                $('#newCategoryModal').click();
+                break;
+              case 'Users':
+                $('#add-user').click();
+                break;
+            }
+          }
+          break;
+        case 67: // Alt+C: Quick Close Modal
+          const activeModal3 = $('.modal.in');
+          if (activeModal3.length > 0) {
+            activeModal3.modal('hide');
+          }
+          break;
+      }
+    }
+  });
+}
+
+// Get all focusable elements
+function getFocusableElements() {
+  const selector = getFocusableSelector();
+  return Array.from(document.querySelectorAll(selector)).filter(el => {
+    return !el.disabled && el.offsetParent !== null;
+  });
+}
+
+// Get focusable selector
+function getFocusableSelector() {
+  return 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"]), [contenteditable="true"]';
+}
+
+// Navigate with arrow keys in tables
+function navigateWithArrows(e, activeElement) {
+  const table = activeElement.closest('table');
+  if (!table) return;
+  
+  const rows = Array.from(table.querySelectorAll('tr'));
+  const cells = Array.from(table.querySelectorAll('td, th'));
+  const currentIndex = cells.indexOf(activeElement);
+  
+  if (currentIndex === -1) return;
+  
+  let nextIndex = currentIndex;
+  const cols = table.querySelector('tr').children.length;
+  
+  switch(e.keyCode) {
+    case 37: // Left arrow
+      if (currentIndex % cols > 0) nextIndex = currentIndex - 1;
+      break;
+    case 38: // Up arrow
+      if (currentIndex >= cols) nextIndex = currentIndex - cols;
+      break;
+    case 39: // Right arrow
+      if (currentIndex % cols < cols - 1) nextIndex = currentIndex + 1;
+      break;
+    case 40: // Down arrow
+      if (currentIndex < cells.length - cols) nextIndex = currentIndex + cols;
+      break;
+  }
+  
+  if (nextIndex !== currentIndex && cells[nextIndex]) {
+    cells[nextIndex].focus();
+    e.preventDefault();
+  }
+}
+
+// Initialize enhanced keyboard navigation
+enhanceKeyboardNavigation();
+    
+    // Quick Actions Menu
+    function showQuickInventoryActions() {
+      const quickActions = `
+        <div class="modal fade" id="quickActionsModal" tabindex="-1" role="dialog">
+          <div class="modal-dialog modal-sm" role="document">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title">Quick Inventory Actions</h5>
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+              </div>
+              <div class="modal-body">
+                <div class="list-group">
+                  <button type="button" class="list-group-item list-group-item-action" data-action="new-product">
+                    <i class="fa fa-plus"></i> New Product
+                  </button>
+                  <button type="button" class="list-group-item list-group-item-action" data-action="bulk-import">
+                    <i class="fa fa-upload"></i> Bulk Import
+                  </button>
+                  <button type="button" class="list-group-item list-group-item-action" data-action="bulk-remove">
+                    <i class="fa fa-trash"></i> Bulk Remove
+                  </button>
+                  <button type="button" class="list-group-item list-group-item-action" data-action="export">
+                    <i class="fa fa-download"></i> Export Products
+                  </button>
+                  <button type="button" class="list-group-item list-group-item-action" data-action="search">
+                    <i class="fa fa-search"></i> Search Products
+                  </button>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <small class="text-muted">Use number keys 1-6 to select actions quickly</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      // Remove existing modal if present
+      $('#quickActionsModal').remove();
+      
+      // Add new modal to body
+      $('body').append(quickActions);
+      
+      // Show the modal
+      $('#quickActionsModal').modal('show');
+      
+      // Add keyboard shortcuts for quick actions
+      $(document).on('keydown', '#quickActionsModal', function(e) {
+        if (e.keyCode >= 49 && e.keyCode <= 54) { // Number keys 1-6
+          const actionIndex = e.keyCode - 49;
+          const actionButtons = $('#quickActionsModal .list-group-item');
+          if (actionButtons[actionIndex]) {
+            actionButtons[actionIndex].click();
+          }
+        }
+      });
+      
+      // Handle quick action clicks
+      $(document).on('click', '#quickActionsModal .list-group-item', function() {
+        const action = $(this).data('action');
+        $('#quickActionsModal').modal('hide');
+        
+        switch(action) {
+          case 'new-product':
+            $('#newProductModal').click();
+            break;
+          case 'bulk-import':
+            $('#bulkImportModal').click();
+            break;
+          case 'bulk-remove':
+            $('#bulkRemoveModal').click();
+            break;
+          case 'export':
+            exportProducts();
+            break;
+          case 'search':
+            const searchField = $('#Products input[type="search"], #Products input[placeholder*="search"]').first();
+            if (searchField.length > 0) {
+              searchField.focus();
+            }
+            break;
+        }
+      });
+    }
+    
+    // Export products function
+    function exportProducts() {
+      // Implementation for exporting products
+      notiflix.Report.info(
+        "Export Feature",
+        "Product export functionality will be implemented here.",
+        "OK"
+      );
+    }
+    
+    // Enhanced form navigation and auto-completion
+    function enhanceFormNavigation() {
+      // Auto-focus first input in forms when modals open
+      $(document).on('shown.bs.modal', function(e) {
+        const modal = $(e.target);
+        const firstInput = modal.find('input:visible, select:visible, textarea:visible').first();
+        if (firstInput.length > 0) {
+          firstInput.focus();
+        }
+      });
+      
+      // Enter key to move to next field in forms
+      $(document).on('keydown', 'input, select, textarea', function(e) {
+        if (e.keyCode === 13) { // Enter key
+          e.preventDefault();
+          const currentField = $(this);
+          const form = currentField.closest('form');
+          const fields = form.find('input:visible, select:visible, textarea:visible');
+          const currentIndex = fields.index(currentField);
+          const nextField = fields.eq(currentIndex + 1);
+          
+          if (nextField.length > 0) {
+            nextField.focus();
+          } else {
+            // If it's the last field, submit the form
+            const submitBtn = form.find('button[type="submit"], .btn-primary, .btn-success').first();
+            if (submitBtn.length > 0) {
+              submitBtn.click();
+            }
+          }
+        }
+      });
+      
+      // Shift+Enter to move to previous field
+      $(document).on('keydown', 'input, select, textarea', function(e) {
+        if (e.keyCode === 13 && e.shiftKey) { // Shift+Enter
+          e.preventDefault();
+          const currentField = $(this);
+          const form = currentField.closest('form');
+          const fields = form.find('input:visible, select:visible, textarea:visible');
+          const currentIndex = fields.index(currentField);
+          const prevField = fields.eq(currentIndex - 1);
+          
+          if (prevField.length > 0) {
+            prevField.focus();
+          }
+        }
+      });
+      
+      // Auto-complete for common fields
+      $(document).on('input', 'input[name*="name"], input[name*="Name"]', function() {
+        const input = $(this);
+        const value = input.val().toLowerCase();
+        
+        // Auto-complete for product names
+        if (input.attr('name') === 'productName' && allProducts.length > 0) {
+          const matches = allProducts.filter(product => 
+            product.name.toLowerCase().includes(value)
+          );
+          
+          if (matches.length > 0 && value.length > 2) {
+            showAutoComplete(input, matches.map(m => m.name));
+          }
+        }
+        
+        // Auto-complete for category names
+        if (input.attr('name') === 'categoryName' && allCategories.length > 0) {
+          const matches = allCategories.filter(category => 
+            category.name.toLowerCase().includes(value)
+          );
+          
+          if (matches.length > 0 && value.length > 2) {
+            showAutoComplete(input, matches.map(m => m.name));
+          }
+        }
+      });
+      
+      // Auto-complete for usernames
+      $(document).on('input', 'input[name*="username"], input[name*="Username"]', function() {
+        const input = $(this);
+        const value = input.val().toLowerCase();
+        
+        if (allUsers.length > 0) {
+          const matches = allUsers.filter(user => 
+            user.username.toLowerCase().includes(value)
+          );
+          
+          if (matches.length > 0 && value.length > 2) {
+            showAutoComplete(input, matches.map(m => m.username));
+          }
+        }
+      });
+    }
+    
+    // Show auto-complete dropdown
+    function showAutoComplete(input, suggestions) {
+      // Remove existing auto-complete
+      input.siblings('.auto-complete-dropdown').remove();
+      
+      if (suggestions.length === 0) return;
+      
+      const dropdown = $(`
+        <div class="auto-complete-dropdown" style="
+          position: absolute;
+          top: 100%;
+          left: 0;
+          right: 0;
+          background: white;
+          border: 1px solid #ddd;
+          border-top: none;
+          max-height: 200px;
+          overflow-y: auto;
+          z-index: 1000;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        ">
+          ${suggestions.map(suggestion => `
+            <div class="auto-complete-item" style="
+              padding: 8px 12px;
+              cursor: pointer;
+              border-bottom: 1px solid #eee;
+            " data-value="${suggestion}">
+              ${suggestion}
+            </div>
+          `).join('')}
+        </div>
+      `);
+      
+      input.after(dropdown);
+      
+      // Handle auto-complete item selection
+      dropdown.on('click', '.auto-complete-item', function() {
+        const value = $(this).data('value');
+        input.val(value);
+        dropdown.remove();
+        input.focus();
+      });
+      
+      // Handle keyboard navigation in auto-complete
+      let selectedIndex = -1;
+      input.on('keydown', function(e) {
+        const items = dropdown.find('.auto-complete-item');
+        
+        switch(e.keyCode) {
+          case 38: // Up arrow
+            e.preventDefault();
+            selectedIndex = selectedIndex > 0 ? selectedIndex - 1 : items.length - 1;
+            updateAutoCompleteSelection(items, selectedIndex);
+            break;
+          case 40: // Down arrow
+            e.preventDefault();
+            selectedIndex = selectedIndex < items.length - 1 ? selectedIndex + 1 : 0;
+            updateAutoCompleteSelection(items, selectedIndex);
+            break;
+          case 13: // Enter
+            e.preventDefault();
+            if (selectedIndex >= 0 && items.eq(selectedIndex).length > 0) {
+              items.eq(selectedIndex).click();
+            }
+            break;
+          case 27: // Escape
+            dropdown.remove();
+            break;
+        }
+      });
+      
+      // Remove auto-complete when input loses focus
+      input.on('blur', function() {
+        setTimeout(() => dropdown.remove(), 200);
+      });
+    }
+    
+    // Update auto-complete selection
+    function updateAutoCompleteSelection(items, selectedIndex) {
+      items.removeClass('bg-primary text-white');
+      if (selectedIndex >= 0 && items.eq(selectedIndex).length > 0) {
+        items.eq(selectedIndex).addClass('bg-primary text-white');
+      }
+    }
+    
+    // Initialize form navigation enhancements
+    enhanceFormNavigation();
+    
+    // Enhanced POS (Point of Sale) Keyboard Navigation
+    function enhancePOSNavigation() {
+      // POS Product Search and Selection
+      $(document).on('keydown', '#skuCode', function(e) {
+        if (e.keyCode === 13) { // Enter key
+          e.preventDefault();
+          barcodeSearch(e);
+        }
+      });
+      
+      // POS Cart Navigation
+      $(document).on('keydown', '#cartTable', function(e) {
+        const cartItems = $('#cartTable .row');
+        let currentIndex = -1;
+        
+        // Find currently focused cart item
+        cartItems.each(function(index) {
+          if ($(this).find(':focus').length > 0) {
+            currentIndex = index;
+          }
+        });
+        
+        if (currentIndex === -1) {
+          // If no item focused, focus first item
+          currentIndex = 0;
+          cartItems.eq(0).find('input, button').first().focus();
+        }
+        
+        switch(e.keyCode) {
+          case 38: // Up arrow - Previous cart item
+            e.preventDefault();
+            if (currentIndex > 0) {
+              cartItems.eq(currentIndex - 1).find('input, button').first().focus();
+            }
+            break;
+          case 40: // Down arrow - Next cart item
+            e.preventDefault();
+            if (currentIndex < cartItems.length - 1) {
+              cartItems.eq(currentIndex + 1).find('input, button').first().focus();
+            }
+            break;
+          case 37: // Left arrow - Previous field in current item
+            e.preventDefault();
+            const currentItem = cartItems.eq(currentIndex);
+            const fields = currentItem.find('input, button');
+            const currentFieldIndex = fields.index(document.activeElement);
+            if (currentFieldIndex > 0) {
+              fields.eq(currentFieldIndex - 1).focus();
+            }
+            break;
+          case 39: // Right arrow - Next field in current item
+            e.preventDefault();
+            const currentItem2 = cartItems.eq(currentIndex);
+            const fields2 = currentItem2.find('input, button');
+            const currentFieldIndex2 = fields2.index(document.activeElement);
+            if (currentFieldIndex2 < fields2.length - 1) {
+              fields.eq(currentFieldIndex2 + 1).focus();
+            }
+            break;
+        }
+      });
+      
+      // POS Quantity Controls
+      $(document).on('keydown', '#cartTable input[readonly]', function(e) {
+        const input = $(this);
+        const row = input.closest('.row');
+        const index = row.index();
+        
+        switch(e.keyCode) {
+          case 38: // Up arrow - Increment quantity
+            e.preventDefault();
+            $(this).qtIncrement(index);
+            break;
+          case 40: // Down arrow - Decrement quantity
+            e.preventDefault();
+            $(this).qtDecrement(index);
+            break;
+          case 46: // Delete key - Remove item
+            e.preventDefault();
+            $(this).deleteFromCart(index);
+            break;
+          case 13: // Enter key - Edit quantity
+            e.preventDefault();
+            input.removeAttr('readonly').focus();
+            break;
+        }
+      });
+      
+      // POS Payment Navigation
+      $(document).on('keydown', '#paymentModel', function(e) {
+        switch(e.keyCode) {
+          case 49: // 1 key - Cash payment
+            e.preventDefault();
+            $('.list-group-item[data-payment-type="1"]').click();
+            break;
+          case 50: // 2 key - Card payment
+            e.preventDefault();
+            $('.list-group-item[data-payment-type="3"]').click();
+            break;
+          case 67: // C key - Calculate change
+            e.preventDefault();
+            $('#payment').trigger('input');
+            break;
+          case 80: // P key - Process payment
+            e.preventDefault();
+            $('#confirmPayment').click();
+            break;
+          case 72: // H key - Hold order
+            e.preventDefault();
+            $('#hold').click();
+            break;
+        }
+      });
+      
+      // POS Customer Selection
+      $(document).on('keydown', '#customer', function(e) {
+        if (e.keyCode === 13) { // Enter key
+          e.preventDefault();
+          $(this).trigger('chosen:open');
+        }
+      });
+      
+      // POS Reference Number
+      $(document).on('keydown', '#refNumber', function(e) {
+        if (e.keyCode === 13) { // Enter key
+          e.preventDefault();
+          $('#payment').focus();
+        }
+      });
+      
+      // POS Discount Input
+      $(document).on('keydown', '#inputDiscount', function(e) {
+        if (e.keyCode === 13) { // Enter key
+          e.preventDefault();
+          $('#payment').focus();
+        }
+      });
+      
+      // POS Payment Amount
+      $(document).on('keydown', '#payment', function(e) {
+        if (e.keyCode === 13) { // Enter key
+          e.preventDefault();
+          $('#confirmPayment').click();
+        }
+      });
+      
+      // POS Quick Actions
+      $(document).on('keydown', function(e) {
+        if (e.altKey) {
+          switch(e.keyCode) {
+            case 80: // Alt+P - Open POS
+              e.preventDefault();
+              $('#pointofsale').click();
+              break;
+            case 67: // Alt+C - Clear cart
+              e.preventDefault();
+              if (cart.length > 0) {
+                $(this).cancelOrder();
+              }
+              break;
+            case 72: // Alt+H - Hold order
+              e.preventDefault();
+              if (cart.length > 0) {
+                $('#hold').click();
+              }
+              break;
+            case 83: // Alt+S - Search products
+              e.preventDefault();
+              $('#skuCode').focus();
+              break;
+            case 78: // Alt+N - New transaction
+              e.preventDefault();
+              if (cart.length === 0) {
+                cart = [];
+                $(this).renderTable(cart);
+                $('#skuCode').focus();
+              }
+              break;
+          }
+        }
+      });
+      
+      // POS Product Grid Navigation
+      $(document).on('keydown', '#parent', function(e) {
+        const productBoxes = $('#parent .box');
+        let currentIndex = -1;
+        
+        // Find currently focused product
+        productBoxes.each(function(index) {
+          if ($(this).find(':focus').length > 0) {
+            currentIndex = index;
+          }
+        });
+        
+        if (currentIndex === -1) {
+          // If no product focused, focus first product
+          currentIndex = 0;
+          productBoxes.eq(0).attr('tabindex', '0').focus();
+        }
+        
+        const cols = 6; // Assuming 6 columns in the grid
+        const rows = Math.ceil(productBoxes.length / cols);
+        const currentRow = Math.floor(currentIndex / cols);
+        const currentCol = currentIndex % cols;
+        
+        switch(e.keyCode) {
+          case 37: // Left arrow
+            e.preventDefault();
+            if (currentCol > 0) {
+              const newIndex = currentIndex - 1;
+              productBoxes.eq(newIndex).attr('tabindex', '0').focus();
+            }
+            break;
+          case 39: // Right arrow
+            e.preventDefault();
+            if (currentCol < cols - 1 && currentIndex < productBoxes.length - 1) {
+              const newIndex = currentIndex + 1;
+              productBoxes.eq(newIndex).attr('tabindex', '0').focus();
+            }
+            break;
+          case 38: // Up arrow
+            e.preventDefault();
+            if (currentRow > 0) {
+              const newIndex = currentIndex - cols;
+              if (newIndex >= 0) {
+                productBoxes.eq(newIndex).attr('tabindex', '0').focus();
+              }
+            }
+            break;
+          case 40: // Down arrow
+            e.preventDefault();
+            if (currentRow < rows - 1) {
+              const newIndex = currentIndex + cols;
+              if (newIndex < productBoxes.length) {
+                productBoxes.eq(newIndex).attr('tabindex', '0').focus();
+              }
+            }
+            break;
+          case 13: // Enter key - Add to cart
+            e.preventDefault();
+            const productId = productBoxes.eq(currentIndex).attr('onclick').match(/\d+/)[0];
+            const quantity = productBoxes.eq(currentIndex).attr('onclick').match(/\d+/)[1];
+            const stock = productBoxes.eq(currentIndex).attr('onclick').match(/\d+/)[2];
+            $(this).addToCart(productId, quantity, stock);
+            break;
+          case 32: // Space key - Add to cart
+            e.preventDefault();
+            const productId2 = productBoxes.eq(currentIndex).attr('onclick').match(/\d+/)[0];
+            const quantity2 = productBoxes.eq(currentIndex).attr('onclick').match(/\d+/)[1];
+            const stock2 = productBoxes.eq(currentIndex).attr('onclick').match(/\d+/)[2];
+            $(this).addToCart(productId2, quantity2, stock2);
+            break;
+        }
+      });
+      
+      // Make product boxes focusable
+      $('#parent .box').attr('tabindex', '0');
+      
+      // POS Quick Product Search
+      $(document).on('keydown', function(e) {
+        if (e.altKey && e.keyCode === 81) { // Alt+Q - Quick product search
+          e.preventDefault();
+          $('#skuCode').focus();
+        }
+      });
+      
+      // POS Category Filter
+      $(document).on('keydown', function(e) {
+        if (e.altKey && e.keyCode >= 49 && e.keyCode <= 57) { // Alt+1-9 for categories
+          e.preventDefault();
+          const categoryIndex = e.keyCode - 49;
+          const categories = ['all', 'Medicines', 'Personal Care', 'First Aid', 'Supplements'];
+          if (categories[categoryIndex]) {
+            filterProductsByCategory(categories[categoryIndex]);
+          }
+        }
+      });
+    }
+    
+    // Filter products by category
+    function filterProductsByCategory(category) {
+      if (category === 'all') {
+        $('#parent .box').show();
+      } else {
+        $('#parent .box').hide();
+        $(`#parent .box.${category}`).show();
+      }
+      
+      // Focus first visible product
+      const firstVisible = $('#parent .box:visible').first();
+      if (firstVisible.length > 0) {
+        firstVisible.attr('tabindex', '0').focus();
+      }
+      
+      // Show notification
+      notiflix.Notify.info(`Filtered by: ${category}`);
+    }
+    
+    // Initialize POS navigation enhancements
+    enhancePOSNavigation();
