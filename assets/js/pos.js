@@ -243,7 +243,8 @@ if (auth == undefined) {
         }
       }
       
-      if (e.ctrlKey && e.keyCode === 48) { // Ctrl+0
+      // Use Alt+0 for bulk remove to avoid conflict with Ctrl+0 (Actual Size)
+      if (e.altKey && e.keyCode === 48) { // Alt+0: Bulk Remove
         e.preventDefault();
         // Check if Products modal is open, if so trigger bulk remove
         if ($('#Products').hasClass('in')) {
@@ -257,6 +258,300 @@ if (auth == undefined) {
           }, 500);
         }
       }
+      
+      // Navigation shortcuts (Ctrl+1 to Ctrl+8)
+      if (e.ctrlKey && e.keyCode >= 49 && e.keyCode <= 56) {
+        e.preventDefault();
+        
+        switch(e.keyCode) {
+          case 49: // Ctrl+1: Products
+            $('#productModal').click();
+            break;
+          case 50: // Ctrl+2: Categories
+            $('#categoryModal').click();
+            break;
+          case 51: // Ctrl+3: Transactions
+            $('#viewRefOrders').click();
+            break;
+          case 52: // Ctrl+4: Settings
+            $('#settings').click();
+            break;
+          case 53: // Ctrl+5: Users
+            $('#usersModal').click();
+            break;
+          case 54: // Ctrl+6: Point of Sale (Orders)
+            $('#viewCustomerOrders').click();
+            break;
+          case 55: // Ctrl+7: Open Tabs (Hold Orders)
+            $('#viewRefOrders').click();
+            break;
+          case 56: // Ctrl+8: Orders
+            $('#viewCustomerOrders').click();
+            break;
+        }
+      }
+      
+      // Quick action shortcuts (when no modal is open) - avoid system conflicts
+      if (!$('.modal.in').length) {
+        if (e.altKey && e.keyCode === 78) { // Alt+N: New Product (avoid Ctrl+N conflict)
+          e.preventDefault();
+          $('#newProductModal').click();
+        }
+        if (e.altKey && e.keyCode === 67) { // Alt+C: New Category (avoid Ctrl+C conflict)
+          e.preventDefault();
+          $('#newCategoryModal').click();
+        }
+        if (e.altKey && e.keyCode === 85) { // Alt+U: New User
+          e.preventDefault();
+          $('#add-user').click();
+        }
+        if (e.altKey && e.keyCode === 79) { // Alt+O: New Customer
+          e.preventDefault();
+          $('#newCustomerModal').click();
+        }
+        if (e.altKey && e.keyCode === 80) { // Alt+P: Point of Sale
+          e.preventDefault();
+          $('#pointofsale').click();
+        }
+        if (e.altKey && e.keyCode === 84) { // Alt+T: Transactions
+          e.preventDefault();
+          $('#transactions').click();
+        }
+      }
+      
+      // Form submission shortcuts
+      if (e.keyCode === 13) { // Enter: Submit Form
+        if (e.ctrlKey) {
+          // Ctrl+Enter: Submit Modal
+          e.preventDefault();
+          const activeModal = $('.modal.in');
+          if (activeModal.length > 0) {
+            const submitBtn = activeModal.find('button[type="submit"], .btn-primary');
+            if (submitBtn.length > 0) {
+              submitBtn.click();
+            }
+          }
+        }
+        // Regular Enter handling is already implemented in forms
+      }
+      
+      // Modal close shortcut
+      if (e.keyCode === 27) { // Escape: Close Modal
+        const activeModal = $('.modal.in');
+        if (activeModal.length > 0) {
+          activeModal.modal('hide');
+        }
+      }
+      
+      // Search and utility shortcuts - avoid system conflicts
+      if (e.altKey && e.keyCode === 70) { // Alt+F: Find/Search (avoid Ctrl+F conflict)
+        e.preventDefault();
+        const activeModal = $('.modal.in');
+        if (activeModal.length > 0) {
+          // Focus on search field in active modal
+          const searchField = activeModal.find('input[type="search"], input[placeholder*="search"], input[placeholder*="Search"]');
+          if (searchField.length > 0) {
+            searchField.focus();
+          }
+        } else {
+          // Focus on main search field
+          const mainSearch = $('input[type="search"], input[placeholder*="search"], input[placeholder*="Search"]').first();
+          if (mainSearch.length > 0) {
+            mainSearch.focus();
+          }
+        }
+      }
+      
+      if (e.altKey && e.keyCode === 82) { // Alt+R: Refresh (avoid Ctrl+R conflict)
+        e.preventDefault();
+        // Refresh current data based on active modal
+        const activeModal = $('.modal.in');
+        if (activeModal.length > 0) {
+          const modalId = activeModal.attr('id');
+          switch(modalId) {
+            case 'Products':
+              loadProducts();
+              break;
+            case 'Categories':
+              loadCategories();
+              break;
+            case 'Users':
+              // Assuming there's a loadUsers function
+              if (typeof loadUsers === 'function') {
+                loadUsers();
+              }
+              break;
+            default:
+              // General refresh
+              location.reload();
+          }
+        } else {
+          // No modal open, refresh page
+          location.reload();
+        }
+      }
+      
+      // Data operation shortcuts - avoid system conflicts
+      if (e.altKey && e.keyCode === 83) { // Alt+S: Save/Submit (avoid Ctrl+S conflict)
+        e.preventDefault();
+        const activeModal = $('.modal.in');
+        if (activeModal.length > 0) {
+          const submitBtn = activeModal.find('button[type="submit"], .btn-success, .btn-primary');
+          if (submitBtn.length > 0) {
+            submitBtn.click();
+          }
+        }
+      }
+      
+      if (e.altKey && e.keyCode === 69) { // Alt+E: Edit (avoid Ctrl+E conflict)
+        e.preventDefault();
+        const activeModal = $('.modal.in');
+        if (activeModal.length > 0) {
+          const editBtn = activeModal.find('.btn-warning, .btn-edit, [title*="Edit"]');
+          if (editBtn.length > 0) {
+            editBtn.first().click();
+          }
+        }
+      }
+      
+      // Table operation shortcuts - avoid system conflicts
+      if (e.altKey && e.keyCode === 65) { // Alt+A: Select All in tables (avoid Ctrl+A conflict)
+        e.preventDefault();
+        const activeTable = $('.table:focus, .dataTable:focus');
+        if (activeTable.length > 0) {
+          activeTable.find('input[type="checkbox"]').prop('checked', true);
+        }
+      }
+      
+      if (e.altKey && e.keyCode === 68) { // Alt+D: Deselect All in tables
+        e.preventDefault();
+        const activeTable2 = $('.table:focus, .dataTable:focus');
+        if (activeTable2.length > 0) {
+          activeTable2.find('input[type="checkbox"]').prop('checked', false);
+        }
+      }
+      
+      // Help shortcut
+      if (e.altKey && e.keyCode === 72) { // Alt+H: Help/Keyboard Shortcuts (avoid Ctrl+H conflict)
+        e.preventDefault();
+        showKeyboardShortcuts();
+      }
+      
+      // Logout shortcut
+      if (e.altKey && e.keyCode === 76) { // Alt+L: Logout (avoid Ctrl+L conflict)
+        e.preventDefault();
+        $('#log-out').click();
+      }
+    });
+    
+    // Function to show keyboard shortcuts help
+    function showKeyboardShortcuts() {
+      const shortcuts = `
+        <div class="modal fade" id="keyboardShortcutsModal" tabindex="-1" role="dialog">
+          <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h4 class="modal-title">PharmaSpot Keyboard Shortcuts Reference</h4>
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+              </div>
+              <div class="modal-body">
+                <div class="row">
+                  <div class="col-md-6">
+                    <h5>Navigation</h5>
+                    <ul class="list-unstyled">
+                      <li><kbd>Ctrl+1</kbd> Products</li>
+                      <li><kbd>Ctrl+2</kbd> Categories</li>
+                      <li><kbd>Ctrl+3</kbd> Transactions</li>
+                      <li><kbd>Ctrl+4</kbd> Settings</li>
+                      <li><kbd>Ctrl+5</kbd> Users</li>
+                      <li><kbd>Ctrl+6</kbd> Point of Sale</li>
+                      <li><kbd>Ctrl+7</kbd> Open Tabs</li>
+                      <li><kbd>Ctrl+8</kbd> Orders</li>
+                    </ul>
+                  </div>
+                  <div class="col-md-6">
+                    <h5>Actions</h5>
+                    <ul class="list-unstyled">
+                      <li><kbd>Ctrl+9</kbd> Bulk Import</li>
+                      <li><kbd>Alt+0</kbd> Bulk Remove</li>
+                      <li><kbd>Alt+N</kbd> New Product</li>
+                      <li><kbd>Alt+C</kbd> New Category</li>
+                      <li><kbd>Alt+U</kbd> New User</li>
+                      <li><kbd>Alt+O</kbd> New Customer</li>
+                      <li><kbd>Alt+P</kbd> Point of Sale</li>
+                      <li><kbd>Alt+T</kbd> Transactions</li>
+                      <li><kbd>Alt+L</kbd> Logout</li>
+                    </ul>
+                  </div>
+                </div>
+                <div class="row mt-3">
+                  <div class="col-md-6">
+                    <h5>Forms & Modals</h5>
+                    <ul class="list-unstyled">
+                      <li><kbd>Enter</kbd> Submit Form</li>
+                      <li><kbd>Ctrl+Enter</kbd> Submit Modal</li>
+                      <li><kbd>Escape</kbd> Close Modal</li>
+                      <li><kbd>Tab</kbd> Navigate Fields</li>
+                    </ul>
+                  </div>
+                  <div class="col-md-6">
+                    <h5>Data Operations</h5>
+                    <ul class="list-unstyled">
+                      <li><kbd>Alt+S</kbd> Save/Submit</li>
+                      <li><kbd>Alt+E</kbd> Edit</li>
+                      <li><kbd>Alt+F</kbd> Find/Search</li>
+                      <li><kbd>Alt+R</kbd> Refresh</li>
+                      <li><kbd>Alt+H</kbd> This Help</li>
+                    </ul>
+                  </div>
+                </div>
+                <div class="row mt-3">
+                  <div class="col-md-6">
+                    <h5>Table Operations</h5>
+                    <ul class="list-unstyled">
+                      <li><kbd>Click</kbd> Select Row</li>
+                      <li><kbd>Double-Click</kbd> Edit Row</li>
+                      <li><kbd>Alt+A</kbd> Select All</li>
+                      <li><kbd>Alt+D</kbd> Deselect All</li>
+                    </ul>
+                  </div>
+                  <div class="col-md-6">
+                    <h5>System Reserved (Do Not Use)</h5>
+                    <ul class="list-unstyled text-muted">
+                      <li><kbd>Ctrl+0</kbd> Actual Size</li>
+                      <li><kbd>Ctrl+C</kbd> Copy</li>
+                      <li><kbd>Ctrl+V</kbd> Paste</li>
+                      <li><kbd>Ctrl+X</kbd> Cut</li>
+                      <li><kbd>Ctrl+Z</kbd> Undo</li>
+                      <li><kbd>Ctrl+Y</kbd> Redo</li>
+                      <li><kbd>Ctrl+A</kbd> Select All</li>
+                      <li><kbd>Delete</kbd> Delete</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="window.print()">Print</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      // Remove existing modal if present
+      $('#keyboardShortcutsModal').remove();
+      
+      // Add new modal to body
+      $('body').append(shortcuts);
+      
+      // Show the modal
+      $('#keyboardShortcutsModal').modal('show');
+    }
+    
+    // Add click event for keyboard help button
+    $(document).on('click', '#keyboardHelp', function() {
+      showKeyboardShortcuts();
     });
 
     if (settings && validator.unescape(settings.symbol)) {
