@@ -7,3 +7,5 @@ out/
 LICENSE
 coverage
 *.old*
+old_perfect_work_code*
+old_perfect_work_code/
