@@ -11,6 +11,10 @@ const contextMenu = require("electron-context-menu");
 let { Menu, template } = require("./assets/js/native_menu/menu");
 const menuController = require('./assets/js/native_menu/menuController.js');
 const isPackaged = app.isPackaged;
+// Silence Electron security warning in development builds only
+if (!isPackaged) {
+    process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true';
+}
 const menu = Menu.buildFromTemplate(template);
 Menu.setApplicationMenu(menu);
 let mainWindow;

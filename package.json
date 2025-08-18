@@ -11,9 +11,29 @@
   "main": "start.js",
   "build": {
     "appId": "com.patternsdigital.pharmaspot",
+    "productName": "PharmaSpot",
     "directories": {
-      "buildResources": "assets"
-    }
+      "buildResources": "assets",
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!node_modules/**/*",
+      "!dist/**/*",
+      "!release-builds/**/*",
+      "!*.log",
+      "!*.md",
+      "!tests/**/*",
+      "!old_perfect_work_code/**/*"
+    ],
+    "win": {
+      "target": "portable",
+      "icon": "assets/images/icon.ico"
+    },
+    "portable": {
+      "artifactName": "PharmaSpot-Demo.exe"
+    },
+    "asar": false
   },
   "dependencies": {
     "@electron/asar": "^3.2.7",
@@ -55,6 +75,10 @@
   "scripts": {
     "electron": "cross-env NODE_ENV=dev nodemon --exec \"\"electron .\"\"",
     "electron-build": "electron-builder",
+    "build": "electron-builder",
+    "build-win": "electron-builder --win",
+    "build-portable": "electron-builder --win portable",
+    "build-demo": "electron-builder --win portable",
     "package-win": "electron-packager . PharmaSpot --overwrite --asar=false --platform=win32 --arch=x64 --icon=assets/images/icon.ico --prune=true --out=release-builds --version-string.ProductName=\"PharmaSpot\"",
     "start": "electron-forge start",
     "package": "electron-forge package",

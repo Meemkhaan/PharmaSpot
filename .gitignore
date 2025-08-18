@@ -9,3 +9,9 @@ coverage
 *.old*
 old_perfect_work_code*
 old_perfect_work_code/
+Improved-POS-system-for-Pharmacies-PharmaSpot-main--main*
+PharmaSpot-Client-Demo*
+dist*
+release-builds*
+*.md*
+*.csv

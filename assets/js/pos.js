@@ -63,8 +63,8 @@ let platform;
 let user = {};
 let start = moment().startOf("month");
 let end = moment();
-let start_date = moment(start).toDate();
-let end_date = moment(end).toDate();
+let start_date = moment(start).toDate().toJSON();
+let end_date = moment(end).toDate().toJSON();
 let by_till = 0;
 let by_user = 0;
 let by_status = 1;
@@ -82,6 +82,20 @@ notiflix.Notify.init({
   messageMaxLength: 150,
   clickToClose: true,
   closeButton: true
+});
+
+// Dismiss all stacked notifications (expiry/low-stock, etc.)
+$(document).on('click', '#clearAlerts', function() {
+  try {
+    if (notiflix && notiflix.Notify && typeof notiflix.Notify.dismiss === 'function') {
+      notiflix.Notify.dismiss();
+    } else {
+      // Fallback: remove Notiflix notification DOM nodes if API not available
+      $(".notiflix-notify-wrap, .notiflix-notify").remove();
+    }
+  } catch (_) {
+    $(".notiflix-notify-wrap, .notiflix-notify").remove();
+  }
 });
 const {
   DATE_FORMAT,
@@ -2184,7 +2198,7 @@ if (auth == undefined) {
        });
      }
 
-     function loadUserList() {
+    function loadUserList() {
       let counter = 0;
       let user_list = "";
       $("#user_list").empty();
@@ -2818,16 +2832,15 @@ function loadSoldProducts() {
 
     counter++;
 
+    const hasProduct = product.length > 0;
+    const stockCell = hasProduct
+      ? (product[0].stock == 1 ? product[0].quantity : "N/A")
+      : "";
+
     sold_list += `<tr>
             <td>${item.product}</td>
             <td>${item.qty}</td>
-            <td>${
-              product[0].stock == 1
-                ? product.length > 0
-                  ? product[0].quantity
-                  : ""
-                : "N/A"
-            }</td>
+            <td>${stockCell}</td>
             <td>${
               validator.unescape(settings.symbol) +
               moneyFormat((item.qty * parseFloat(item.price)).toFixed(2))
@@ -2940,10 +2953,10 @@ $.fn.viewTransaction = function (index) {
               validator.unescape(settings.contact) != "" ? "Tel: " + validator.unescape(settings.contact) + "<br>" : ""
             } 
             ${validator.unescape(settings.tax) != "" ? "Vat No: " + validator.unescape(settings.tax) + "<br>" : ""} 
-        </p>
-        <hr>
-        <left>
-            <p>
+    </p>
+    <hr>
+    <left>
+        <p>
         Invoice : ${orderNumber} <br>
         Ref No : ${refNumber} <br>
         Customer : ${

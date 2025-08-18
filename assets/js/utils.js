@@ -2,6 +2,12 @@ let fs = require("fs");
 const crypto = require("crypto");
 let moment = require("moment");
 const DATE_FORMAT = "DD-MMM-YYYY";
+const SUPPORTED_DATE_FORMATS = [
+  "DD-MMM-YY",
+  "DD-MMM-YYYY",
+  "DD/MM/YYYY",
+  "YYYY-MM-DD",
+];
 const PORT = process.env.PORT;
 let path = require("path");
 const moneyFormat = (amount, locale = "en-US") => {
@@ -10,14 +16,20 @@ const moneyFormat = (amount, locale = "en-US") => {
 
 /** Date functions **/
 const isExpired = (dueDate) => {
-  let todayDate = moment();
-  let expiryDate = moment(dueDate, DATE_FORMAT);
-  return todayDate.isSameOrAfter(dueDate);
+  const todayDate = moment();
+  const expiryDate = moment(dueDate, SUPPORTED_DATE_FORMATS, true);
+  if (!expiryDate.isValid()) {
+    return false;
+  }
+  return todayDate.isSameOrAfter(expiryDate, "day");
 };
 
 const daysToExpire = (dueDate) => {
-  let todayDate = moment();
-  let expiryDate = moment(dueDate, DATE_FORMAT);
+  const todayDate = moment();
+  const expiryDate = moment(dueDate, SUPPORTED_DATE_FORMATS, true);
+  if (!expiryDate.isValid()) {
+    return 0;
+  }
 
   if (expiryDate.isSameOrBefore(todayDate, "day")) {
     return 0;

@@ -96,7 +96,7 @@ app.get("/by-date", function (req, res) {
     transactionsDB.find(
       {
         $and: [
-          { date: { $gte: startDate.toJSON(), $lte: endDate.toJSON() } },
+          { date: { $gte: startDate, $lte: endDate } },
           { status: parseInt(req.query.status) },
         ],
       },
@@ -107,12 +107,14 @@ app.get("/by-date", function (req, res) {
   }
 
   if (req.query.user != 0 && req.query.till == 0) {
+    const userNum = parseInt(req.query.user);
+    const userStr = req.query.user.toString();
     transactionsDB.find(
       {
         $and: [
-          { date: { $gte: startDate.toJSON(), $lte: endDate.toJSON() } },
+          { date: { $gte: startDate, $lte: endDate } },
           { status: parseInt(req.query.status) },
-          { user_id: parseInt(req.query.user) },
+          { user_id: { $in: [userNum, userStr] } },
         ],
       },
       function (err, docs) {
@@ -122,12 +124,14 @@ app.get("/by-date", function (req, res) {
   }
 
   if (req.query.user == 0 && req.query.till != 0) {
+    const tillNum = parseInt(req.query.till);
+    const tillStr = req.query.till.toString();
     transactionsDB.find(
       {
         $and: [
-          { date: { $gte: startDate.toJSON(), $lte: endDate.toJSON() } },
+          { date: { $gte: startDate, $lte: endDate } },
           { status: parseInt(req.query.status) },
-          { till: parseInt(req.query.till) },
+          { till: { $in: [tillNum, tillStr] } },
         ],
       },
       function (err, docs) {
@@ -137,13 +141,17 @@ app.get("/by-date", function (req, res) {
   }
 
   if (req.query.user != 0 && req.query.till != 0) {
+    const tillNum = parseInt(req.query.till);
+    const tillStr = req.query.till.toString();
+    const userNum = parseInt(req.query.user);
+    const userStr = req.query.user.toString();
     transactionsDB.find(
       {
         $and: [
-          { date: { $gte: startDate.toJSON(), $lte: endDate.toJSON() } },
+          { date: { $gte: startDate, $lte: endDate } },
           { status: parseInt(req.query.status) },
-          { till: parseInt(req.query.till) },
-          { user_id: parseInt(req.query.user) },
+          { till: { $in: [tillNum, tillStr] } },
+          { user_id: { $in: [userNum, userStr] } },
         ],
       },
       function (err, docs) {
