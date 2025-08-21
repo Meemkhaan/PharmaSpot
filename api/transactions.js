@@ -89,76 +89,47 @@ app.get("/customer-orders", function (req, res) {
  * @returns {void}
  */
 app.get("/by-date", function (req, res) {
-  let startDate = new Date(req.query.start);
-  let endDate = new Date(req.query.end);
+  const startDate = new Date(req.query.start);
+  const endDate = new Date(req.query.end);
 
-  if (req.query.user == 0 && req.query.till == 0) {
-    transactionsDB.find(
-      {
-        $and: [
-          { date: { $gte: startDate, $lte: endDate } },
-          { status: parseInt(req.query.status) },
-        ],
-      },
-      function (err, docs) {
-        if (docs) res.send(docs);
-      },
-    );
+  const baseFilters = [];
+
+  // Optional status filter (skip when 'all')
+  if (req.query.status !== 'all') {
+    baseFilters.push({ status: parseInt(req.query.status) });
   }
 
-  if (req.query.user != 0 && req.query.till == 0) {
+  // Optional user filter (tolerant of string/number)
+  if (req.query.user != 0) {
     const userNum = parseInt(req.query.user);
     const userStr = req.query.user.toString();
-    transactionsDB.find(
-      {
-        $and: [
-          { date: { $gte: startDate, $lte: endDate } },
-          { status: parseInt(req.query.status) },
-          { user_id: { $in: [userNum, userStr] } },
-        ],
-      },
-      function (err, docs) {
-        if (docs) res.send(docs);
-      },
-    );
+    baseFilters.push({ user_id: { $in: [userNum, userStr] } });
   }
 
-  if (req.query.user == 0 && req.query.till != 0) {
+  // Optional till filter (tolerant of string/number)
+  if (req.query.till != 0) {
     const tillNum = parseInt(req.query.till);
     const tillStr = req.query.till.toString();
-    transactionsDB.find(
-      {
-        $and: [
-          { date: { $gte: startDate, $lte: endDate } },
-          { status: parseInt(req.query.status) },
-          { till: { $in: [tillNum, tillStr] } },
-        ],
-      },
-      function (err, docs) {
-        if (docs) res.send(docs);
-      },
-    );
+    baseFilters.push({ till: { $in: [tillNum, tillStr] } });
   }
 
-  if (req.query.user != 0 && req.query.till != 0) {
-    const tillNum = parseInt(req.query.till);
-    const tillStr = req.query.till.toString();
-    const userNum = parseInt(req.query.user);
-    const userStr = req.query.user.toString();
-    transactionsDB.find(
-      {
-        $and: [
-          { date: { $gte: startDate, $lte: endDate } },
-          { status: parseInt(req.query.status) },
-          { till: { $in: [tillNum, tillStr] } },
-          { user_id: { $in: [userNum, userStr] } },
-        ],
-      },
-      function (err, docs) {
-        if (docs) res.send(docs);
-      },
-    );
-  }
+  const query = baseFilters.length > 0 ? { $and: baseFilters } : {};
+
+  transactionsDB.find(query, function (err, docs) {
+    if (err) {
+      console.error('Transactions query error:', err);
+      return res.status(500).json({ error: 'Query error' });
+    }
+
+    // Normalize and filter by date in JS to handle both Date and string-stored dates
+    const filtered = (docs || []).filter((t) => {
+      const d = t.date instanceof Date ? t.date : new Date(t.date);
+      if (isNaN(d.getTime())) return false;
+      return d >= startDate && d <= endDate;
+    });
+
+    res.send(filtered);
+  });
 });
 
 /**

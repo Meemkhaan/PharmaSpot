@@ -67,7 +67,7 @@ let start_date = moment(start).toDate().toJSON();
 let end_date = moment(end).toDate().toJSON();
 let by_till = 0;
 let by_user = 0;
-let by_status = 1;
+let by_status = 'all';
 const default_item_img = path.join("assets","images","default.jpg");
 const permissions = [
   "perm_products",
@@ -691,6 +691,54 @@ if (auth == undefined) {
 
         allProducts = [...data];
 
+        // Update loss tiles immediately after products load
+        try {
+          let lossPartialExpiry = 0;
+          let lossTotalExpired = 0;
+          let expiredWithCost = 0;
+          let expiredWithoutCost = 0;
+          let nearWithCost = 0;
+          let nearWithoutCost = 0;
+          allProducts.forEach((p) => {
+            const qty = parseInt(p.quantity || 0);
+            const cost = parseFloat(p.actualPrice || p.purchasePrice || p.buy_price || p.buyPrice || 0);
+            const hasCost = !(isNaN(cost) || cost <= 0);
+            const isExp = isExpired(p.expirationDate);
+            if (isExp) {
+              if (qty > 0 && hasCost) {
+                lossTotalExpired += qty * cost;
+                expiredWithCost++;
+              } else if (qty > 0 && !hasCost) {
+                expiredWithoutCost++;
+              }
+              return;
+            }
+            const days = daysToExpire(p.expirationDate);
+            if (days > 0 && days <= 90) {
+              if (qty > 0 && hasCost) {
+                lossPartialExpiry += 0.5 * qty * cost;
+                nearWithCost++;
+              } else if (qty > 0 && !hasCost) {
+                nearWithoutCost++;
+              }
+            }
+          });
+
+          const overallLoss = lossPartialExpiry + lossTotalExpired;
+          const profitText = $("#total_profit #counter").text() || "0";
+          const numericProfit = parseFloat((profitText || "0").replace(/[^0-9.\-]/g, "")) || 0;
+          const netProfit = numericProfit - overallLoss;
+
+          $("#loss_partial_expiry #counter").text(validator.unescape(settings.symbol) + moneyFormat(lossPartialExpiry.toFixed(2)));
+          $("#loss_total_expired #counter").text(validator.unescape(settings.symbol) + moneyFormat(lossTotalExpired.toFixed(2)));
+          $("#loss_overall #counter").text(validator.unescape(settings.symbol) + moneyFormat(overallLoss.toFixed(2)));
+          $("#net_profit #counter").text(validator.unescape(settings.symbol) + moneyFormat(netProfit.toFixed(2)));
+
+          if ((expiredWithCost + nearWithCost) === 0 && (expiredWithoutCost + nearWithoutCost) > 0) {
+            notiflix.Notify.info('Expired/near-expiry items found but no cost set. Set Purchase Price to see losses.');
+          }
+        } catch (e) { }
+
         loadProductList();
 
         let delay = 0;
@@ -925,6 +973,11 @@ if (auth == undefined) {
         sku: data.sku,
         price: data.price,
         quantity: 1,
+        purchasePrice: data.actualPrice || "",
+        genericName: data.genericName || "",
+        manufacturer: data.manufacturer || "",
+        supplier: data.supplier || "",
+        batchNumber: data.batchNumber || "",
       };
 
       if ($(this).isExist(item)) {
@@ -1472,6 +1525,11 @@ if (auth == undefined) {
             sku: product.sku,
             price: product.price,
             quantity: product.quantity,
+            purchasePrice: product.purchasePrice || product.actualPrice || "",
+            genericName: product.genericName || "",
+            manufacturer: product.manufacturer || "",
+            supplier: product.supplier || "",
+            batchNumber: product.batchNumber || "",
           };
           cart.push(item);
         });
@@ -1495,6 +1553,11 @@ if (auth == undefined) {
             sku: product.sku,
             price: product.price,
             quantity: product.quantity,
+            purchasePrice: product.purchasePrice || product.actualPrice || "",
+            genericName: product.genericName || "",
+            manufacturer: product.manufacturer || "",
+            supplier: product.supplier || "",
+            batchNumber: product.batchNumber || "",
           };
           cart.push(item);
         });
@@ -1677,6 +1740,17 @@ if (auth == undefined) {
       $(this).ajaxSubmit({
         contentType: "application/json",
         success: function (response) {
+          let resp = response;
+          if (typeof resp === 'string') {
+            try { resp = JSON.parse(resp); } catch (_) {}
+          }
+          if (resp && resp.status === 'duplicate_barcode') {
+            return notiflix.Report.warning("Duplicate Barcode","A product with this barcode already exists.","Ok");
+          }
+          if (resp && resp.status === 'duplicate_product') {
+            return notiflix.Report.warning("Duplicate Product","A product with the same Name, Batch Number and Manufacturer already exists.","Ok");
+          }
+
           $("#saveProduct").get(0).reset();
           $("#current_img").text("");
 
@@ -1766,6 +1840,11 @@ if (auth == undefined) {
       $("#barcode").val(allProducts[index].barcode || allProducts[index]._id);
       $("#expirationDate").val(allProducts[index].expirationDate);
       $("#minStock").val(allProducts[index].minStock || 1);
+      $("#genericName").val(allProducts[index].genericName || "");
+      $("#manufacturer").val(allProducts[index].manufacturer || "");
+      $("#supplier").val(allProducts[index].supplier || "");
+      $("#batchNumber").val(allProducts[index].batchNumber || "");
+      $("#actual_price").val(allProducts[index].actualPrice || "");
       $("#product_id").val(allProducts[index]._id);
       $("#img").val(allProducts[index].img);
 
@@ -1932,7 +2011,28 @@ if (auth == undefined) {
 
     // Download CSV Template
     $("#downloadTemplate").on("click", function () {
-      const csvContent = "Name,Barcode,Price,Category,Quantity,MinStock,ExpirationDate\nParacetamol 500mg,123456789,5.99,Medicines,100,10,31/12/2025\nIbuprofen 400mg,987654321,4.99,Medicines,50,5,30/06/2025\nAspirin 100mg,456789123,3.99,,75,8,31/03/2026";
+      const header = [
+        'Name',
+        'Barcode',
+        'SellingPrice',
+        'PurchasePrice',
+        'GenericName',
+        'Manufacturer',
+        'Supplier',
+        'BatchNumber',
+        'Category',
+        'Quantity',
+        'MinStock',
+        'ExpirationDate'
+      ].join(',');
+
+      const rows = [
+        ['Paracetamol 500mg','123456789','5.99','4.20','Paracetamol','Acme Pharma','MediSuppliers Ltd','BATCH-001','Medicines','100','10','31/12/2025'],
+        ['Ibuprofen 400mg','987654321','4.99','3.50','Ibuprofen','HealthCorp','MediSuppliers Ltd','BATCH-002','Medicines','50','5','30/06/2025'],
+        ['Aspirin 100mg','456789123','3.99','2.60','Aspirin','Wellness Labs','','','', '75','8','31/03/2026']
+      ].map(r => r.join(',')).join('\n');
+
+      const csvContent = header + '\n' + rows;
       const blob = new Blob([csvContent], { type: 'text/csv' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -2329,17 +2429,26 @@ if (auth == undefined) {
           product._id +
           `"></td>
             <td><img style="max-height: 50px; max-width: 50px; border: 1px solid #ddd;" src="${product_img}" id="product_img"></td>
-            <td>${product.name}
-            ${product.expiryAlert}</td>
-            <td>${validator.unescape(settings.symbol)}${product.price}</td>
+            <td>
+              <div><strong>${product.name}</strong></div>
+              ${product.genericName ? `<div><small class="text-muted">${product.genericName}</small></div>` : ""}
+              ${product.manufacturer ? `<div><small class="text-muted">${product.manufacturer}</small></div>` : ""}
+              ${product.supplier ? `<div><small class="text-muted">Supplier: ${product.supplier}</small></div>` : ""}
+              ${product.batchNumber ? `<div><small class="text-muted">Batch: ${product.batchNumber}</small></div>` : ""}
+              ${product.expiryAlert}
+            </td>
+            <td>
+              ${product.actualPrice ? `<div><small>Purchase: ${validator.unescape(settings.symbol)}${product.actualPrice}</small></div>`: ""}
+              <div><strong>Sell: ${validator.unescape(settings.symbol)}${product.price}</strong></div>
+            </td>
             <td>${product.stock == 1 ? product.quantity : "N/A"}
             ${product.stockAlert}
             </td>
             <td>${product.expirationDate}</td>
             <td>${category.length > 0 ? category[0].name : ""}</td>
-            <td class="nobr"><span class="btn-group"><button onClick="$(this).editProduct(${index})" class="btn btn-warning btn-sm"><i class="fa fa-edit"></i></button><button onClick="$(this).deleteProduct(${
-              product._id
-            })" class="btn btn-danger btn-sm"><i class="fa fa-trash"></i></button></span></td></tr>`;
+            <td class="nobr"><span class="btn-group"><button onClick="$(this).editProduct(${index})" class="btn btn-warning btn-sm"><i class="fa fa-edit"></i></button><button onClick="$(this).deleteProduct(` +
+              product._id +
+            `)" class="btn btn-danger btn-sm"><i class="fa fa-trash"></i></button></span></td></tr>`;
 
         if (counter == allProducts.length) {
           $("#product_list").html(product_list);
@@ -2749,20 +2858,26 @@ function loadTransactions() {
 
           const result = {};
 
-          for (const { product_name, price, quantity, id } of sold_items) {
+          for (const { product_name, price, quantity, id, purchasePrice, genericName, manufacturer, supplier, batchNumber } of sold_items) {
             if (!result[product_name]) result[product_name] = [];
-            result[product_name].push({ id, price, quantity });
+            result[product_name].push({ id, price, quantity, purchasePrice, genericName, manufacturer, supplier, batchNumber });
           }
 
           for (item in result) {
             let price = 0;
             let quantity = 0;
             let id = 0;
+            let totalSales = 0;
+            let totalCost = 0;
 
             result[item].forEach((i) => {
               id = i.id;
               price = i.price;
               quantity = quantity + parseInt(i.quantity);
+              totalSales += parseFloat(i.price) * parseInt(i.quantity);
+              if (i.purchasePrice && !isNaN(parseFloat(i.purchasePrice))) {
+                totalCost += parseFloat(i.purchasePrice) * parseInt(i.quantity);
+              }
             });
 
             sold.push({
@@ -2770,6 +2885,9 @@ function loadTransactions() {
               product: item,
               qty: quantity,
               price: price,
+              sales: totalSales,
+              cost: totalCost,
+              profit: totalSales - totalCost,
             });
           }
 
@@ -2794,11 +2912,41 @@ function loadTransactions() {
         }
       });
     } else {
-      notiflix.Report.warning(
-        "No data!",
-        "No transactions available within the selected criteria",
-        "Ok",
-      );
+      $("#transaction_list").empty();
+      if ($.fn.DataTable.isDataTable('#transactionList')) {
+        $("#transactionList").DataTable().clear().draw();
+      }
+      // Still compute and show inventory-based losses even when there are no transactions in range
+      try {
+        let lossPartialExpiry = 0;
+        let lossTotalExpired = 0;
+        allProducts.forEach((p) => {
+          const qty = parseInt(p.quantity || 0);
+          let buy = parseFloat(p.actualPrice || p.purchasePrice || p.buy_price || p.buyPrice || 0);
+          if ((isNaN(buy) || buy <= 0) && Array.isArray(sold_items) && sold_items.length) {
+            const match = sold_items.find(si => parseInt(si.id) === parseInt(p._id) && !isNaN(parseFloat(si.purchasePrice)));
+            if (match) buy = parseFloat(match.purchasePrice);
+          }
+          if (isNaN(qty) || qty <= 0 || isNaN(buy) || buy <= 0) return;
+          if (isExpired(p.expirationDate)) {
+            lossTotalExpired += qty * buy;
+            return;
+          }
+          const days = daysToExpire(p.expirationDate);
+          if (days > 0 && days <= 90) {
+            lossPartialExpiry += 0.5 * qty * buy;
+          }
+        });
+        const overallLoss = lossPartialExpiry + lossTotalExpired;
+        const netProfit = 0 - overallLoss;
+        $("#total_sales_profit #counter").text(validator.unescape(settings.symbol) + moneyFormat((0).toFixed(2)));
+        $("#loss_partial_expiry #counter").text(validator.unescape(settings.symbol) + moneyFormat(lossPartialExpiry.toFixed(2)));
+        $("#loss_total_expired #counter").text(validator.unescape(settings.symbol) + moneyFormat(lossTotalExpired.toFixed(2)));
+        $("#loss_overall #counter").text(validator.unescape(settings.symbol) + moneyFormat(overallLoss.toFixed(2)));
+        $("#net_profit #counter").text(validator.unescape(settings.symbol) + moneyFormat(netProfit.toFixed(2)));
+      } catch (e) {
+        // ignore
+      }
     }
   });
 }
@@ -2820,6 +2968,14 @@ function loadSoldProducts() {
   let sold_list = "";
   let items = 0;
   let products = 0;
+  let totalSalesAll = 0;
+  let totalCostAll = 0;
+  let totalProfitAll = 0;
+  let salesMinusProfitAll = 0;
+  let lossPartialExpiry = 0;
+  let lossTotalExpired = 0;
+  let overallLoss = 0;
+  let netProfit = 0;
   $("#product_sales").empty();
 
   sold.forEach((item, index) => {
@@ -2837,20 +2993,75 @@ function loadSoldProducts() {
       ? (product[0].stock == 1 ? product[0].quantity : "N/A")
       : "";
 
+    const salesVal = item.sales || (item.qty * parseFloat(item.price));
+    const costVal = item.cost || 0;
+    const profitVal = item.profit || (item.sales ? (item.sales - (item.cost || 0)) : 0);
+    totalSalesAll += salesVal;
+    totalCostAll += costVal;
+    totalProfitAll += profitVal;
+    salesMinusProfitAll += (salesVal - profitVal);
+
     sold_list += `<tr>
             <td>${item.product}</td>
             <td>${item.qty}</td>
             <td>${stockCell}</td>
-            <td>${
-              validator.unescape(settings.symbol) +
-              moneyFormat((item.qty * parseFloat(item.price)).toFixed(2))
-            }</td>
+            <td>${validator.unescape(settings.symbol)}${moneyFormat((item.sales || (item.qty * parseFloat(item.price))).toFixed(2))}</td>
+            <td>${validator.unescape(settings.symbol)}${moneyFormat((item.cost || 0).toFixed(2))}</td>
+            <td>${validator.unescape(settings.symbol)}${moneyFormat((item.profit || ((item.sales || 0) - (item.cost || 0))).toFixed(2))}</td>
             </tr>`;
 
     if (counter == sold.length) {
       $("#total_items #counter").text(items);
       $("#total_products #counter").text(products);
       $("#product_sales").html(sold_list);
+      $("#total_cost #counter").text(validator.unescape(settings.symbol) + moneyFormat(totalCostAll.toFixed(2)));
+      $("#total_profit #counter").text(validator.unescape(settings.symbol) + moneyFormat(totalProfitAll.toFixed(2)));
+
+      // Compute expiry-based losses and net profit using current inventory snapshot
+      try {
+        lossPartialExpiry = 0;
+        lossTotalExpired = 0;
+        allProducts.forEach((p) => {
+          const qty = parseInt(p.quantity || 0);
+          let buy = parseFloat(p.actualPrice || p.purchasePrice || p.buy_price || p.buyPrice || 0);
+          if ((isNaN(buy) || buy <= 0) && Array.isArray(sold_items) && sold_items.length) {
+            const match = sold_items.find(si => parseInt(si.id) === parseInt(p._id) && !isNaN(parseFloat(si.purchasePrice)));
+            if (match) buy = parseFloat(match.purchasePrice);
+          }
+          if (isNaN(qty) || qty <= 0 || isNaN(buy) || buy <= 0) return;
+
+          let expired = isExpired(p.expirationDate);
+          if (!expired) {
+            const m = moment(p.expirationDate);
+            if (m.isValid() && m.isSameOrBefore(moment(), 'day')) expired = true;
+          }
+          if (expired) {
+            lossTotalExpired += qty * buy;
+            return;
+          }
+
+          let days = daysToExpire(p.expirationDate);
+          if (days === 0) {
+            const m = moment(p.expirationDate);
+            if (m.isValid() && m.isAfter(moment(), 'day')) days = m.diff(moment(), 'days');
+          }
+          if (days > 0 && days <= 90) {
+            // Partial expiry window (<= 3 months): provision 50% cost
+            lossPartialExpiry += 0.5 * qty * buy;
+          }
+        });
+
+        overallLoss = lossPartialExpiry + lossTotalExpired;
+        netProfit = totalProfitAll - overallLoss;
+
+        $("#total_sales_profit #counter").text(validator.unescape(settings.symbol) + moneyFormat(totalProfitAll.toFixed(2)));
+        $("#loss_partial_expiry #counter").text(validator.unescape(settings.symbol) + moneyFormat(lossPartialExpiry.toFixed(2)));
+        $("#loss_total_expired #counter").text(validator.unescape(settings.symbol) + moneyFormat(lossTotalExpired.toFixed(2)));
+        $("#loss_overall #counter").text(validator.unescape(settings.symbol) + moneyFormat(overallLoss.toFixed(2)));
+        $("#net_profit #counter").text(validator.unescape(settings.symbol) + moneyFormat(netProfit.toFixed(2)));
+      } catch (e) {
+        // ignore calculation errors to avoid blocking UI
+      }
     }
   });
 }
@@ -2895,9 +3106,16 @@ $.fn.viewTransaction = function (index) {
   let products = allTransactions[index].items;
 
   products.forEach((item) => {
-    items += `<tr><td>${item.product_name}</td><td>${
-      item.quantity
-    } </td><td class="text-right"> ${validator.unescape(settings.symbol)} ${moneyFormat(
+    const meta = [];
+    if (item.genericName) meta.push(`<small class="text-muted">${DOMPurify.sanitize(item.genericName)}</small>`);
+    if (item.manufacturer) meta.push(`<small class="text-muted">${DOMPurify.sanitize(item.manufacturer)}</small>`);
+    if (item.supplier) meta.push(`<small class="text-muted">Supplier: ${DOMPurify.sanitize(item.supplier)}</small>`);
+    if (item.batchNumber) meta.push(`<small class="text-muted">Batch: ${DOMPurify.sanitize(item.batchNumber)}</small>`);
+    const purchaseLine = item.purchasePrice ? `<div><small>Purchase: ${DOMPurify.sanitize(validator.unescape(settings.symbol))}${moneyFormat(Math.abs(item.purchasePrice).toString())}</small></div>` : "";
+
+    items += `<tr><td>${DOMPurify.sanitize(item.product_name)}${meta.length ? `<div>${meta.join('<br>')}</div>` : ''}${purchaseLine}</td><td>${
+      DOMPurify.sanitize(item.quantity)
+    } </td><td class="text-right"> ${DOMPurify.sanitize(validator.unescape(settings.symbol))} ${moneyFormat(
       Math.abs(item.price).toFixed(2),
     )} </td></tr>`;
   });

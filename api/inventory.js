@@ -224,6 +224,11 @@ app.post("/product", function (req, res) {
         barcode: parseInt(validator.escape(req.body.barcode)),
         expirationDate: validator.escape(req.body.expirationDate),
         price: validator.escape(req.body.price),
+        actualPrice: validator.escape(req.body.actualPrice || ""),
+        genericName: validator.escape(req.body.genericName || ""),
+        manufacturer: validator.escape(req.body.manufacturer || ""),
+        supplier: validator.escape(req.body.supplier || ""),
+        batchNumber: validator.escape(req.body.batchNumber || ""),
         category: validator.escape(req.body.category),
         quantity:
             validator.escape(req.body.quantity) == ""
@@ -236,37 +241,66 @@ app.post("/product", function (req, res) {
     };
 
     if (validator.escape(req.body.id) === "") {
-        Product._id = Math.floor(Date.now() / 1000);
-        inventoryDB.insert(Product, function (err, product) {
-            if (err) {
-                console.error(err);
-                res.status(500).json({
-                    error: "Internal Server Error",
-                    message: "An unexpected error occurred.",
-                });
-            } else {
-                res.sendStatus(200);
+        // New product: prevent duplicates by barcode or by (name,batchNumber,manufacturer)
+        const barcodeVal = parseInt(validator.escape(req.body.barcode));
+        const nameVal = validator.escape(req.body.name).trim();
+        const batchVal = validator.escape(req.body.batchNumber || "");
+        const manuVal = validator.escape(req.body.manufacturer || "");
+
+        const duplicateByBarcode = { barcode: barcodeVal };
+        const duplicateByComposite = {
+            name: new RegExp("^" + nameVal + "$", "i"),
+            batchNumber: new RegExp("^" + batchVal + "$", "i"),
+            manufacturer: new RegExp("^" + manuVal + "$", "i"),
+        };
+
+        inventoryDB.findOne(duplicateByBarcode, function (e1, d1) {
+            if (d1) {
+                return res.status(200).json({ status: "duplicate_barcode", id: d1._id });
             }
+            inventoryDB.findOne(duplicateByComposite, function (e2, d2) {
+                if (d2) {
+                    return res.status(200).json({ status: "duplicate_product", id: d2._id });
+                }
+                Product._id = Math.floor(Date.now() / 1000);
+                inventoryDB.insert(Product, function (err, product) {
+                    if (err) {
+                        console.error(err);
+                        res.status(500).json({
+                            error: "Internal Server Error",
+                            message: "An unexpected error occurred.",
+                        });
+                    } else {
+                        res.sendStatus(200);
+                    }
+                });
+            });
         });
     } else {
-        inventoryDB.update(
-            {
-                _id: parseInt(validator.escape(req.body.id)),
-            },
-            Product,
-            {},
-            function (err, numReplaced, product) {
-                if (err) {
-                    console.error(err);
-                    res.status(500).json({
-                        error: "Internal Server Error",
-                        message: "An unexpected error occurred.",
-                    });
-                } else {
-                    res.sendStatus(200);
-                }
-            },
-        );
+        // Update: prevent setting a barcode that belongs to a different product
+        const currentId = parseInt(validator.escape(req.body.id));
+        const newBarcode = parseInt(validator.escape(req.body.barcode));
+        inventoryDB.findOne({ barcode: newBarcode }, function (e3, d3) {
+            if (d3 && d3._id !== currentId) {
+                return res.status(200).json({ status: "duplicate_barcode", id: d3._id });
+            }
+            inventoryDB.update(
+                { _id: currentId },
+                Product,
+                {},
+                function (err, numReplaced, product) {
+                    if (err) {
+                        console.error(err);
+                        res.status(500).json({
+                            error: "Internal Server Error",
+                            message: "An unexpected error occurred.",
+                        });
+                    } else {
+                        res.sendStatus(200);
+                    }
+                },
+            );
+        });
     }
     });
 });
@@ -324,9 +358,19 @@ app.post("/bulk-import", csvUpload.single('csvFile'), function (req, res) {
         console.log("Warning: No default category specified");
     }
 
+    // Normalize boolean flags coming from multipart form-data
+    const parseBool = (v) => {
+        if (Array.isArray(v)) {
+            return v.includes('on') || v.includes('true') || v.includes('1');
+        }
+        return v === true || v === 'true' || v === '1' || v === 1;
+    };
+    const skipDuplicates = parseBool(req.body.skipDuplicates);
+    const updateExisting = parseBool(req.body.updateExisting);
+
     console.log('Bulk import started with options:');
-    console.log('- Skip Duplicates:', req.body.skipDuplicates);
-    console.log('- Update Existing:', req.body.updateExisting);
+    console.log('- Skip Duplicates:', skipDuplicates);
+    console.log('- Update Existing:', updateExisting);
     console.log('- Default Category:', req.body.defaultCategory);
     console.log('- File:', req.file.originalname);
 
@@ -372,11 +416,12 @@ app.post("/bulk-import", csvUpload.single('csvFile'), function (req, res) {
         const data = rows[index];
         
         try {
-            // Validate required fields
-            if (!data.Name || !data.Barcode || !data.Price) {
+            // Validate required fields (SellingPrice or Price is required)
+            const sellingPriceField = (typeof data.SellingPrice !== 'undefined' && data.SellingPrice !== '') ? data.SellingPrice : data.Price;
+            if (!data.Name || !data.Barcode || typeof sellingPriceField === 'undefined' || sellingPriceField === '') {
                 errors.push({
                     row: index + 1,
-                    error: 'Missing required fields (Name, Barcode, or Price)',
+                    error: 'Missing required fields (Name, Barcode, or SellingPrice/Price)',
                     data: data
                 });
                 processed++;
@@ -396,11 +441,11 @@ app.post("/bulk-import", csvUpload.single('csvFile'), function (req, res) {
                 return;
             }
 
-            // Validate price format
-            if (isNaN(parseFloat(data.Price))) {
+            // Validate selling price format
+            if (isNaN(parseFloat(sellingPriceField))) {
                 errors.push({
                     row: index + 1,
-                    error: 'Invalid price format (must be numeric)',
+                    error: 'Invalid selling price format (must be numeric)',
                     data: data
                 });
                 processed++;
@@ -408,28 +453,152 @@ app.post("/bulk-import", csvUpload.single('csvFile'), function (req, res) {
                 return;
             }
 
-            // Check for duplicate barcode if skipDuplicates is true and not updating existing
-            if (req.body.skipDuplicates === 'true' && req.body.updateExisting !== 'true') {
-                inventoryDB.findOne({ barcode: parseInt(data.Barcode) }, function (err, existingProduct) {
-                    if (existingProduct) {
-                        errors.push({
-                            row: index + 1,
-                            error: 'Duplicate barcode found',
-                            data: data
-                        });
+            // Validate purchase/actual price format if provided
+            if (typeof data.PurchasePrice !== 'undefined' && data.PurchasePrice !== '' && isNaN(parseFloat(data.PurchasePrice))) {
+                errors.push({
+                    row: index + 1,
+                    error: 'Invalid purchase price format (must be numeric)',
+                    data: data
+                });
+                processed++;
+                processRowsSequentially(rows, index + 1);
+                return;
+            }
+            if (typeof data.ActualPrice !== 'undefined' && data.ActualPrice !== '' && isNaN(parseFloat(data.ActualPrice))) {
+                errors.push({
+                    row: index + 1,
+                    error: 'Invalid purchase/actual price format (must be numeric)',
+                    data: data
+                });
+                processed++;
+                processRowsSequentially(rows, index + 1);
+                return;
+            }
+
+            // Comprehensive duplicate checking
+            const barcodeVal = parseInt(data.Barcode);
+            const nameVal = validator.escape((data.Name || '').trim());
+            const batchVal = validator.escape((data.BatchNumber || '').toString().trim());
+            const manuVal = validator.escape((data.Manufacturer || '').toString().trim());
+
+            // Check for duplicates by barcode first
+            inventoryDB.findOne({ barcode: barcodeVal }, function (err, existingByBarcode) {
+                if (err) {
+                    errors.push({ row: index + 1, error: 'Database error checking barcode: ' + err.message, data });
+                    processed++;
+                    return processRowsSequentially(rows, index + 1);
+                }
+
+                if (existingByBarcode) {
+                    // Duplicate barcode found
+                    if (skipDuplicates && !updateExisting) {
+                        errors.push({ row: index + 1, error: 'Duplicate barcode found (skipped)', data });
                         processed++;
-                        processRowsSequentially(rows, index + 1);
-                    } else {
-                        processProductWithCategory(data, req.body.defaultCategory, req.body.updateExisting === 'true', () => {
+                        return processRowsSequentially(rows, index + 1);
+                    }
+                    
+                    if (updateExisting) {
+                        errors.push({ row: index + 1, error: 'Duplicate barcode found (will update existing)', data });
+                        // Process as update
+                        return processProductWithCategory(data, req.body.defaultCategory, true, existingByBarcode._id, () => {
                             processRowsSequentially(rows, index + 1);
                         });
                     }
-                });
-            } else {
-                processProductWithCategory(data, req.body.defaultCategory, req.body.updateExisting === 'true', () => {
-                    processRowsSequentially(rows, index + 1);
-                });
-            }
+                    
+                    // If neither skip nor update, proceed with insert (will fail with constraint error)
+                    return processProductWithCategory(data, req.body.defaultCategory, false, null, () => {
+                        processRowsSequentially(rows, index + 1);
+                    });
+                }
+
+                // No barcode duplicate, check for composite duplicates
+                // Check by name first (most common duplicate scenario)
+                if (nameVal) {
+                    inventoryDB.findOne({
+                        name: new RegExp('^' + nameVal + '$', 'i')
+                    }, function (err2, existingByName) {
+                        if (err2) {
+                            errors.push({ row: index + 1, error: 'Database error checking by name: ' + err2.message, data });
+                            processed++;
+                            return processRowsSequentially(rows, index + 1);
+                        }
+
+                        if (existingByName) {
+                            // Duplicate name found
+                            if (skipDuplicates && !updateExisting) {
+                                errors.push({ row: index + 1, error: 'Duplicate product name found (skipped)', data });
+                                processed++;
+                                return processRowsSequentially(rows, index + 1);
+                            }
+                            
+                            if (updateExisting) {
+                                errors.push({ row: index + 1, error: 'Duplicate product name found (will update existing)', data });
+                                // Process as update using the found product's ID
+                                return processProductWithCategory(data, req.body.defaultCategory, true, existingByName._id, () => {
+                                    processRowsSequentially(rows, index + 1);
+                                });
+                            }
+                            
+                            // If neither skip nor update, proceed with insert
+                            return processProductWithCategory(data, req.body.defaultCategory, false, null, () => {
+                                processRowsSequentially(rows, index + 1);
+                            });
+                        }
+
+                        // No name duplicate, check for more specific composite duplicates if fields exist
+                        if (batchVal && manuVal) {
+                            inventoryDB.findOne({
+                                name: new RegExp('^' + nameVal + '$', 'i'),
+                                batchNumber: new RegExp('^' + batchVal + '$', 'i'),
+                                manufacturer: new RegExp('^' + manuVal + '$', 'i')
+                            }, function (err3, existingByComposite) {
+                                if (err3) {
+                                    errors.push({ row: index + 1, error: 'Database error checking composite: ' + err3.message, data });
+                                    processed++;
+                                    return processRowsSequentially(rows, index + 1);
+                                }
+
+                                if (existingByComposite) {
+                                    // Duplicate composite found
+                                    if (skipDuplicates && !updateExisting) {
+                                        errors.push({ row: index + 1, error: 'Duplicate product (name+batch+manufacturer) found (skipped)', data });
+                                        processed++;
+                                        return processRowsSequentially(rows, index + 1);
+                                    }
+                                    
+                                    if (updateExisting) {
+                                        errors.push({ row: index + 1, error: 'Duplicate product (name+batch+manufacturer) found (will update existing)', data });
+                                        // Process as update using the found product's ID
+                                        return processProductWithCategory(data, req.body.defaultCategory, true, existingByComposite._id, () => {
+                                            processRowsSequentially(rows, index + 1);
+                                        });
+                                    }
+                                    
+                                    // If neither skip nor update, proceed with insert
+                                    return processProductWithCategory(data, req.body.defaultCategory, false, null, () => {
+                                        processRowsSequentially(rows, index + 1);
+                                    });
+                                }
+
+                                // No duplicates found, proceed with insert
+                                return processProductWithCategory(data, req.body.defaultCategory, false, null, () => {
+                                    processRowsSequentially(rows, index + 1);
+                                });
+                            });
+                        } else {
+                            // No composite fields to check, proceed with insert
+                            return processProductWithCategory(data, req.body.defaultCategory, false, null, () => {
+                                processRowsSequentially(rows, index + 1);
+                            });
+                        }
+                    });
+                } else {
+                    // No name field, proceed with insert (this should rarely happen)
+                    return processProductWithCategory(data, req.body.defaultCategory, false, null, () => {
+                        processRowsSequentially(rows, index + 1);
+                    });
+                }
+            });
         } catch (error) {
             errors.push({
                 row: index + 1,
@@ -441,7 +610,7 @@ app.post("/bulk-import", csvUpload.single('csvFile'), function (req, res) {
         }
     }
 
-    function processProductWithCategory(data, defaultCategory, updateExisting, callback) {
+    function processProductWithCategory(data, defaultCategory, updateExisting, existingProductId, callback) {
         // Handle category - check if it exists in the database, if not create it
         let categoryId = defaultCategory; // Default to the selected category
         
@@ -494,12 +663,12 @@ app.post("/bulk-import", csvUpload.single('csvFile'), function (req, res) {
                     // Use default category if lookup fails
                     console.log(`- Using default category due to lookup error: ${defaultCategory}`);
                     categoryId = defaultCategory;
-                    processProductData(data, categoryId, updateExisting, callback);
+                    processProductData(data, categoryId, updateExisting, null, callback);
                 } else if (existingCategory) {
                     // Use existing category ID
                     categoryId = existingCategory._id;
                     console.log(`- Using existing category: ${categoryName} (ID: ${categoryId})`);
-                    processProductData(data, categoryId, updateExisting, callback);
+                    processProductData(data, categoryId, updateExisting, null, callback);
                 } else {
                     // Create new category
                     const newCategory = {
@@ -528,7 +697,7 @@ app.post("/bulk-import", csvUpload.single('csvFile'), function (req, res) {
                                 console.log(`- Successfully created new category: ${categoryName} (ID: ${categoryId})`);
                                 console.log(`- Inserted category object:`, category);
                             }
-                            processProductData(data, categoryId, updateExisting, callback);
+                            processProductData(data, categoryId, updateExisting, null, callback);
                         });
                     });
                 }
@@ -536,15 +705,22 @@ app.post("/bulk-import", csvUpload.single('csvFile'), function (req, res) {
         } else {
             // No category specified, use default
             console.log(`- No category specified in CSV, using default: ${defaultCategory}`);
-            processProductData(data, categoryId, updateExisting, callback);
+            processProductData(data, categoryId, updateExisting, null, callback);
         }
     }
 
-    function processProductData(data, categoryId, updateExisting, callback) {
+    function processProductData(data, categoryId, updateExisting, existingProductId, callback) {
+        const sellingPriceField = (typeof data.SellingPrice !== 'undefined' && data.SellingPrice !== '') ? data.SellingPrice : data.Price;
         const productData = {
             barcode: parseInt(data.Barcode),
             name: validator.escape(data.Name),
-            price: validator.escape(data.Price),
+            price: validator.escape(sellingPriceField),
+            // Accept both PurchasePrice (new) and ActualPrice (legacy)
+            actualPrice: validator.escape((data.PurchasePrice !== undefined && data.PurchasePrice !== "") ? data.PurchasePrice : (data.ActualPrice || "")),
+            genericName: validator.escape((data.GenericName || "").toString()),
+            manufacturer: validator.escape((data.Manufacturer || "").toString()),
+            supplier: validator.escape((data.Supplier || "").toString()),
+            batchNumber: validator.escape((data.BatchNumber || "").toString()),
             category: categoryId,
             quantity: parseInt(data.Quantity) || 0,
             minStock: parseInt(data.MinStock) || 1,
@@ -555,8 +731,36 @@ app.post("/bulk-import", csvUpload.single('csvFile'), function (req, res) {
 
         console.log(`Processing product: ${data.Name} (Barcode: ${data.Barcode}), Category: ${categoryId}, UpdateExisting: ${updateExisting}`);
 
-        if (updateExisting) {
-            // Try to update existing product by barcode
+        if (updateExisting && existingProductId) {
+            // Update existing product using provided ID
+            const updateData = {
+                ...productData,
+                _id: existingProductId // Use the provided ID
+            };
+            
+            console.log(`Updating existing product: ${data.Name} (ID: ${existingProductId})`);
+            
+            inventoryDB.update(
+                { _id: existingProductId },
+                updateData,
+                {},
+                function (err, numReplaced) {
+                    if (err) {
+                        console.error(`Update error for ${data.Name}:`, err);
+                        errors.push({
+                            row: processed + 1,
+                            error: 'Update error: ' + err.message,
+                            data: data
+                        });
+                    } else {
+                        console.log(`Successfully updated product: ${data.Name} (${numReplaced} records updated)`);
+                    }
+                    processed++;
+                    callback();
+                }
+            );
+        } else if (updateExisting) {
+            // Try to find existing product by barcode for update
             inventoryDB.findOne({ barcode: productData.barcode }, function (err, existingProduct) {
                 if (err) {
                     errors.push({

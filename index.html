@@ -5,6 +5,29 @@
     <meta charset="UTF-8">
     <title></title>
     <link href="assets/dist/css/bundle.min.css" rel="stylesheet" type="text/css" />
+    <style>
+        /* Compact stats tiles in Transactions view */
+        #totals > div, #extra_totals > div {
+            padding: 6px 8px !important;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 55px;
+            box-sizing: border-box;
+        }
+        #totals h5, #extra_totals h5 {
+            font-size: 12px;
+            margin: 0 0 4px 0;
+            line-height: 1.1;
+            white-space: nowrap;
+        }
+        #totals #counter, #extra_totals #counter {
+            display: inline-block;
+            font-size: 16px;
+            line-height: 1.2;
+        }
+    </style>
 </head>
 
 <body>
@@ -96,20 +119,50 @@
             <div id="transactions_view">
                 <div class="container">
                     <div class="row text-center m-t-20" id="totals">
-                        <div id="total_sales" class="col-md-3 py-2 bg-success">
+                        <div id="total_sales" class="col-md-2 py-2 bg-success">
                             <h5>SALES</h5>
                             <span id="counter">0</span>
                         </div>
-                        <div id="total_transactions" class="col-md-3 py-2 bg-warning">
+                        <div id="total_cost" class="col-md-2 py-2 bg-info">
+                            <h5>COST</h5>
+                            <span id="counter">0</span>
+                        </div>
+                        <div id="total_profit" class="col-md-2 py-2 bg-primary">
+                            <h5>PROFIT</h5>
+                            <span id="counter">0</span>
+                        </div>
+                        <div id="total_transactions" class="col-md-2 py-2 bg-warning">
                             <h5>TRANSACTIONS</h5>
                             <span id="counter">0</span>
                         </div>
-                        <div id="total_items" class="col-md-3 py-2 bg-info">
+                        <div id="total_items" class="col-md-2 py-2 bg-info">
                             <h5>ITEMS SOLD</h5>
                             <span id="counter">0</span>
                         </div>
-                        <div id="total_products" class="col-md-3 py-2 bg-success">
+                        <div id="total_products" class="col-md-2 py-2 bg-success">
                             <h5>PRODUCTS</h5>
+                            <span id="counter">0</span>
+                        </div>
+                    </div>
+                    <div class="row text-center m-t-10" id="extra_totals">
+                        <div id="total_sales_profit" class="col-md-2 py-2 bg-primary">
+                            <h5>SALES-PROFIT</h5>
+                            <span id="counter">0</span>
+                        </div>
+                        <div id="loss_partial_expiry" class="col-md-2 py-2 bg-warning">
+                            <h5>LOSS (PARTIAL EXP.)</h5>
+                            <span id="counter">0</span>
+                        </div>
+                        <div id="loss_total_expired" class="col-md-2 py-2 bg-danger">
+                            <h5>LOSS (EXPIRED)</h5>
+                            <span id="counter">0</span>
+                        </div>
+                        <div id="loss_overall" class="col-md-2 py-2 bg-info">
+                            <h5>OVERALL LOSS</h5>
+                            <span id="counter">0</span>
+                        </div>
+                        <div id="net_profit" class="col-md-2 py-2 bg-success">
+                            <h5>NET PROFIT</h5>
                             <span id="counter">0</span>
                         </div>
                     </div>
@@ -133,6 +186,7 @@
                             <div class="input-group">
                                 <span class="input-group-addon" id="status-addon">Status</span>
                                 <select id="status" class="form-control" aria-describedby="">
+                                    <option value="all" selected>All</option>
                                     <option value="1">Paid</option>
                                     <option value="0">Unpaid</option>
                                 </select>
@@ -149,7 +203,7 @@
                         </div>
                     </div>
                     <div class="row">
-                        <div class="col-md-4 bg-white" id="productSales">
+                        <div class="col-md-6 bg-white" id="productSales">
                             <div class="card-box">
                                 <div class="card-title">
                                     <h4>Products</h4>
@@ -162,6 +216,8 @@
                                                 <th>Sold</th>
                                                 <th>Available</th>
                                                 <th>Sales</th>
+                                                <th>Cost</th>
+                                                <th>Profit</th>
                                             </tr>
                                         </thead>
                                         <tbody id="product_sales"></tbody>
@@ -169,7 +225,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-8" id="transactionDetails">
+                        <div class="col-md-6" id="transactionDetails">
                             <div class="card-box">
                                 <div class="card-title">
                                     <h4>Transaction Details</h4>
@@ -524,12 +580,32 @@
                                 <input type="text" required="required" name="name" parsley-trigger="change" placeholder="Enter a product name" class="form-control" id="productName">
                             </div>
                             <div class="form-group">
+                                <label for="genericName">Generic Name</label>
+                                <input type="text" name="genericName" placeholder="Enter generic/active name" class="form-control" id="genericName">
+                            </div>
+                            <div class="form-group">
+                                <label for="manufacturer">Manufacturer</label>
+                                <input type="text" name="manufacturer" placeholder="Enter manufacturer" class="form-control" id="manufacturer">
+                            </div>
+                            <div class="form-group">
+                                <label for="supplier">Supplier</label>
+                                <input type="text" name="supplier" placeholder="Enter supplier" class="form-control" id="supplier">
+                            </div>
+                            <div class="form-group">
+                                <label for="batchNumber">Batch Number</label>
+                                <input type="text" name="batchNumber" placeholder="Enter batch number" class="form-control" id="batchNumber">
+                            </div>
+                            <div class="form-group">
                                 <label for="barcode">BarCode</label>
                                 <input type="text" required="required" name="barcode" parsley-trigger="change" placeholder="Enter product barcode" class="form-control number-input" id="barcode">
                             </div>
                             <div class="form-group">
-                                <label for="product_price">Price</label>
-                                <input type="text" required="required" name="price" placeholder="Price" class="form-control number-input" id="product_price">
+                                <label for="actual_price">Purchase Price</label>
+                                <input type="text" name="actualPrice" placeholder="Purchase/Cost price" class="form-control number-input" id="actual_price">
+                            </div>
+                            <div class="form-group">
+                                <label for="product_price">Selling Price</label>
+                                <input type="text" required="required" name="price" placeholder="Selling price" class="form-control number-input" id="product_price">
                             </div>
                             <div class="form-group">
                                 <label for="expirationDate">Expiry Date</label>
@@ -674,12 +750,17 @@
                                         <p>Upload a CSV file with the following columns:</p>
                                         <ul>
                                             <li><strong>Name</strong> - Product name (required)</li>
-                                            <li><strong>Barcode</strong> - Product barcode (required)</li>
-                                            <li><strong>Price</strong> - Product price (required)</li>
+                                            <li><strong>Barcode</strong> - Product barcode (required, numeric)</li>
+                                            <li><strong>SellingPrice</strong> or <strong>Price</strong> - Selling price (required)</li>
+                                            <li><strong>PurchasePrice</strong> or <strong>ActualPrice</strong> - Purchase/Cost price (optional)</li>
+                                            <li><strong>GenericName</strong> - Generic/active name (optional)</li>
+                                            <li><strong>Manufacturer</strong> - Manufacturer (optional)</li>
+                                            <li><strong>Supplier</strong> - Supplier (optional)</li>
+                                            <li><strong>BatchNumber</strong> - Batch number (optional)</li>
                                             <li><strong>Category</strong> - Product category (optional, will use default if not specified)</li>
                                             <li><strong>Quantity</strong> - Initial stock quantity (optional, default: 0)</li>
                                             <li><strong>MinStock</strong> - Minimum stock level (optional, default: 1)</li>
-                                            <li><strong>ExpirationDate</strong> - Expiry date in DD/MM/YYYY format (optional)</li>
+                                            <li><strong>ExpirationDate</strong> - Expiry date (optional, formats supported: DD-MMM-YY, DD-MMM-YYYY, DD/MM/YYYY, YYYY-MM-DD)</li>
                                         </ul>
                                         <p><strong>Note:</strong> The first row should contain column headers. New categories will be created automatically if they don't exist.</p>
                                     </div>

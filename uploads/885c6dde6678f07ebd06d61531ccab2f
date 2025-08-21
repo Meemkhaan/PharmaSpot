@@ -1,0 +1,10 @@
+Name,Barcode,SellingPrice,PurchasePrice,GenericName,Manufacturer,Supplier,BatchNumber,Category,Quantity,MinStock,ExpirationDate
+Paracetamol 500mg,1454600,8.99,5.99,Paracetamol,Acme Pharma,MediSuppliers Ltd,BATCH-001,Medicines,100,10,31-Mar-26
+Ibuprofen 400mg,7126520,7.49,4.99,Ibuprofen,HealthCorp,MediSuppliers Ltd,BATCH-002,Medicines,50,5,28-Sep-25
+Aspirin 325mg,1779658,5.24,3.49,Aspirin,Wellness Labs,Global Pharma Distributors,BATCH-ASP-0325,Medicines,80,8,14-Dec-25
+Amoxicillin 500mg,6746528,11.99,7.99,Amoxicillin,Biomed Pharmaceuticals,HealthPlus Wholesale,BATCH-AMX-1124,Medicines,60,6,29-May-26
+Cough Syrup 100ml,9017213,9.74,6.49,Dextromethorphan,Wellness Labs,MediSuppliers Ltd,BATCH-SYR-0125,Medicines,40,5,28-Feb-26
+Loratadine 10mg,6849988,6.44,4.29,Loratadine,ClearPharm,Global Pharma Distributors,BATCH-LOR-1024,Medicines,70,7,29-Jun-26
+Omeprazole 20mg,6494243,13.49,8.99,Omeprazole,AcidGuard Pharma,HealthPlus Wholesale,BATCH-OME-0924,Medicines,45,5,29-Jul-25
+Metformin 500mg,6842811,14.24,9.49,Metformin,DiabetoMed,MediSuppliers Ltd,BATCH-MET-0824,Medicines,55,6,29-Aug-26
+Vitamin C 1000mg,4741703,5.99,3.99,Ascorbic Acid,VitaNature,HealthPlus Wholesale,BATCH-VC-0225,Supplements,120,12,29-Dec-25
