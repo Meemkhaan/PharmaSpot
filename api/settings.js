@@ -151,6 +151,22 @@ app.post("/post", function (req, res) {
             charge_tax: req.body.charge_tax === 'on',
             footer: validator.escape(req.body.footer),
             img: image,
+            
+            // Manufacturer Settings
+            defaultManufacturer: validator.escape(req.body.defaultManufacturer || ''),
+            autoCreateManufacturers: req.body.autoCreateManufacturers === 'on',
+            requireManufacturerName: req.body.requireManufacturerName === 'on',
+            requireManufacturerCode: req.body.requireManufacturerCode === 'on',
+            requireManufacturerContact: req.body.requireManufacturerContact === 'on',
+            manufacturerCodeFormat: validator.escape(req.body.manufacturerCodeFormat || 'auto'),
+            
+            // Supplier Settings
+            defaultSupplier: validator.escape(req.body.defaultSupplier || ''),
+            autoCreateSuppliers: req.body.autoCreateSuppliers === 'on',
+            requireSupplierName: req.body.requireSupplierName === 'on',
+            requireSupplierCode: req.body.requireSupplierCode === 'on',
+            requireSupplierContact: req.body.requireSupplierContact === 'on',
+            supplierCodeFormat: validator.escape(req.body.supplierCodeFormat || 'auto'),
         },
     };
 

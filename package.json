@@ -40,6 +40,7 @@
     "@electron/remote": "^2.0.9",
     "@seald-io/nedb": "^4.0.3",
     "async": "^3.2.4",
+    "axios": "^1.11.0",
     "bcrypt": "^5.1.0",
     "body-parser": "^1.20.3",
     "csv-parser": "^3.2.0",

@@ -44,6 +44,13 @@ app.get("/", function (req, res) {
  * @returns {void}
  */
 app.get("/all", function (req, res) {
+    // Force database reload to ensure fresh data
+    try {
+        categoryDB.loadDatabase();
+    } catch (reloadError) {
+        console.log(`Category database reload warning: ${reloadError.message}`);
+    }
+    
     categoryDB.find({}, function (err, docs) {
         res.send(docs);
     });

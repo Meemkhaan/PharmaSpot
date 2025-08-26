@@ -72,6 +72,22 @@
                                 <i class="fa fa-plus"></i>
                             </button>
                         </div>
+                        <div class="btn-group p_manufacturers">
+                            <button id="manufacturerModal" data-toggle="modal" data-target="#Manufacturers" type="button" class="btn btn-success waves-effect waves-light">
+                                <span class="btn-label"><i class="fa fa-industry"></i> </span> Manufacturers
+                            </button>
+                            <button id="newManufacturerModal" data-toggle="modal" data-target="#newManufacturer" type="button" class="btn btn-warning waves-effect waves-light">
+                                <i class="fa fa-plus"></i>
+                            </button>
+                        </div>
+                        <div class="btn-group p_suppliers">
+                            <button id="supplierModal" data-toggle="modal" data-target="#Suppliers" type="button" class="btn btn-success waves-effect waves-light">
+                                <span class="btn-label"><i class="fa fa-truck"></i> </span> Suppliers
+                            </button>
+                            <button id="newSupplierModal" data-toggle="modal" data-target="#newSupplier" type="button" class="btn btn-warning waves-effect waves-light">
+                                <i class="fa fa-plus"></i>
+                            </button>
+                        </div>
                         <button id="viewRefOrders" data-toggle="modal" data-target="#holdOrdersModal" type="button" class="btn btn-info waves-effect waves-light">
                             <span class="btn-label"><i class="fa fa-shopping-basket"></i> </span> Open Tabs
                         </button>
@@ -333,12 +349,27 @@
                     <div class="col-md-6">
                         <div class="card-box">
                             <div class="row">
-                                <div class="col-md-6">
+                                <div class="col-md-2">
                                     <input type="text" id="search" class="form-control" placeholder="Search product by name or sku">
                                 </div>
-                                <div class="col-md-6">
+                                <div class="col-md-2">
                                     <select id="categories" class="form-control">
                                     </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <select id="manufacturers" class="form-control">
+                                        <option value="">All Manufacturers</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <select id="suppliers" class="form-control">
+                                        <option value="">All Suppliers</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <button id="clearFilters" class="btn btn-default btn-sm" style="width: 100%;">
+                                        <i class="fa fa-times"></i> Clear Filters
+                                    </button>
                                 </div>
                             </div>
                             <hr>
@@ -573,7 +604,14 @@
                             <input type="hidden" name="remove" id="remove_img">
                             <div class="form-group">
                                 <label for="category">Category</label>
+                                <div class="input-group">
                                 <select name="category" class="form-control" id="category"></select>
+                                    <span class="input-group-btn">
+                                        <button type="button" class="btn btn-warning" id="newCategoryFromProduct" title="Add New Category">
+                                            <i class="fa fa-plus"></i>
+                                        </button>
+                                    </span>
+                                </div>
                             </div>
                             <div class="form-group">
                                 <label for="productName">Product Name</label>
@@ -585,11 +623,29 @@
                             </div>
                             <div class="form-group">
                                 <label for="manufacturer">Manufacturer</label>
-                                <input type="text" name="manufacturer" placeholder="Enter manufacturer" class="form-control" id="manufacturer">
+                                <div class="input-group">
+                                    <select name="manufacturer" class="form-control" id="manufacturer">
+                                        <option value="">Select Manufacturer</option>
+                                    </select>
+                                    <span class="input-group-btn">
+                                        <button type="button" class="btn btn-warning" id="newManufacturerFromProduct" title="Add New Manufacturer">
+                                            <i class="fa fa-plus"></i>
+                                        </button>
+                                    </span>
+                                </div>
                             </div>
                             <div class="form-group">
                                 <label for="supplier">Supplier</label>
-                                <input type="text" name="supplier" placeholder="Enter supplier" class="form-control" id="supplier">
+                                <div class="input-group">
+                                    <select name="supplier" class="form-control" id="supplier">
+                                        <option value="">Select Supplier</option>
+                                    </select>
+                                    <span class="input-group-btn">
+                                        <button type="button" class="btn btn-warning" id="newSupplierFromProduct" title="Add New Supplier">
+                                            <i class="fa fa-plus"></i>
+                                        </button>
+                                    </span>
+                                </div>
                             </div>
                             <div class="form-group">
                                 <label for="batchNumber">Batch Number</label>
@@ -670,6 +726,7 @@
                         </button>
                     </div>
                     <div class="modal-body p-20 p-r-40" id="all_products">
+
                         <table class="table table-bordered" id="productList">
                             <thead>
                                 <tr>
@@ -679,7 +736,6 @@
                                     <th>Price</th>
                                     <th>Stock</th>
                                     <th>Expiry Date</th>
-                                    <th>Category</th>
                                     <th>Action</th>
                                 </tr>
                             </thead>
@@ -735,6 +791,460 @@
                 </div>
             </div>
         </div>
+        
+        <!-- Manufacturer Modals -->
+        <div id="newManufacturer" class="modal fade bs-example-modal-lg" tabindex="-1" role="dialog" aria-labelledby="newManufacturerModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
+                        <h4 class="modal-title" id="newManufacturerModalLabel">Manufacturer</h4>
+                    </div>
+                    <div class="modal-body">
+                        <form id="saveManufacturer">
+                            <input id="manufacturer_id" type="hidden" name="id">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="manufacturerName">Name *</label>
+                                        <input id="manufacturerName" type="text" required="required" name="name" placeholder="Enter manufacturer name" class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="manufacturerCode">Code</label>
+                                        <input id="manufacturerCode" type="text" name="code" placeholder="Enter manufacturer code" class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="manufacturerAddress">Address</label>
+                                        <textarea id="manufacturerAddress" name="address" placeholder="Enter full address" class="form-control" rows="2"></textarea>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="manufacturerCity">City</label>
+                                        <input id="manufacturerCity" type="text" name="city" placeholder="Enter city" class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="manufacturerState">State/Province</label>
+                                        <input id="manufacturerState" type="text" name="state" placeholder="Enter state/province" class="form-control">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="manufacturerCountry">Country</label>
+                                        <input id="manufacturerCountry" type="text" name="country" placeholder="Enter country" class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="manufacturerPostalCode">Postal Code</label>
+                                        <input id="manufacturerPostalCode" type="text" name="postalCode" placeholder="Enter postal code" class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="manufacturerPhone">Phone</label>
+                                        <input id="manufacturerPhone" type="text" name="phone" placeholder="Enter phone number" class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="manufacturerEmail">Email</label>
+                                        <input id="manufacturerEmail" type="email" name="email" placeholder="Enter email address" class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="manufacturerWebsite">Website</label>
+                                        <input id="manufacturerWebsite" type="url" name="website" placeholder="Enter website URL" class="form-control">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="manufacturerContactPerson">Contact Person</label>
+                                        <input id="manufacturerContactPerson" type="text" name="contactPerson" placeholder="Enter contact person name" class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="manufacturerTaxId">Tax ID</label>
+                                        <input id="manufacturerTaxId" type="text" name="taxId" placeholder="Enter tax identification number" class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="manufacturerLicenseNumber">License Number</label>
+                                        <input id="manufacturerLicenseNumber" type="text" name="licenseNumber" placeholder="Enter business license number" class="form-control">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="manufacturerRegistrationDate">Registration Date</label>
+                                        <input id="manufacturerRegistrationDate" type="date" name="registrationDate" class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="manufacturerStatus">Status</label>
+                                        <select id="manufacturerStatus" name="status" class="form-control">
+                                            <option value="active">Active</option>
+                                            <option value="inactive">Inactive</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="manufacturerNotes">Notes</label>
+                                        <textarea id="manufacturerNotes" name="notes" placeholder="Enter additional notes" class="form-control" rows="3"></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                            <input type="submit" id="submitManufacturer" class="btn btn-primary btn-block waves-effect waves-light">
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Supplier Modals -->
+        <div id="newSupplier" class="modal fade bs-example-modal-lg" tabindex="-1" role="dialog" aria-labelledby="newSupplierModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
+                        <h4 class="modal-title" id="newSupplierModalLabel">Supplier</h4>
+                    </div>
+                    <div class="modal-body">
+                        <form id="saveSupplier">
+                            <input id="supplier_id" type="hidden" name="id">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="supplierName">Name *</label>
+                                        <input id="supplierName" type="text" required="required" name="name" placeholder="Enter supplier name" class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="supplierCode">Code</label>
+                                        <input id="supplierCode" type="text" name="code" placeholder="Enter supplier code" class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="supplierContact">Contact Person</label>
+                                        <input id="supplierContact" type="text" name="contact" placeholder="Enter contact person name" class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="supplierEmail">Email</label>
+                                        <input id="supplierEmail" type="email" name="email" placeholder="Enter email address" class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="supplierPhone">Phone</label>
+                                        <input id="supplierPhone" type="text" name="phone" placeholder="Enter phone number" class="form-control">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="supplierAddress">Address</label>
+                                        <textarea id="supplierAddress" name="address" placeholder="Enter full address" class="form-control" rows="2"></textarea>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="supplierCity">City</label>
+                                        <input id="supplierCity" type="text" name="city" placeholder="Enter city" class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="supplierState">State/Province</label>
+                                        <input id="supplierState" type="text" name="state" placeholder="Enter state/province" class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="supplierCountry">Country</label>
+                                        <input id="supplierCountry" type="text" name="country" placeholder="Enter country" class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="supplierPostalCode">Postal Code</label>
+                                        <input id="supplierPostalCode" type="text" name="postalCode" placeholder="Enter postal code" class="form-control">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="supplierWebsite">Website</label>
+                                        <input id="supplierWebsite" type="url" name="website" placeholder="Enter website URL" class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="supplierStatus">Status</label>
+                                        <select id="supplierStatus" name="status" class="form-control">
+                                            <option value="active">Active</option>
+                                            <option value="inactive">Inactive</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="supplierNotes">Notes</label>
+                                        <textarea id="supplierNotes" name="notes" placeholder="Enter additional notes" class="form-control" rows="3"></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                            <input type="submit" id="submitSupplier" class="btn btn-primary btn-block waves-effect waves-light">
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="Manufacturers" class="modal fade bs-example-modal-lg" tabindex="-1" role="dialog" aria-labelledby="manufacturersModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <div class="header-actions d-flex justify-content-between align-items-center w-100">
+                            <h4 class="modal-title" id="manufacturersModalLabel">Manufacturers</h4>
+                            <div>
+                                <button type="button" id="manufacturerReportsBtn" class="btn btn-primary btn-sm mr-2" title="Manufacturer Reports">
+                                    <i class="fa fa-chart-bar"></i> Reports
+                                </button>
+                                <button type="button" id="manufacturerExportBtn" class="btn btn-success btn-sm mr-2" title="Export to CSV">
+                                    <i class="fa fa-download"></i> Export
+                                </button>
+                                <button type="button" id="manufacturerIntegrityBtn" class="btn btn-warning btn-sm mr-2" title="Data Integrity Check">
+                                    <i class="fa fa-shield"></i> Integrity
+                                </button>
+                                <button type="button" id="manufacturerBulkImportBtn" class="btn btn-info btn-sm mr-2">
+                                    <i class="fa fa-upload"></i> Bulk Import
+                                </button>
+                        <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <div class="input-group">
+                                    <input type="text" id="manufacturerSearch" class="form-control" placeholder="Search manufacturers...">
+                                    <span class="input-group-btn">
+                                        <button class="btn btn-default" type="button" id="manufacturerSearchBtn">
+                                            <i class="fa fa-search"></i>
+                                        </button>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="col-md-6 text-right">
+                                <button id="refreshManufacturers" class="btn btn-info">
+                                    <i class="fa fa-refresh"></i> Refresh
+                                </button>
+                            </div>
+                        </div>
+                        <table class="table table-bordered" id="manufacturerList">
+                                <thead>
+                                    <tr>
+                                        <th>Code</th>
+                                        <th>Name</th>
+                                    <th>City</th>
+                                    <th>Country</th>
+                                        <th>Phone</th>
+                                        <th>Status</th>
+                                    <th>Action</th>
+                                    </tr>
+                                </thead>
+                            <tbody id="manufacturer_list"></tbody>
+                            </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Manufacturer Bulk Import Modal -->
+        <div id="manufacturerBulkImport" class="modal fade bs-example-modal-lg" tabindex="-1" role="dialog" aria-labelledby="manufacturerBulkImportModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
+                        <h4 class="modal-title" id="manufacturerBulkImportModalLabel">Bulk Manufacturer Import</h4>
+                    </div>
+                    <div class="modal-body">
+                            <div class="row">
+                            <div class="col-md-12">
+                                <div class="alert alert-info">
+                                    <h5><i class="fa fa-info-circle"></i> Manufacturer Import Instructions</h5>
+                                    <p>Upload a CSV file with the following columns:</p>
+                                    <ul>
+                                        <li><strong>Name</strong> - Manufacturer name (required)</li>
+                                        <li><strong>Code</strong> - Manufacturer code/short name (optional)</li>
+                                        <li><strong>Address</strong> - Full address (optional)</li>
+                                        <li><strong>City</strong> - City (optional)</li>
+                                        <li><strong>State</strong> - State/Province (optional)</li>
+                                        <li><strong>Country</strong> - Country (optional)</li>
+                                        <li><strong>PostalCode</strong> - Postal/ZIP code (optional)</li>
+                                        <li><strong>Phone</strong> - Contact phone (optional)</li>
+                                        <li><strong>Email</strong> - Contact email (optional)</li>
+                                        <li><strong>Website</strong> - Company website (optional)</li>
+                                        <li><strong>ContactPerson</strong> - Primary contact person (optional)</li>
+                                        <li><strong>TaxId</strong> - Tax identification number (optional)</li>
+                                        <li><strong>LicenseNumber</strong> - Business license number (optional)</li>
+                                        <li><strong>RegistrationDate</strong> - Business registration date (optional)</li>
+                                        <li><strong>Status</strong> - Status (active/inactive, default: active)</li>
+                                        <li><strong>Notes</strong> - Additional notes (optional)</li>
+                                    </ul>
+                                    <p><strong>Note:</strong> The first row should contain column headers. Only Name is required.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                <form id="manufacturerBulkImportForm" encType="multipart/form-data">
+                                    <div class="form-group">
+                                        <label for="manufacturerCsvFile">Select CSV File</label>
+                                        <input type="file" name="csvFile" id="manufacturerCsvFile" accept=".csv" required class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label><input type="checkbox" name="skipDuplicates" id="manufacturerSkipDuplicates" checked> Skip duplicate names</label>
+                                    </div>
+                                    <div class="form-group">
+                                        <label><input type="checkbox" name="updateExisting" id="manufacturerUpdateExisting"> Update existing manufacturers</label>
+                                    </div>
+                                    <button type="submit" id="submitManufacturerBulkImport" class="btn btn-primary btn-block waves-effect waves-light">
+                                        <i class="fa fa-upload"></i> Import Manufacturers
+                                    </button>
+                                </form>
+                                    </div>
+                                <div class="col-md-6">
+                                <div class="alert alert-warning">
+                                    <h6><i class="fa fa-download"></i> Download Template</h6>
+                                    <p>Click the button below to download a sample CSV template with the correct format.</p>
+                                    <button type="button" id="downloadManufacturerTemplate" class="btn btn-outline-warning btn-sm">
+                                        <i class="fa fa-download"></i> Download Template
+                                    </button>
+                                    </div>
+                                <div id="manufacturerImportProgress" style="display: none;">
+                                    <div class="progress">
+                                        <div class="progress-bar progress-bar-striped active" role="progressbar" style="width: 100%"></div>
+                                </div>
+                                    <p id="manufacturerImportStatus" class="text-center mt-2">Processing...</p>
+                                    </div>
+                                </div>
+                            </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Suppliers Modal -->
+        <div id="Suppliers" class="modal fade bs-example-modal-lg" tabindex="-1" role="dialog" aria-labelledby="suppliersModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <div class="header-actions d-flex justify-content-between align-items-center w-100">
+                            <h4 class="modal-title" id="suppliersModalLabel">Suppliers</h4>
+                            <div>
+                                <button type="button" id="supplierReportsBtn" class="btn btn-primary btn-sm mr-2" title="Supplier Reports">
+                                    <i class="fa fa-chart-bar"></i> Reports
+                                </button>
+                                <button type="button" id="supplierExportBtn" class="btn btn-success btn-sm mr-2" title="Export to CSV">
+                                    <i class="fa fa-download"></i> Export
+                                </button>
+                                <button type="button" id="supplierIntegrityBtn" class="btn btn-warning btn-sm mr-2" title="Data Integrity Check">
+                                    <i class="fa fa-shield"></i> Integrity
+                                </button>
+                                <button type="button" id="supplierBulkImportBtn" class="btn btn-info btn-sm mr-2">
+                                    <i class="fa fa-upload"></i> Bulk Import
+                                </button>
+                                <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row mb-3">
+                                <div class="col-md-6">
+                                <div class="input-group">
+                                    <input type="text" id="supplierSearch" class="form-control" placeholder="Search suppliers...">
+                                    <span class="input-group-btn">
+                                        <button class="btn btn-default" type="button" id="supplierSearchBtn">
+                                            <i class="fa fa-search"></i>
+                                        </button>
+                                    </span>
+                                    </div>
+                                    </div>
+                            <div class="col-md-6 text-right">
+                                <button id="refreshSuppliers" class="btn btn-info">
+                                    <i class="fa fa-refresh"></i> Refresh
+                                </button>
+                                    </div>
+                                    </div>
+                        <table class="table table-bordered" id="supplierList">
+                            <thead>
+                                <tr>
+                                    <th>Code</th>
+                                    <th>Name</th>
+                                    <th>Contact</th>
+                                    <th>Email</th>
+                                    <th>Phone</th>
+                                    <th>City</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="supplier_list"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Supplier Bulk Import Modal -->
+        <div id="supplierBulkImport" class="modal fade bs-example-modal-lg" tabindex="-1" role="dialog" aria-labelledby="supplierBulkImportModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
+                        <h4 class="modal-title" id="supplierBulkImportModalLabel">Bulk Supplier Import</h4>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="alert alert-info">
+                                    <h5><i class="fa fa-info-circle"></i> Supplier Import Instructions</h5>
+                                    <p>Upload a CSV file with the following columns:</p>
+                                    <ul>
+                                        <li><strong>Name</strong> - Supplier name (required)</li>
+                                        <li><strong>Code</strong> - Supplier code/short name (optional)</li>
+                                        <li><strong>Contact</strong> - Primary contact person (optional)</li>
+                                        <li><strong>Email</strong> - Contact email (optional)</li>
+                                        <li><strong>Phone</strong> - Contact phone (optional)</li>
+                                        <li><strong>Address</strong> - Full address (optional)</li>
+                                        <li><strong>City</strong> - City (optional)</li>
+                                        <li><strong>State</strong> - State/Province (optional)</li>
+                                        <li><strong>Country</strong> - Country (optional)</li>
+                                        <li><strong>PostalCode</strong> - Postal/ZIP code (optional)</li>
+                                        <li><strong>Website</strong> - Company website (optional)</li>
+                                        <li><strong>Notes</strong> - Additional notes (optional)</li>
+                                        <li><strong>Status</strong> - Status (active/inactive, default: active)</li>
+                                    </ul>
+                                    <p><strong>Note:</strong> The first row should contain column headers. Only Name is required.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                <form id="supplierBulkImportForm" encType="multipart/form-data">
+                                    <div class="form-group">
+                                        <label for="supplierCsvFile">Select CSV File</label>
+                                        <input type="file" name="csvFile" id="supplierCsvFile" accept=".csv" required class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label><input type="checkbox" name="skipDuplicates" id="supplierSkipDuplicates" checked> Skip duplicate names</label>
+                                    </div>
+                                    <div class="form-group">
+                                        <label><input type="checkbox" name="updateExisting" id="supplierUpdateExisting"> Update existing suppliers</label>
+                                    </div>
+                                    <button type="submit" id="submitSupplierBulkImport" class="btn btn-primary btn-block waves-effect waves-light">
+                                        <i class="fa fa-upload"></i> Import Suppliers
+                                    </button>
+                                </form>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                    <label>Download Sample CSV Template</label>
+                                    <button type="button" id="downloadSupplierTemplate" class="btn btn-success btn-block waves-effect waves-light">
+                                        <i class="fa fa-download"></i> Download Template
+                                    </button>
+                                    </div>
+                                    <div class="form-group">
+                                    <label>Import Progress</label>
+                                    <div id="supplierImportProgress" style="display: none;">
+                                        <div class="progress">
+                                            <div class="progress-bar progress-bar-striped active" role="progressbar" style="width: 100%"></div>
+                                    </div>
+                                        <p id="supplierImportStatus" class="text-center mt-2">Processing...</p>
+                                    </div>
+                                </div>
+                            </div>
+                    </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <div id="bulkImport" class="modal fade bs-example-modal-lg" tabindex="-1" role="dialog" aria-labelledby="bulkImportModalLabel" aria-hidden="true">
             <div class="modal-dialog modal-lg">
                 <div class="modal-content">
@@ -754,7 +1264,7 @@
                                             <li><strong>SellingPrice</strong> or <strong>Price</strong> - Selling price (required)</li>
                                             <li><strong>PurchasePrice</strong> or <strong>ActualPrice</strong> - Purchase/Cost price (optional)</li>
                                             <li><strong>GenericName</strong> - Generic/active name (optional)</li>
-                                            <li><strong>Manufacturer</strong> - Manufacturer (optional)</li>
+                                            <li><strong>Manufacturer</strong> - Manufacturer name (optional, will create new manufacturer if doesn't exist)</li>
                                             <li><strong>Supplier</strong> - Supplier (optional)</li>
                                             <li><strong>BatchNumber</strong> - Batch number (optional)</li>
                                             <li><strong>Category</strong> - Product category (optional, will use default if not specified)</li>
@@ -762,7 +1272,7 @@
                                             <li><strong>MinStock</strong> - Minimum stock level (optional, default: 1)</li>
                                             <li><strong>ExpirationDate</strong> - Expiry date (optional, formats supported: DD-MMM-YY, DD-MMM-YYYY, DD/MM/YYYY, YYYY-MM-DD)</li>
                                         </ul>
-                                        <p><strong>Note:</strong> The first row should contain column headers. New categories will be created automatically if they don't exist.</p>
+                                        <p><strong>Note:</strong> The first row should contain column headers. New categories and manufacturers will be created automatically if they don't exist.</p>
                                     </div>
                             </div>
                         </div>
@@ -782,6 +1292,12 @@
                                     </div>
                                     <div class="form-group">
                                         <label><input type="checkbox" name="updateExisting" id="updateExisting"> Update existing products</label>
+                                    </div>
+                                    <div class="form-group">
+                                        <label><input type="checkbox" name="createManufacturers" id="createManufacturers" checked> Create new manufacturers automatically</label>
+                                    </div>
+                                    <div class="form-group">
+                                        <label><input type="checkbox" name="createSuppliers" id="createSuppliers" checked> Create new suppliers automatically</label>
                                     </div>
                                     <button type="submit" id="submitBulkImport" class="btn btn-primary btn-block waves-effect waves-light">
                                         <i class="fa fa-upload"></i> Import Products
@@ -913,6 +1429,14 @@
                                 <div class="form-group">
                                     <span><input type="checkbox" name="perm_categories" id="perm_categories"> Manage
                                     Product Categories </span>
+                                </div>
+                                <div class="form-group">
+                                    <span><input type="checkbox" name="perm_manufacturers" id="perm_manufacturers"> Manage
+                                    Product Manufacturers </span>
+                                </div>
+                                <div class="form-group">
+                                    <span><input type="checkbox" name="perm_suppliers" id="perm_suppliers"> Manage
+                                    Product Suppliers </span>
                                 </div>
                                 <div class="form-group">
                                     <span><input type="checkbox" name="perm_transactions" id="perm_transactions"> View
@@ -1086,6 +1610,93 @@
                                         </div>
                                     </div>
                                 </div>
+                                
+                                <!-- Manufacturer Settings Section -->
+                                <hr>
+                                <h5><i class="fa fa-industry"></i> Manufacturer Settings</h5>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="defaultManufacturer">Default Manufacturer for New Products</label>
+                                            <select name="defaultManufacturer" id="defaultManufacturer" class="form-control">
+                                                <option value="">Select Default Manufacturer</option>
+                                            </select>
+                                            <small class="text-muted">Products without a manufacturer will use this default</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="autoCreateManufacturers">
+                                                <input type="checkbox" name="autoCreateManufacturers" id="autoCreateManufacturers"> Auto-create Manufacturers
+                                            </label>
+                                            <small class="text-muted">Automatically create manufacturers during bulk import if they don't exist</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="manufacturerValidation">Manufacturer Field Requirements</label>
+                                            <div class="checkbox">
+                                                <label><input type="checkbox" name="requireManufacturerName" id="requireManufacturerName" checked> Name (Required)</label>
+                                            </div>
+                                            <div class="checkbox">
+                                                <label><input type="checkbox" name="requireManufacturerCode" id="requireManufacturerCode"> Code (Optional)</label>
+                                            </div>
+                                            <div class="checkbox">
+                                                <label><input type="checkbox" name="requireManufacturerContact" id="requireManufacturerContact"> Contact Information (Optional)</label>
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="manufacturerCodeFormat">Manufacturer Code Format</label>
+                                            <select name="manufacturerCodeFormat" id="manufacturerCodeFormat" class="form-control">
+                                                <option value="auto">Auto-generate (MANU-001)</option>
+                                                <option value="manual">Manual Entry</option>
+                                                <option value="custom">Custom Format</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Supplier Settings Section -->
+                                <hr>
+                                <h5><i class="fa fa-truck"></i> Supplier Settings</h5>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="defaultSupplier">Default Supplier for New Products</label>
+                                            <select name="defaultSupplier" id="defaultSupplier" class="form-control">
+                                                <option value="">Select Default Supplier</option>
+                                            </select>
+                                            <small class="text-muted">Products without a supplier will use this default</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="autoCreateSuppliers">
+                                                <input type="checkbox" name="autoCreateSuppliers" id="autoCreateSuppliers"> Auto-create Suppliers
+                                            </label>
+                                            <small class="text-muted">Automatically create suppliers during bulk import if they don't exist</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="supplierValidation">Supplier Field Requirements</label>
+                                            <div class="checkbox">
+                                                <label><input type="checkbox" name="requireSupplierName" id="requireSupplierName" checked> Name (Required)</label>
+                                            </div>
+                                            <div class="checkbox">
+                                                <label><input type="checkbox" name="requireSupplierCode" id="requireSupplierCode"> Code (Optional)</label>
+                                            </div>
+                                            <div class="checkbox">
+                                                <label><input type="checkbox" name="requireSupplierContact" id="requireSupplierContact"> Contact Information (Optional)</label>
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="supplierCodeFormat">Supplier Code Format</label>
+                                            <select name="supplierCodeFormat" id="supplierCodeFormat" class="form-control">
+                                                <option value="auto">Auto-generate (SUPP-001)</option>
+                                                <option value="manual">Manual Entry</option>
+                                                <option value="custom">Custom Format</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                
                                 <div class="form-group">
                                     <input id="save_settings" type="submit" class="btn btn-success btn-block waves-effect waves-light" value="Save Settings">
                                 </div>

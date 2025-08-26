@@ -13,5 +13,6 @@ Improved-POS-system-for-Pharmacies-PharmaSpot-main--main*
 PharmaSpot-Client-Demo*
 dist*
 release-builds*
-*.md*
+*.md
 *.csv
+*.md*

@@ -72,6 +72,8 @@ const default_item_img = path.join("assets","images","default.jpg");
 const permissions = [
   "perm_products",
   "perm_categories",
+  "perm_manufacturers",
+  "perm_suppliers",
   "perm_transactions",
   "perm_users",
   "perm_settings",
@@ -223,6 +225,46 @@ if (auth == undefined) {
 
   $.get(api + "settings/get", function (data) {
     settings = data.settings;
+    
+    // Populate manufacturer settings if they exist
+    if (settings && settings.defaultManufacturer) {
+      $("#defaultManufacturer").val(settings.defaultManufacturer);
+    }
+    if (settings && settings.autoCreateManufacturers) {
+      $("#autoCreateManufacturers").prop('checked', settings.autoCreateManufacturers);
+    }
+    if (settings && settings.requireManufacturerName !== undefined) {
+      $("#requireManufacturerName").prop('checked', settings.requireManufacturerName);
+    }
+    if (settings && settings.requireManufacturerCode !== undefined) {
+      $("#requireManufacturerCode").prop('checked', settings.requireManufacturerCode);
+    }
+    if (settings && settings.requireManufacturerContact !== undefined) {
+      $("#requireManufacturerContact").prop('checked', settings.requireManufacturerContact);
+    }
+    if (settings && settings.manufacturerCodeFormat) {
+      $("#manufacturerCodeFormat").val(settings.manufacturerCodeFormat);
+    }
+    
+    // Populate supplier settings if they exist
+    if (settings && settings.defaultSupplier) {
+      $("#defaultSupplier").val(settings.defaultSupplier);
+    }
+    if (settings && settings.autoCreateSuppliers) {
+      $("#autoCreateSuppliers").prop('checked', settings.autoCreateSuppliers);
+    }
+    if (settings && settings.requireSupplierName !== undefined) {
+      $("#requireSupplierName").prop('checked', settings.requireSupplierName);
+    }
+    if (settings && settings.requireSupplierCode !== undefined) {
+      $("#requireSupplierCode").prop('checked', settings.requireSupplierCode);
+    }
+    if (settings && settings.requireSupplierContact !== undefined) {
+      $("#requireSupplierContact").prop('checked', settings.requireSupplierContact);
+    }
+    if (settings && settings.supplierCodeFormat) {
+      $("#supplierCodeFormat").val(settings.supplierCodeFormat);
+    }
   });
 
   $.get(api + "users/all", function (users) {
@@ -237,8 +279,16 @@ if (auth == undefined) {
     $(".loading").hide();
 
     loadCategories();
+    loadManufacturers();
+    loadSuppliers();
     loadProducts();
     loadCustomers();
+    
+    // Populate manufacturer settings dropdown when settings modal is opened
+    $("#settings").on("click", function() {
+      populateManufacturerSettings();
+      populateSupplierSettings();
+    });
 
     // Keyboard shortcuts
     $(document).on('keydown', function(e) {
@@ -284,22 +334,28 @@ if (auth == undefined) {
           case 50: // Ctrl+2: Categories
             $('#categoryModal').click();
             break;
-          case 51: // Ctrl+3: Transactions
+          case 51: // Ctrl+3: Manufacturers
+            $('#manufacturerModal').click();
+            break;
+          case 52: // Ctrl+4: Suppliers
+            $('#supplierModal').click();
+            break;
+          case 53: // Ctrl+5: Transactions
             $('#viewRefOrders').click();
             break;
-          case 52: // Ctrl+4: Settings
+          case 54: // Ctrl+6: Settings
             $('#settings').click();
             break;
-          case 53: // Ctrl+5: Users
+          case 55: // Ctrl+7: Users
             $('#usersModal').click();
             break;
-          case 54: // Ctrl+6: Point of Sale (Orders)
+          case 56: // Ctrl+8: Point of Sale (Orders)
             $('#viewCustomerOrders').click();
             break;
-          case 55: // Ctrl+7: Open Tabs (Hold Orders)
+          case 57: // Ctrl+9: Open Tabs (Hold Orders)
             $('#viewRefOrders').click();
             break;
-          case 56: // Ctrl+8: Orders
+          case 48: // Ctrl+0: Orders
             $('#viewCustomerOrders').click();
             break;
         }
@@ -314,6 +370,14 @@ if (auth == undefined) {
         if (e.altKey && e.keyCode === 67) { // Alt+C: New Category (avoid Ctrl+C conflict)
           e.preventDefault();
           $('#newCategoryModal').click();
+        }
+        if (e.altKey && e.keyCode === 77) { // Alt+M: New Manufacturer (avoid Ctrl+M conflict)
+          e.preventDefault();
+          $('#newManufacturerModal').click();
+        }
+        if (e.altKey && e.keyCode === 83) { // Alt+S: New Supplier (avoid Ctrl+S conflict)
+          e.preventDefault();
+          $('#newSupplierModal').click();
         }
         if (e.altKey && e.keyCode === 85) { // Alt+U: New User
           e.preventDefault();
@@ -475,12 +539,14 @@ if (auth == undefined) {
                     <ul class="list-unstyled">
                       <li><kbd>Ctrl+1</kbd> Products</li>
                       <li><kbd>Ctrl+2</kbd> Categories</li>
-                      <li><kbd>Ctrl+3</kbd> Transactions</li>
-                      <li><kbd>Ctrl+4</kbd> Settings</li>
-                      <li><kbd>Ctrl+5</kbd> Users</li>
-                      <li><kbd>Ctrl+6</kbd> Point of Sale</li>
-                      <li><kbd>Ctrl+7</kbd> Open Tabs</li>
-                      <li><kbd>Ctrl+8</kbd> Orders</li>
+                      <li><kbd>Ctrl+3</kbd> Manufacturers</li>
+                      <li><kbd>Ctrl+4</kbd> Suppliers</li>
+                      <li><kbd>Ctrl+5</kbd> Transactions</li>
+                      <li><kbd>Ctrl+6</kbd> Settings</li>
+                      <li><kbd>Ctrl+7</kbd> Users</li>
+                      <li><kbd>Ctrl+8</kbd> Point of Sale</li>
+                      <li><kbd>Ctrl+9</kbd> Open Tabs</li>
+                      <li><kbd>Ctrl+0</kbd> Orders</li>
                     </ul>
                   </div>
                   <div class="col-md-6">
@@ -490,6 +556,8 @@ if (auth == undefined) {
                       <li><kbd>Alt+0</kbd> Bulk Remove</li>
                       <li><kbd>Alt+N</kbd> New Product</li>
                       <li><kbd>Alt+C</kbd> New Category</li>
+                      <li><kbd>Alt+M</kbd> New Manufacturer</li>
+                      <li><kbd>Alt+S</kbd> New Supplier</li>
                       <li><kbd>Alt+U</kbd> New User</li>
                       <li><kbd>Alt+O</kbd> New Customer</li>
                       <li><kbd>Alt+P</kbd> Point of Sale</li>
@@ -670,6 +738,12 @@ if (auth == undefined) {
     if (0 == user.perm_categories) {
       $(".p_two").hide();
     }
+    if (0 == user.perm_manufacturers) {
+      $(".p_manufacturers").hide();
+    }
+    if (0 == user.perm_suppliers) {
+      $(".p_suppliers").hide();
+    }
     if (0 == user.perm_transactions) {
       $(".p_three").hide();
     }
@@ -798,9 +872,14 @@ if (auth == undefined) {
                             <div class="widget-panel widget-style-2 " title="${item.name}">                    
                             <div id="image"><img src="${item_img}" id="product_img" alt=""></div>                    
                                         <div class="text-muted m-t-5 text-center">
-                                        <div class="name" id="product_name"><span class="${
-                                          item_isExpired ? "text-danger" : ""
-                                        }">${item.name}</span></div> 
+                                        <div class="name" id="product_name">
+                                          <span class="${
+                                            item_isExpired ? "text-danger" : ""
+                                          }">${item.name}</span>
+                                          ${item.manufacturer ? `<div><small class="text-success"><i class="fa fa-industry"></i> ${item.manufacturer}</small></div>` : ""}
+                                          ${item.supplier ? `<div><small class="text-info"><i class="fa fa-truck"></i> ${item.supplier}</small></div>` : ""}
+                                          ${item.genericName ? `<div><small class="text-muted">Generic: ${item.genericName}</small></div>` : ""}
+                                        </div> 
                                         <span class="sku">${
                                           item.barcode || item._id
                                         }</span>
@@ -821,7 +900,7 @@ if (auth == undefined) {
     }
 
     function loadCategories() {
-      $.get(api + "categories/all", function (data) {
+      $.get(api + "categories/all?_t=" + Date.now(), function (data) {
         allCategories = data;
         loadCategoryList();
         $("#category,#categories").html(`<option value="0">Select</option>`);
@@ -1729,10 +1808,23 @@ if (auth == undefined) {
     $("#newProductModal").on("click", function () {
       $("#saveProduct").get(0).reset();
       $("#current_img").text("");
+      
+      // Load manufacturers for the dropdown
+      loadManufacturers();
     });
 
     $("#saveProduct").submit(function (e) {
       e.preventDefault();
+
+      // Apply default manufacturer setting if no manufacturer is selected
+      if (settings && settings.defaultManufacturer && !$("#manufacturer").val()) {
+        $("#manufacturer").val(settings.defaultManufacturer);
+      }
+      
+      // Apply default supplier setting if no supplier is selected
+      if (settings && settings.defaultSupplier && !$("#supplier").val()) {
+        $("#supplier").val(settings.defaultSupplier);
+      }
 
       $(this).attr("action", api + "inventory/product");
       $(this).attr("method", "POST");
@@ -1803,6 +1895,11 @@ if (auth == undefined) {
           $("#saveCategory").get(0).reset();
           loadCategories();
           loadProducts();
+          
+          // Refresh category dropdown in product form if it's open
+          if ($("#newProduct").is(":visible")) {
+            loadCategories();
+          }
           diagOptions = {
             title: "Category Saved",
             text: "Select an option below to continue.",
@@ -1825,8 +1922,1412 @@ if (auth == undefined) {
       });
     });
 
+    // Manufacturer Management Functions
+    let allManufacturers = [];
+    
+    // Supplier Management Functions
+    let allSuppliers = [];
+
+    function loadManufacturers() {
+      $.get(api + "manufacturers/all?_t=" + Date.now(), function (data) {
+        allManufacturers = data;
+        loadManufacturerList();
+        
+        // Also populate the manufacturer dropdown in product form
+        $("#manufacturer").html(`<option value="">Select Manufacturer</option>`);
+        allManufacturers.forEach((manufacturer) => {
+          $("#manufacturer").append(
+            `<option value="${manufacturer.name}">${manufacturer.name}${manufacturer.code ? ` (${manufacturer.code})` : ''}</option>`,
+          );
+        });
+        
+        // Also populate the manufacturer filter in POS
+        $("#manufacturers").html(`<option value="">All Manufacturers</option>`);
+        allManufacturers.forEach((manufacturer) => {
+          $("#manufacturers").append(
+            `<option value="${manufacturer.name}">${manufacturer.name}${manufacturer.code ? ` (${manufacturer.code})` : ''}</option>`,
+          );
+        });
+      }).fail(function (jqXHR, textStatus, errorThrown) {
+        console.error("Failed to load manufacturers:", errorThrown);
+        notiflix.Notify.failure("Failed to load manufacturers");
+      });
+    }
+    
+    function populateManufacturerSettings() {
+      $("#defaultManufacturer").html(`<option value="">Select Default Manufacturer</option>`);
+      if (allManufacturers && allManufacturers.length > 0) {
+        allManufacturers.forEach((manufacturer) => {
+          $("#defaultManufacturer").append(
+            `<option value="${manufacturer._id}">${manufacturer.name}${manufacturer.code ? ` (${manufacturer.code})` : ''}</option>`,
+          );
+        });
+        
+        // Set the current default if it exists in settings
+        if (settings && settings.defaultManufacturer) {
+          $("#defaultManufacturer").val(settings.defaultManufacturer);
+        }
+      }
+    }
+    
+    function populateSupplierSettings() {
+      $("#defaultSupplier").html(`<option value="">Select Default Supplier</option>`);
+      if (allSuppliers && allSuppliers.length > 0) {
+        allSuppliers.forEach((supplier) => {
+          $("#defaultSupplier").append(
+            `<option value="${supplier._id}">${supplier.name}${supplier.code ? ` (${supplier.code})` : ''}</option>`,
+          );
+        });
+        
+        // Set the current default if it exists in settings
+        if (settings && settings.defaultSupplier) {
+          $("#defaultSupplier").val(settings.defaultSupplier);
+        }
+      }
+    }
+    
+    function validateManufacturerData() {
+      // Check required fields based on settings
+      if (settings && settings.requireManufacturerName && !$("#manufacturerName").val().trim()) {
+        notiflix.Report.failure("Validation Error", "Manufacturer name is required.", "Ok");
+        $("#manufacturerName").focus();
+        return false;
+      }
+      
+      if (settings && settings.requireManufacturerCode && !$("#manufacturerCode").val().trim()) {
+        notiflix.Report.failure("Validation Error", "Manufacturer code is required.", "Ok");
+        $("#manufacturerCode").focus();
+        return false;
+      }
+      
+      if (settings && settings.requireManufacturerContact && 
+          !$("#manufacturerPhone").val().trim() && !$("#manufacturerEmail").val().trim()) {
+        notiflix.Report.failure("Validation Error", "Either phone or email is required.", "Ok");
+        $("#manufacturerPhone").focus();
+        return false;
+      }
+      
+      return true;
+    }
+    
+    function validateSupplierData() {
+      // Check required fields based on settings
+      if (settings && settings.requireSupplierName && !$("#supplierName").val().trim()) {
+        notiflix.Report.failure("Validation Error", "Supplier name is required.", "Ok");
+        $("#supplierName").focus();
+        return false;
+      }
+      
+      if (settings && settings.requireSupplierCode && !$("#supplierCode").val().trim()) {
+        notiflix.Report.failure("Validation Error", "Supplier code is required.", "Ok");
+        $("#supplierCode").focus();
+        return false;
+      }
+      
+      if (settings && settings.requireSupplierContact && 
+          !$("#supplierPhone").val().trim() && !$("#supplierEmail").val().trim()) {
+        notiflix.Report.failure("Validation Error", "Either phone or email is required.", "Ok");
+        $("#supplierPhone").focus();
+        return false;
+      }
+      
+      return true;
+    }
+
+    function loadManufacturerList() {
+      let manufacturer_list = "";
+      let counter = 0;
+      $("#manufacturer_list").empty();
+      
+      if ($.fn.DataTable.isDataTable('#manufacturerList')) {
+        $("#manufacturerList").DataTable().destroy();
+      }
+
+      allManufacturers.forEach((manufacturer, index) => {
+        counter++;
+
+        manufacturer_list += `<tr>
+          <td>${manufacturer.code || '-'}</td>
+          <td>${manufacturer.name}</td>
+          <td>${manufacturer.city || '-'}</td>
+          <td>${manufacturer.country || '-'}</td>
+          <td>${manufacturer.phone || '-'}</td>
+          <td><span class="label label-${manufacturer.status === 'active' ? 'success' : 'warning'}">${manufacturer.status}</span></td>
+          <td>
+            <span class="btn-group">
+              <button onClick="$(this).editManufacturer(${index})" class="btn btn-warning btn-xs" title="Edit">
+                <i class="fa fa-edit"></i>
+              </button>
+              <button onClick="$(this).deleteManufacturer(${manufacturer._id})" class="btn btn-danger btn-xs" title="Delete">
+                <i class="fa fa-trash"></i>
+              </button>
+            </span>
+          </td>
+        </tr>`;
+      });
+
+      if (counter == allManufacturers.length) {
+        $("#manufacturer_list").html(manufacturer_list);
+        $("#manufacturerList").DataTable({
+          autoWidth: false,
+          info: true,
+          JQueryUI: true,
+          ordering: true,
+          paging: true,
+          pageLength: 10,
+          lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]]
+        });
+      }
+    }
+
+    $("#saveManufacturer").submit(function (e) {
+      e.preventDefault();
+
+      // Validate manufacturer data based on settings
+      if (!validateManufacturerData()) {
+        return;
+      }
+
+      let method;
+      if ($("#manufacturer_id").val() == "") {
+        method = "POST";
+      } else {
+        method = "PUT";
+      }
+
+      $.ajax({
+        type: method,
+        url: api + "manufacturers/manufacturer",
+        data: $(this).serialize(),
+        success: function (data, textStatus, jqXHR) {
+          $("#saveManufacturer").get(0).reset();
+          loadManufacturers();
+          loadProducts();
+          
+          // Refresh manufacturer dropdown in product form if it's open
+          if ($("#newProduct").is(":visible")) {
+            loadManufacturers();
+          }
+          
+          diagOptions = {
+            title: "Manufacturer Saved",
+            text: "Select an option below to continue.",
+            okButtonText: "Add another",
+            cancelButtonText: "Close",
+          };
+
+          notiflix.Confirm.show(
+            diagOptions.title,
+            diagOptions.text,
+            diagOptions.okButtonText,
+            diagOptions.cancelButtonText,
+            ()=>{},
+            () => {
+                $("#newManufacturer").modal("hide");
+            },
+          );
+        },
+        error: function (jqXHR, textStatus, errorThrown) {
+          let errorMessage = "An error occurred while saving the manufacturer.";
+          if (jqXHR.responseJSON && jqXHR.responseJSON.message) {
+            errorMessage = jqXHR.responseJSON.message;
+          }
+          notiflix.Report.failure("Error", errorMessage, "Ok");
+        }
+      });
+    });
+
+    $.fn.editManufacturer = function (index) {
+      $("#Manufacturers").modal("hide");
+
+      const manufacturer = allManufacturers[index];
+      
+      $("#manufacturer_id").val(manufacturer._id);
+      $("#manufacturerName").val(manufacturer.name);
+      $("#manufacturerCode").val(manufacturer.code || "");
+      $("#manufacturerAddress").val(manufacturer.address || "");
+      $("#manufacturerCity").val(manufacturer.city || "");
+      $("#manufacturerState").val(manufacturer.state || "");
+      $("#manufacturerCountry").val(manufacturer.country || "");
+      $("#manufacturerPostalCode").val(manufacturer.postalCode || "");
+      $("#manufacturerPhone").val(manufacturer.phone || "");
+      $("#manufacturerEmail").val(manufacturer.email || "");
+      $("#manufacturerWebsite").val(manufacturer.website || "");
+      $("#manufacturerContactPerson").val(manufacturer.contactPerson || "");
+      $("#manufacturerTaxId").val(manufacturer.taxId || "");
+      $("#manufacturerLicenseNumber").val(manufacturer.licenseNumber || "");
+      $("#manufacturerRegistrationDate").val(manufacturer.registrationDate || "");
+      $("#manufacturerStatus").val(manufacturer.status || "active");
+      $("#manufacturerNotes").val(manufacturer.notes || "");
+
+      $("#newManufacturer").modal("show");
+    };
+    
+    // Auto-generate manufacturer code when name is entered
+    $("#manufacturerName").on("input", function() {
+      if (settings && settings.manufacturerCodeFormat === 'auto' && !$("#manufacturerCode").val()) {
+        const name = $(this).val().trim();
+        if (name) {
+          const code = generateManufacturerCode(name);
+          $("#manufacturerCode").val(code);
+        }
+      }
+    });
+    
+    // Auto-generate supplier code when name is entered
+    $("#supplierName").on("input", function() {
+      if (settings && settings.supplierCodeFormat === 'auto' && !$("#supplierCode").val()) {
+        const name = $(this).val().trim();
+        if (name) {
+          const code = generateSupplierCode(name);
+          $("#supplierCode").val(code);
+        }
+      }
+    });
+    
+    function generateManufacturerCode(name) {
+      if (!name) return '';
+      
+      // Generate code based on name (e.g., "ABC Pharma" -> "MANU-ABC")
+      const words = name.split(' ').filter(word => word.length > 0);
+      let code = 'MANU-';
+      
+      if (words.length >= 2) {
+        // Use first letter of first two words
+        code += words[0].charAt(0).toUpperCase() + words[1].charAt(0).toUpperCase();
+      } else if (words.length === 1) {
+        // Use first two letters of single word
+        code += words[0].substring(0, 2).toUpperCase();
+      }
+      
+      // Add a unique number
+      const existingCodes = allManufacturers.map(m => m.code).filter(c => c && c.startsWith(code));
+      const nextNumber = existingCodes.length + 1;
+      
+      return `${code}${nextNumber.toString().padStart(3, '0')}`;
+    }
+    
+    function generateSupplierCode(name) {
+      if (!name || name.trim() === '') return '';
+      
+      const words = name.split(' ').filter(word => word.length > 0);
+      let code = 'SUPP-';
+      
+      if (words.length >= 2) {
+        // Use first letter of first two words
+        code += words[0].charAt(0).toUpperCase() + words[1].charAt(0).toUpperCase();
+      } else if (words.length === 1) {
+        // Use first two letters of single word
+        code += name.substring(0, 2).toUpperCase();
+      }
+      
+      // Add a unique number
+      const existingCodes = allSuppliers.map(s => s.code).filter(c => c && c.startsWith(code));
+      const nextNumber = existingCodes.length + 1;
+      
+      return `${code}${nextNumber.toString().padStart(3, '0')}`;
+    }
+
+    $.fn.deleteManufacturer = function (manufacturerId) {
+      notiflix.Confirm.show(
+        "Delete Manufacturer",
+        "Are you sure you want to delete this manufacturer? This action cannot be undone.",
+        "Delete",
+        "Cancel",
+        () => {
+          $.ajax({
+            type: "DELETE",
+            url: api + "manufacturers/manufacturer/" + manufacturerId,
+            success: function (data, textStatus, jqXHR) {
+              notiflix.Notify.success("Manufacturer deleted successfully");
+              loadManufacturers();
+              loadProducts();
+            },
+            error: function (jqXHR, textStatus, errorThrown) {
+              let errorMessage = "An error occurred while deleting the manufacturer.";
+              if (jqXHR.responseJSON && jqXHR.responseJSON.message) {
+                errorMessage = jqXHR.responseJSON.message;
+              }
+              notiflix.Report.failure("Error", errorMessage, "Ok");
+            }
+          });
+        }
+      );
+    }
+
+    // Manufacturer search functionality
+    $("#manufacturerSearch").on("input", function() {
+      const searchTerm = $(this).val().toLowerCase();
+      const table = $("#manufacturerList").DataTable();
+      table.search(searchTerm).draw();
+    });
+
+    $("#manufacturerSearchBtn").on("click", function() {
+      const searchTerm = $("#manufacturerSearch").val().toLowerCase();
+      const table = $("#manufacturerList").DataTable();
+      table.search(searchTerm).draw();
+    });
+
+    $("#refreshManufacturers").on("click", function() {
+      loadManufacturers();
+    });
+
+    // Manufacturer modal events
+    $("#newManufacturerModal").on("click", function() {
+      $("#manufacturer_id").val("");
+      $("#saveManufacturer").get(0).reset();
+      $("#manufacturerStatus").val("active");
+    });
+
+    $("#manufacturerModal").on("click", function() {
+      loadManufacturers();
+    });
+
+    // New Manufacturer button from product form
+    $("#newManufacturerFromProduct").click(function() {
+      $("#newManufacturer").modal("show");
+    });
+
+    // New Category button from product form
+    $("#newCategoryFromProduct").click(function() {
+      $("#newCategory").modal("show");
+    });
+
+    // Manufacturer reports button
+    $("#manufacturerReportsBtn").click(function() {
+      // Show reports modal with tabs
+      showManufacturerReports();
+    });
+
+
+
+    // Function to show manufacturer reports
+    function showManufacturerReports() {
+      // Create modal content dynamically
+      let modalContent = `
+        <div class="modal fade" id="manufacturerReportsModal" tabindex="-1" role="dialog">
+          <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h4 class="modal-title"><i class="fa fa-chart-bar"></i> Manufacturer Reports</h4>
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+              </div>
+              <div class="modal-body">
+                <ul class="nav nav-tabs" id="reportTabs">
+                  <li class="nav-item">
+                    <a class="nav-link active" data-toggle="tab" href="#performanceTab">Performance</a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" data-toggle="tab" href="#directoryTab">Contact Directory</a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" data-toggle="tab" href="#completenessTab">Data Completeness</a>
+                  </li>
+                </ul>
+                <div class="tab-content mt-3">
+                  <div id="performanceTab" class="tab-pane active">
+                    <div id="performanceContent">Loading performance metrics...</div>
+                  </div>
+                  <div id="directoryTab" class="tab-pane">
+                    <div id="directoryContent">Loading contact directory...</div>
+                  </div>
+                  <div id="completenessTab" class="tab-pane">
+                    <div id="completenessContent">Loading completeness data...</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      // Remove existing modal if any
+      $("#manufacturerReportsModal").remove();
+      
+      // Add modal to body
+      $("body").append(modalContent);
+      
+      // Show modal
+      $("#manufacturerReportsModal").modal("show");
+      
+      // Load data for each tab
+      loadPerformanceMetrics();
+      loadContactDirectory();
+      loadCompletenessData();
+    }
+
+    function loadPerformanceMetrics() {
+      $.get(api + "manufacturers/performance", function(data) {
+        let content = `
+          <div class="row">
+            <div class="col-md-6">
+              <div class="card">
+                <div class="card-header">
+                  <h5><i class="fa fa-chart-pie"></i> Overview</h5>
+                </div>
+                <div class="card-body">
+                  <p><strong>Total Manufacturers:</strong> ${data.totalManufacturers}</p>
+                  <p><strong>Active:</strong> ${data.activeManufacturers}</p>
+                  <p><strong>Inactive:</strong> ${data.inactiveManufacturers}</p>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="card">
+                <div class="card-header">
+                  <h5><i class="fa fa-info-circle"></i> Data Quality</h5>
+                </div>
+                <div class="card-body">
+                  <p><strong>Complete Info:</strong> ${data.manufacturersWithCompleteInfo}</p>
+                  <p><strong>Partial Info:</strong> ${data.manufacturersWithPartialInfo}</p>
+                  <p><strong>No Contact Info:</strong> ${data.manufacturersWithNoContactInfo}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+        
+        $("#performanceContent").html(content);
+      }).fail(function() {
+        $("#performanceContent").html('<div class="alert alert-danger">Failed to load performance metrics</div>');
+      });
+    }
+
+    function loadContactDirectory() {
+      $.get(api + "manufacturers/directory", function(data) {
+        let content = `
+          <div class="table-responsive">
+            <table class="table table-striped">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Contact Person</th>
+                  <th>Phone</th>
+                  <th>Email</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+        `;
+        
+        data.forEach(manufacturer => {
+          content += `
+            <tr>
+              <td><strong>${manufacturer.name}</strong>${manufacturer.code ? ` (${manufacturer.code})` : ''}</td>
+              <td>${manufacturer.contactPerson || '-'}</td>
+              <td>${manufacturer.phone || '-'}</td>
+              <td>${manufacturer.email || '-'}</td>
+              <td><span class="label label-${manufacturer.status === 'active' ? 'success' : 'warning'}">${manufacturer.status}</span></td>
+            </tr>
+          `;
+        });
+        
+        content += `
+              </tbody>
+            </table>
+          </div>
+        `;
+        
+        $("#directoryContent").html(content);
+      }).fail(function() {
+        $("#directoryContent").html('<div class="alert alert-danger">Failed to load contact directory</div>');
+      });
+    }
+
+    function loadCompletenessData() {
+      $.get(api + "manufacturers/performance", function(data) {
+        let content = `
+          <div class="table-responsive">
+            <table class="table table-striped">
+              <thead>
+                <tr>
+                  <th>Manufacturer</th>
+                  <th>Completeness Score</th>
+                  <th>Missing Fields</th>
+                </tr>
+              </thead>
+              <tbody>
+        `;
+        
+        data.topManufacturersByCompleteness.forEach(manufacturer => {
+          content += `
+            <tr>
+              <td><strong>${manufacturer.name}</strong></td>
+              <td>
+                <div class="progress">
+                  <div class="progress-bar" style="width: ${manufacturer.completenessScore}%">
+                    ${manufacturer.completenessScore}%
+                  </div>
+                </div>
+              </td>
+              <td>${manufacturer.missingFields.length > 0 ? manufacturer.missingFields.join(', ') : 'Complete'}</td>
+            </tr>
+          `;
+        });
+        
+        content += `
+              </tbody>
+            </table>
+          </div>
+        `;
+        
+        $("#completenessContent").html(content);
+      }).fail(function() {
+        $("#completenessContent").html('<div class="alert alert-danger">Failed to load completeness data</div>');
+      });
+    }
+
+    // Manufacturer export button
+    $("#manufacturerExportBtn").click(function() {
+      window.open(api + "manufacturers/export", "_blank");
+    });
+
+    // Manufacturer integrity check button
+    $("#manufacturerIntegrityBtn").click(function() {
+      $.get(api + "manufacturers/integrity", function(data) {
+        let integrityReport = `
+          <div class="alert alert-info">
+            <h5><i class="fa fa-shield"></i> Data Integrity Report</h5>
+            <div class="row">
+              <div class="col-md-6">
+                <strong>Total Manufacturers:</strong> ${data.totalManufacturers}<br>
+                <strong>Active:</strong> ${data.activeManufacturers}<br>
+                <strong>Inactive:</strong> ${data.inactiveManufacturers}<br>
+                <strong>With Code:</strong> ${data.manufacturersWithCode}<br>
+                <strong>With Email:</strong> ${data.manufacturersWithEmail}<br>
+                <strong>With Phone:</strong> ${data.manufacturersWithPhone}<br>
+                <strong>With Address:</strong> ${data.manufacturersWithAddress}
+              </div>
+              <div class="col-md-6">
+                <strong>Validation Issues:</strong> ${data.validationIssues.length}<br>
+                <strong>Recommendations:</strong> ${data.recommendations.length}
+              </div>
+            </div>
+          </div>
+        `;
+        
+        if (data.validationIssues.length > 0) {
+          integrityReport += `
+            <div class="alert alert-warning">
+              <h6><i class="fa fa-exclamation-triangle"></i> Validation Issues Found</h6>
+              <ul>
+          `;
+          data.validationIssues.forEach(issue => {
+            integrityReport += `<li><strong>${issue.name}</strong>: ${issue.errors.join(', ')}</li>`;
+          });
+          integrityReport += `</ul></div>`;
+        }
+        
+        if (data.recommendations.length > 0) {
+          integrityReport += `
+            <div class="alert alert-info">
+              <h6><i class="fa fa-lightbulb-o"></i> Recommendations</h6>
+              <ul>
+          `;
+          data.recommendations.forEach(rec => {
+            integrityReport += `<li>${rec}</li>`;
+          });
+          integrityReport += `</ul></div>`;
+        }
+        
+        notiflix.Report.info(
+          "Data Integrity Report",
+          integrityReport,
+          "Close"
+        );
+      }).fail(function() {
+        notiflix.Report.failure(
+          "Error",
+          "Failed to generate integrity report",
+          "Close"
+        );
+      });
+    });
+
+    // Manufacturer bulk import button
+    $("#manufacturerBulkImportBtn").click(function () {
+        $("#manufacturerBulkImport").modal("show");
+    });
+
+
+
+
+
+    // Download manufacturer template
+    $("#downloadManufacturerTemplate").click(function() {
+        const header = [
+            'Name',
+            'Code',
+            'Address',
+            'City',
+            'State',
+            'Country',
+            'PostalCode',
+            'Phone',
+            'Email',
+            'Website',
+            'ContactPerson',
+            'TaxId',
+            'LicenseNumber',
+            'RegistrationDate',
+            'Status',
+            'Notes'
+        ].join(',');
+
+        const rows = [
+            ['Acme Pharmaceuticals','ACME','123 Pharma Street','New York','NY','USA','10001','+1-555-0123','info@acmepharma.com','www.acmepharma.com','John Smith','TAX123456','LIC789012','2020-01-15','active','Leading pharmaceutical company'],
+            ['HealthCorp International','HEALTH','456 Wellness Avenue','Los Angeles','CA','USA','90210','+1-555-0456','contact@healthcorp.com','www.healthcorp.com','Jane Doe','TAX789012','LIC345678','2019-06-20','active','Global health solutions'],
+            ['Wellness Labs','WELL','789 Health Boulevard','Chicago','IL','USA','60601','+1-555-0789','info@wellnesslabs.com','www.wellnesslabs.com','Mike Johnson','TAX456789','LIC901234','2021-03-10','active','Innovative wellness products']
+        ].map(r => r.join(',')).join('\n');
+
+        const csvContent = header + '\n' + rows;
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'pharmaspot_manufacturers_template.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+    });
+
+    // Manufacturer bulk import form submission
+    $("#manufacturerBulkImportForm").submit(function (e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        formData.append('skipDuplicates', $("#manufacturerSkipDuplicates").is(':checked'));
+        formData.append('updateExisting', $("#manufacturerUpdateExisting").is(':checked'));
+        
+        console.log("Manufacturer bulk import parameters:");
+        console.log("- Skip Duplicates:", $("#manufacturerSkipDuplicates").is(':checked'));
+        console.log("- Update Existing:", $("#manufacturerUpdateExisting").is(':checked'));
+        
+        $("#submitManufacturerBulkImport").prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Importing...');
+        $("#manufacturerImportProgress").show();
+        $("#manufacturerImportStatus").text("Starting import...");
+        
+        $.ajax({
+            url: api + "manufacturers/bulk-import",
+            type: "POST",
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function (response) {
+                $("#submitManufacturerBulkImport").prop('disabled', false).html('<i class="fa fa-upload"></i> Import Manufacturers');
+                $("#manufacturerImportProgress").hide();
+                
+                if (response.success) {
+                    let message = response.message;
+                    if (response.errors && response.errors.length > 0) {
+                        message += `\n\nErrors encountered:\n`;
+                        response.errors.forEach(error => {
+                            message += `Row ${error.row}: ${error.error}\n`;
+                        });
+                    }
+                    
+                    notiflix.Report.success(
+                        "Import Completed",
+                        message,
+                        "OK"
+                    );
+                    
+                    // Refresh manufacturers list
+                    loadManufacturers();
+                    
+                    // Close modal
+                    $("#manufacturerBulkImport").modal("hide");
+                    
+                    // Reopen Manufacturers modal to show updated list
+                    $("#Manufacturers").modal("show");
+                }
+            },
+            error: function (jqXHR, textStatus, errorThrown) {
+                $("#submitManufacturerBulkImport").prop('disabled', false).html('<i class="fa fa-upload"></i> Import Manufacturers');
+                $("#manufacturerImportProgress").hide();
+                
+                let errorMessage = "An error occurred during import.";
+                if (jqXHR.responseJSON && jqXHR.responseJSON.message) {
+                    errorMessage = jqXHR.responseJSON.message;
+                }
+                
+                notiflix.Report.failure(
+                    "Import Failed",
+                    errorMessage,
+                    "OK"
+                );
+            }
+        });
+    });
+
+    // ========================================
+    // SUPPLIER MANAGEMENT FUNCTIONS
+    // ========================================
+
+    function loadSuppliers() {
+      // Fix: Call the suppliers API root route which should return suppliers data
+      const suppliersUrl = api + "suppliers";
+      console.log("Calling suppliers API with URL:", suppliersUrl);
+      console.log("Original api variable:", api);
+      
+      $.get(suppliersUrl + "?_t=" + Date.now(), function (data) {
+        console.log("Suppliers API response:", data);
+        
+        // Ensure data is an array
+        if (!Array.isArray(data)) {
+          console.error("Suppliers API did not return an array:", data);
+          allSuppliers = [];
+        } else {
+          allSuppliers = data;
+        }
+        
+        loadSupplierList();
+        
+        // Also populate the supplier dropdown in product form
+        $("#supplier").html(`<option value="">Select Supplier</option>`);
+        if (allSuppliers.length > 0) {
+          allSuppliers.forEach((supplier) => {
+            $("#supplier").append(
+              `<option value="${supplier.name}">${supplier.name}${supplier.code ? ` (${supplier.code})` : ''}</option>`,
+            );
+          });
+        }
+        
+        // Also populate the supplier filter in POS
+        $("#suppliers").html(`<option value="">All Suppliers</option>`);
+        if (allSuppliers.length > 0) {
+          allSuppliers.forEach((supplier) => {
+            $("#suppliers").append(
+              `<option value="${supplier.name}">${supplier.name}${supplier.code ? ` (${supplier.code})` : ''}</option>`,
+            );
+          });
+        }
+      }).fail(function (jqXHR, textStatus, errorThrown) {
+        console.error("Failed to load suppliers:", errorThrown);
+        console.error("Response:", jqXHR.responseText);
+        allSuppliers = [];
+        notiflix.Notify.failure("Failed to load suppliers");
+      });
+    }
+
+    function loadSupplierList() {
+      let supplier_list = "";
+      let counter = 0;
+      $("#supplier_list").empty();
+      
+      if ($.fn.DataTable.isDataTable('#supplierList')) {
+        $("#supplierList").DataTable().destroy();
+      }
+
+      // Ensure allSuppliers is an array
+      if (!Array.isArray(allSuppliers)) {
+        console.error("allSuppliers is not an array:", allSuppliers);
+        allSuppliers = [];
+      }
+
+      if (allSuppliers.length === 0) {
+        supplier_list = `<tr>
+          <td class="text-center text-muted">-</td>
+          <td class="text-center text-muted">No suppliers found</td>
+          <td class="text-center text-muted">-</td>
+          <td class="text-center text-muted">-</td>
+          <td class="text-center text-muted">-</td>
+          <td class="text-center text-muted">-</td>
+          <td class="text-center text-muted">-</td>
+          <td class="text-center text-muted">Click "New Supplier" to add one</td>
+        </tr>`;
+      } else {
+        allSuppliers.forEach((supplier, index) => {
+          counter++;
+
+          supplier_list += `<tr>
+            <td>${supplier.code || '-'}</td>
+            <td>${supplier.name}</td>
+            <td>${supplier.contact || '-'}</td>
+            <td>${supplier.email || '-'}</td>
+            <td>${supplier.phone || '-'}</td>
+            <td>${supplier.city || '-'}</td>
+            <td><span class="label label-${supplier.status === 'active' ? 'success' : 'warning'}">${supplier.status}</span></td>
+            <td>
+              <span class="btn-group">
+                <button class="btn btn-warning btn-xs edit-supplier-btn" data-index="${index}" title="Edit">
+                  <i class="fa fa-edit"></i>
+                </button>
+                <button class="btn btn-danger btn-xs delete-supplier-btn" data-supplier-id="${supplier._id}" title="Delete">
+                  <i class="fa fa-trash"></i>
+                </button>
+              </span>
+            </td>
+          </tr>`;
+        });
+      }
+
+      $("#supplier_list").html(supplier_list);
+
+      // Initialize DataTable
+      $("#supplierList").DataTable({
+        responsive: true,
+        pageLength: 10,
+        order: [[1, 'asc']], // Sort by name
+        columnDefs: [
+          { targets: [0, 2, 3, 4, 5], orderable: false }, // Disable sorting for some columns
+          { targets: [7], orderable: false, searchable: false } // Action column
+        ]
+      });
+    }
+
+    // Event handlers for supplier action buttons
+    $(document).on('click', '.edit-supplier-btn', function() {
+      const index = $(this).data('index');
+      $.fn.editSupplier(index);
+    });
+
+    $(document).on('click', '.delete-supplier-btn', function() {
+      const supplierId = $(this).data('supplier-id');
+      $.fn.deleteSupplier(supplierId);
+    });
+
+    // Supplier form submission
+    $("#saveSupplier").submit(function (e) {
+      e.preventDefault();
+      
+      // Validate supplier data based on settings
+      if (!validateSupplierData()) {
+        return false;
+      }
+
+      let method;
+      if ($("#supplier_id").val() == "") {
+        method = "POST";
+      } else {
+        method = "PUT";
+      }
+
+      $.ajax({
+        type: method,
+        url: api + "suppliers/supplier" + ($("#supplier_id").val() ? "/" + $("#supplier_id").val() : ""),
+        data: $(this).serialize(),
+        success: function (data, textStatus, jqXHR) {
+          $("#saveSupplier").get(0).reset();
+          $("#supplier_id").val("");
+          $("#supplierStatus").val("active");
+          $("#submitSupplier").val("Create Supplier");
+          
+          loadSuppliers();
+          
+          // If editing from product form, refresh the supplier dropdown
+          if ($("#supplier").length > 0) {
+            loadSuppliers();
+          }
+          
+          diagOptions = {
+            title: "Supplier Saved",
+            text: "Select an option below to continue.",
+            okButtonText: "Add another",
+            cancelButtonText: "Close",
+          };
+
+          notiflix.Confirm.show(
+            diagOptions.title,
+            diagOptions.text,
+            diagOptions.okButtonText,
+            diagOptions.cancelButtonText,
+            ()=>{},
+            () => {
+                $("#newSupplier").modal("hide");
+            },
+          );
+        },
+        error: function (jqXHR, textStatus, errorThrown) {
+          let errorMessage = "An error occurred while saving the supplier.";
+          if (jqXHR.responseJSON && jqXHR.responseJSON.message) {
+            errorMessage = jqXHR.responseJSON.message;
+          }
+          notiflix.Report.failure("Error", errorMessage, "Ok");
+        }
+      });
+    });
+
+    $.fn.editSupplier = function (index) {
+      $("#Suppliers").modal("hide");
+      
+      let supplier = allSuppliers[index];
+      
+      $("#supplier_id").val(supplier._id);
+      $("#supplierName").val(supplier.name);
+      $("#supplierCode").val(supplier.code || "");
+      $("#supplierContact").val(supplier.contact || "");
+      $("#supplierEmail").val(supplier.email || "");
+      $("#supplierPhone").val(supplier.phone || "");
+      $("#supplierAddress").val(supplier.address || "");
+      $("#supplierCity").val(supplier.city || "");
+      $("#supplierState").val(supplier.state || "");
+      $("#supplierCountry").val(supplier.country || "");
+      $("#supplierPostalCode").val(supplier.postalCode || "");
+      $("#supplierWebsite").val(supplier.website || "");
+      $("#supplierStatus").val(supplier.status || "active");
+      $("#supplierNotes").val(supplier.notes || "");
+      
+      $("#submitSupplier").val("Update Supplier");
+      $("#newSupplier").modal("show");
+    };
+
+    $.fn.deleteSupplier = function (supplierId) {
+      notiflix.Confirm.show(
+        "Delete Supplier",
+        "Are you sure you want to delete this supplier? This action cannot be undone.",
+        "Delete",
+        "Cancel",
+        () => {
+          $.ajax({
+            type: "DELETE",
+            url: api + "suppliers/supplier/" + supplierId,
+            success: function (data, textStatus, jqXHR) {
+              notiflix.Notify.success("Supplier deleted successfully");
+              loadSuppliers();
+            },
+            error: function (jqXHR, textStatus, errorThrown) {
+              let errorMessage = "An error occurred while deleting the supplier.";
+              if (jqXHR.responseJSON && jqXHR.responseJSON.message) {
+                errorMessage = jqXHR.responseJSON.message;
+              }
+              notiflix.Report.failure("Error", errorMessage, "Ok");
+            }
+          });
+        }
+      );
+    }
+
+    // Supplier search functionality
+    $("#supplierSearch").on("input", function() {
+      const searchTerm = $(this).val().toLowerCase();
+      const table = $("#supplierList").DataTable();
+      table.search(searchTerm).draw();
+    });
+
+    $("#supplierSearchBtn").on("click", function() {
+      const searchTerm = $("#supplierSearch").val().toLowerCase();
+      const table = $("#supplierList").DataTable();
+      table.search(searchTerm).draw();
+    });
+
+    $("#refreshSuppliers").on("click", function() {
+      loadSuppliers();
+    });
+
+    // Supplier modal events
+    $("#newSupplierModal").on("click", function() {
+      $("#supplier_id").val("");
+      $("#saveSupplier").get(0).reset();
+      $("#supplierStatus").val("active");
+      $("#submitSupplier").val("Create Supplier");
+    });
+
+    $("#supplierModal").on("click", function() {
+      loadSuppliers();
+    });
+
+    // New Supplier button from product form
+    $("#newSupplierFromProduct").click(function() {
+      $("#newSupplier").modal("show");
+    });
+
+    // Supplier reports button
+    $("#supplierReportsBtn").click(function() {
+      // Show reports modal with tabs
+      showSupplierReports();
+    });
+
+    // Function to show supplier reports
+    function showSupplierReports() {
+      // Create modal content dynamically
+      let modalContent = `
+        <div class="modal fade" id="supplierReportsModal" tabindex="-1" role="dialog">
+          <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h4 class="modal-title"><i class="fa fa-chart-bar"></i> Supplier Reports</h4>
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+              </div>
+              <div class="modal-body">
+                <ul class="nav nav-tabs" role="tablist">
+                  <li class="nav-item">
+                    <a class="nav-link active" data-toggle="tab" href="#supplierPerformanceTab">Performance</a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" data-toggle="tab" href="#supplierDirectoryTab">Directory</a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" data-toggle="tab" href="#supplierIntegrityTab">Integrity</a>
+                  </li>
+                </ul>
+                <div class="tab-content mt-3">
+                  <div id="supplierPerformanceTab" class="tab-pane active">
+                    <div id="supplierPerformanceContent">Loading...</div>
+                  </div>
+                  <div id="supplierDirectoryTab" class="tab-pane">
+                    <div id="supplierDirectoryContent">Loading...</div>
+                  </div>
+                  <div id="supplierIntegrityTab" class="tab-pane">
+                    <div id="supplierIntegrityContent">Loading...</div>
+                  </div>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      // Remove existing modal if any
+      $("#supplierReportsModal").remove();
+      
+      // Add modal to body
+      $("body").append(modalContent);
+      
+      // Show modal
+      $("#supplierReportsModal").modal("show");
+      
+      // Load data for each tab
+      loadSupplierPerformanceMetrics();
+      loadSupplierDirectory();
+      loadSupplierIntegrityData();
+    }
+
+    function loadSupplierPerformanceMetrics() {
+              $.get(api.replace(/\/$/, '') + "/suppliers/performance", function(data) {
+        let content = `
+          <div class="row">
+            <div class="col-md-6">
+              <div class="card">
+                <div class="card-header">
+                  <h5><i class="fa fa-chart-pie"></i> Overview</h5>
+                </div>
+                <div class="card-body">
+                  <p><strong>Total Suppliers:</strong> ${data.totalSuppliers}</p>
+                  <p><strong>Active:</strong> ${data.activeSuppliers}</p>
+                  <p><strong>Inactive:</strong> ${data.inactiveSuppliers}</p>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="card">
+                <div class="card-header">
+                  <h5><i class="fa fa-info-circle"></i> Data Quality</h5>
+                </div>
+                <div class="card-body">
+                  <p><strong>With Code:</strong> ${data.completionRate.withCode}%</p>
+                  <p><strong>With Contact:</strong> ${data.completionRate.withContact}%</p>
+                  <p><strong>With Email:</strong> ${data.completionRate.withEmail}%</p>
+                  <p><strong>With Phone:</strong> ${data.completionRate.withPhone}%</p>
+                  <p><strong>With Address:</strong> ${data.completionRate.withAddress}%</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+        
+        $("#supplierPerformanceContent").html(content);
+      }).fail(function() {
+        $("#supplierPerformanceContent").html('<div class="alert alert-danger">Failed to load performance metrics</div>');
+      });
+    }
+
+    function loadSupplierDirectory() {
+              $.get(api.replace(/\/$/, '') + "/suppliers/directory", function(data) {
+        let content = `
+          <div class="table-responsive">
+            <table class="table table-striped">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Contact</th>
+                  <th>Phone</th>
+                  <th>Email</th>
+                  <th>City</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+        `;
+        
+        data.suppliers.forEach(supplier => {
+          content += `
+            <tr>
+              <td><strong>${supplier.name}</strong>${supplier.code ? ` (${supplier.code})` : ''}</td>
+              <td>${supplier.contact || '-'}</td>
+              <td>${supplier.phone || '-'}</td>
+              <td>${supplier.email || '-'}</td>
+              <td>${supplier.city || '-'}</td>
+              <td><span class="label label-${supplier.status === 'active' ? 'success' : 'warning'}">${supplier.status}</span></td>
+            </tr>
+          `;
+        });
+        
+        content += `
+              </tbody>
+            </table>
+          </div>
+        `;
+        
+        $("#supplierDirectoryContent").html(content);
+      }).fail(function() {
+        $("#supplierDirectoryContent").html('<div class="alert alert-danger">Failed to load contact directory</div>');
+      });
+    }
+
+          function loadSupplierIntegrityData() {
+        $.get(api.replace(/\/$/, '') + "/suppliers/integrity-report", function(data) {
+        let content = `
+          <div class="alert alert-info">
+            <h5><i class="fa fa-shield"></i> Data Integrity Summary</h5>
+            <div class="row">
+              <div class="col-md-6">
+                <strong>Total Suppliers:</strong> ${data.totalSuppliers}<br>
+                <strong>Active:</strong> ${data.activeSuppliers}<br>
+                <strong>Inactive:</strong> ${data.inactiveSuppliers}<br>
+                <strong>With Code:</strong> ${data.suppliersWithCode}<br>
+                <strong>With Contact:</strong> ${data.suppliersWithContact}<br>
+                <strong>With Email:</strong> ${data.suppliersWithEmail}<br>
+                <strong>With Phone:</strong> ${data.suppliersWithPhone}<br>
+                <strong>With Address:</strong> ${data.suppliersWithAddress}
+              </div>
+              <div class="col-md-6">
+                <strong>Validation Issues:</strong> ${data.validationIssues.length}<br>
+                <strong>Recommendations:</strong> ${data.recommendations.length}
+              </div>
+            </div>
+          </div>
+        `;
+        
+        if (data.validationIssues.length > 0) {
+          content += `
+            <div class="alert alert-warning">
+              <h6><i class="fa fa-exclamation-triangle"></i> Validation Issues Found</h6>
+              <ul>
+          `;
+          data.validationIssues.forEach(issue => {
+            content += `<li>${issue}</li>`;
+          });
+          content += `</ul></div>`;
+        }
+        
+        if (data.recommendations.length > 0) {
+          content += `
+            <div class="alert alert-info">
+              <h6><i class="fa fa-lightbulb-o"></i> Recommendations</h6>
+              <ul>
+          `;
+          data.recommendations.forEach(rec => {
+            content += `<li>${rec}</li>`;
+          });
+          content += `</ul></div>`;
+        }
+        
+        $("#supplierIntegrityContent").html(content);
+      }).fail(function() {
+        $("#supplierIntegrityContent").html('<div class="alert alert-danger">Failed to load integrity data</div>');
+      });
+    }
+
+    // Supplier export button
+    $("#supplierExportBtn").click(function() {
+              window.open(api.replace(/\/$/, '') + "/suppliers/export", "_blank");
+    });
+
+    // Supplier integrity check button
+    $("#supplierIntegrityBtn").click(function() {
+              $.get(api.replace(/\/$/, '') + "/suppliers/integrity-report", function(data) {
+        let integrityReport = `
+          <div class="alert alert-info">
+            <h5><i class="fa fa-shield"></i> Data Integrity Report</h5>
+            <div class="row">
+              <div class="col-md-6">
+                <strong>Total Suppliers:</strong> ${data.totalSuppliers}<br>
+                <strong>Active:</strong> ${data.activeSuppliers}<br>
+                <strong>Inactive:</strong> ${data.inactiveSuppliers}<br>
+                <strong>With Code:</strong> ${data.suppliersWithCode}<br>
+                <strong>With Email:</strong> ${data.suppliersWithEmail}<br>
+                <strong>With Phone:</strong> ${data.suppliersWithPhone}<br>
+                <strong>With Address:</strong> ${data.suppliersWithAddress}
+              </div>
+              <div class="col-md-6">
+                <strong>Validation Issues:</strong> ${data.validationIssues.length}<br>
+                <strong>Recommendations:</strong> ${data.recommendations.length}
+              </div>
+            </div>
+          </div>
+        `;
+        
+        if (data.validationIssues.length > 0) {
+          integrityReport += `
+            <div class="alert alert-warning">
+              <h6><i class="fa fa-exclamation-triangle"></i> Validation Issues Found</h6>
+              <ul>
+          `;
+          data.validationIssues.forEach(issue => {
+            integrityReport += `<li>${issue}</li>`;
+          });
+          integrityReport += `</ul></div>`;
+        }
+        
+        if (data.recommendations.length > 0) {
+          integrityReport += `
+            <div class="alert alert-info">
+              <h6><i class="fa fa-lightbulb-o"></i> Recommendations</h6>
+              <ul>
+          `;
+          data.recommendations.forEach(rec => {
+            integrityReport += `<li>${rec}</li>`;
+          });
+          integrityReport += `</ul></div>`;
+        }
+        
+        notiflix.Report.info(
+          "Data Integrity Report",
+          integrityReport,
+          "Close"
+        );
+      }).fail(function() {
+        notiflix.Report.failure(
+          "Error",
+          "Failed to generate integrity report",
+          "Close"
+        );
+      });
+    });
+
+    // Supplier bulk import button
+    $("#supplierBulkImportBtn").click(function () {
+        $("#supplierBulkImport").modal("show");
+    });
+
+    // Supplier bulk import form submission
+    $("#supplierBulkImportForm").submit(function (e) {
+        e.preventDefault();
+        
+        let formData = new FormData();
+        formData.append('csvFile', $("#supplierCsvFile")[0].files[0]);
+        formData.append('skipDuplicates', $("#supplierSkipDuplicates").is(':checked'));
+        formData.append('updateExisting', $("#supplierUpdateExisting").is(':checked'));
+        
+        $("#submitSupplierBulkImport").prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Importing...');
+        $("#supplierImportProgress").show();
+        $("#supplierImportStatus").text("Processing...");
+        
+        $.ajax({
+            url: api.replace(/\/$/, '') + "/suppliers/bulk-import",
+            type: "POST",
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function (response) {
+                $("#submitSupplierBulkImport").prop('disabled', false).html('<i class="fa fa-upload"></i> Import Suppliers');
+                $("#supplierImportProgress").hide();
+                
+                if (response.success) {
+                    let message = response.message;
+                    if (response.errors && response.errors.length > 0) {
+                        message += `\n\nErrors encountered:\n`;
+                        response.errors.forEach(error => {
+                            message += `${error}\n`;
+                        });
+                    }
+                    
+                    notiflix.Report.success(
+                        "Import Completed",
+                        message,
+                        "OK"
+                    );
+                    
+                    // Refresh suppliers list
+                    loadSuppliers();
+                    
+                    // Close modal
+                    $("#supplierBulkImport").modal("hide");
+                    
+                    // Reopen Suppliers modal to show updated list
+                    $("#Suppliers").modal("show");
+                }
+            },
+            error: function (jqXHR, textStatus, errorThrown) {
+                $("#submitSupplierBulkImport").prop('disabled', false).html('<i class="fa fa-upload"></i> Import Suppliers');
+                $("#supplierImportProgress").hide();
+                
+                let errorMessage = "An error occurred during import.";
+                if (jqXHR.responseJSON && jqXHR.responseJSON.message) {
+                    errorMessage = jqXHR.responseJSON.message;
+                }
+                
+                notiflix.Report.failure(
+                    "Import Failed",
+                    errorMessage,
+                    "OK"
+                );
+            }
+        });
+    });
+
+    // Download supplier template
+    $("#downloadSupplierTemplate").click(function() {
+        const header = [
+            'Name',
+            'Code',
+            'Contact',
+            'Email',
+            'Phone',
+            'Address',
+            'City',
+            'State',
+            'Country',
+            'PostalCode',
+            'Website',
+            'Notes',
+            'Status'
+        ];
+        
+        const sampleData = [
+            'ABC Pharmaceuticals',
+            'ABC',
+            'John Smith',
+            'john@abcpharma.com',
+            '+1-555-0123',
+            '123 Main Street',
+            'New York',
+            'NY',
+            'USA',
+            '10001',
+            'https://abcpharma.com',
+            'Primary supplier for antibiotics',
+            'active'
+        ];
+        
+        let csvContent = header.join(',') + '\n' + sampleData.join(',');
+        
+        // Create download link
+        let blob = new Blob([csvContent], { type: 'text/csv' });
+        let url = window.URL.createObjectURL(blob);
+        let a = document.createElement('a');
+        a.href = url;
+        a.download = 'suppliers_template.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+    });
+
+    // ========================================
+    // END SUPPLIER MANAGEMENT FUNCTIONS
+    // ========================================
+
     $.fn.editProduct = function (index) {
       $("#Products").modal("hide");
+
+      // Load manufacturers first to ensure dropdown is populated
+      loadManufacturers();
 
       $("#category option")
         .filter(function () {
@@ -2049,8 +3550,10 @@ if (auth == undefined) {
       e.preventDefault();
       
       const formData = new FormData(this);
-      formData.append('skipDuplicates', $("#skipDuplicates").is(':checked'));
-      formData.append('updateExisting', $("#updateExisting").is(':checked'));
+              formData.append('skipDuplicates', $("#skipDuplicates").is(':checked'));
+        formData.append('updateExisting', $("#updateExisting").is(':checked'));
+        formData.append('createManufacturers', $("#createManufacturers").is(':checked'));
+        formData.append('createSuppliers', $("#createSuppliers").is(':checked'));
       
       // Get the selected default category value
       const defaultCategory = $("#defaultCategory").val();
@@ -2059,9 +3562,11 @@ if (auth == undefined) {
       }
       
       console.log("Bulk import parameters:");
-      console.log("- Skip Duplicates:", $("#skipDuplicates").is(':checked'));
-      console.log("- Update Existing:", $("#updateExisting").is(':checked'));
-      console.log("- Default Category:", defaultCategory);
+              console.log("- Skip Duplicates:", $("#skipDuplicates").is(':checked'));
+        console.log("- Update Existing:", $("#updateExisting").is(':checked'));
+        console.log("- Create Manufacturers:", $("#createManufacturers").is(':checked'));
+        console.log("- Create Suppliers:", $("#createSuppliers").is(':checked'));
+        console.log("- Default Category:", defaultCategory);
       
       $("#submitBulkImport").prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Importing...');
       $("#importProgress").show();
@@ -2086,20 +3591,53 @@ if (auth == undefined) {
               });
             }
             
-            notiflix.Report.success(
-              "Import Completed",
-              message,
-              "OK"
-            );
+                      notiflix.Report.success(
+            "Import Completed",
+            message,
+            "OK"
+          );
+          
+          // Add a longer delay to ensure backend processing and database sync is complete
+          setTimeout(() => {
+            console.log("Starting to refresh lists after bulk import...");
             
-                         // Refresh products list
-             loadProducts();
-             
-             // Close modal
-             $("#bulkImport").modal("hide");
-             
-             // Reopen Products modal to show updated list
-             $("#Products").modal("show");
+            // Refresh all relevant lists with retry logic
+            const refreshLists = (retryCount = 0) => {
+              if (retryCount >= 3) {
+                console.log("Max retries reached, closing modal...");
+                $("#bulkImport").modal("hide");
+                return;
+              }
+              
+              console.log(`Refresh attempt ${retryCount + 1}/3`);
+              
+              // Refresh all relevant lists
+              console.log("Refreshing products...");
+              loadProducts();
+              
+              console.log("Refreshing categories...");
+              loadCategories();
+              
+              console.log("Refreshing manufacturers...");
+              loadManufacturers();
+              
+              console.log("Refreshing suppliers...");
+              loadSuppliers();
+              
+              // Check if suppliers loaded successfully
+              setTimeout(() => {
+                if (allSuppliers && allSuppliers.length > 0) {
+                  console.log("All lists refreshed successfully, closing modal...");
+                  $("#bulkImport").modal("hide");
+                } else {
+                  console.log(`Suppliers not loaded, retrying... (${retryCount + 1}/3)`);
+                  refreshLists(retryCount + 1);
+                }
+              }, 2000); // Wait 2 seconds to check if data loaded
+            };
+            
+            refreshLists();
+          }, 2000); // 2 second delay
           }
         },
         error: function (jqXHR, textStatus, errorThrown) {
@@ -2431,10 +3969,11 @@ if (auth == undefined) {
             <td><img style="max-height: 50px; max-width: 50px; border: 1px solid #ddd;" src="${product_img}" id="product_img"></td>
             <td>
               <div><strong>${product.name}</strong></div>
-              ${product.genericName ? `<div><small class="text-muted">${product.genericName}</small></div>` : ""}
-              ${product.manufacturer ? `<div><small class="text-muted">${product.manufacturer}</small></div>` : ""}
-              ${product.supplier ? `<div><small class="text-muted">Supplier: ${product.supplier}</small></div>` : ""}
-              ${product.batchNumber ? `<div><small class="text-muted">Batch: ${product.batchNumber}</small></div>` : ""}
+              ${product.genericName ? `<div><small class="text-muted">Generic: ${product.genericName}</small></div>` : ""}
+              ${category.length > 0 ? `<div><small class="text-info"><i class="fa fa-tag"></i> ${category[0].name}</small></div>` : ""}
+              ${product.manufacturer ? `<div><small class="text-success"><i class="fa fa-industry"></i> ${product.manufacturer}</small></div>` : ""}
+              ${product.supplier ? `<div><small class="text-warning"><i class="fa fa-truck"></i> ${product.supplier}</small></div>` : ""}
+              ${product.batchNumber ? `<div><small class="text-muted"><i class="fa fa-barcode"></i> ${product.batchNumber}</small></div>` : ""}
               ${product.expiryAlert}
             </td>
             <td>
@@ -2445,7 +3984,6 @@ if (auth == undefined) {
             ${product.stockAlert}
             </td>
             <td>${product.expirationDate}</td>
-            <td>${category.length > 0 ? category[0].name : ""}</td>
             <td class="nobr"><span class="btn-group"><button onClick="$(this).editProduct(${index})" class="btn btn-warning btn-sm"><i class="fa fa-edit"></i></button><button onClick="$(this).deleteProduct(` +
               product._id +
             `)" class="btn btn-danger btn-sm"><i class="fa fa-trash"></i></button></span></td></tr>`;

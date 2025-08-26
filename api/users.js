@@ -185,6 +185,8 @@ app.post("/post", function (req, res) {
             const perms = [
                 "perm_products",
                 "perm_categories",
+                "perm_manufacturers",
+                "perm_suppliers",
                 "perm_transactions",
                 "perm_users",
                 "perm_settings",
@@ -281,6 +283,8 @@ app.get("/check", function (req, res) {
                             fullname: "Administrator",
                             perm_products: 1,
                             perm_categories: 1,
+                            perm_manufacturers: 1,
+                            perm_suppliers: 1,
                             perm_transactions: 1,
                             perm_users: 1,
                             perm_settings: 1,

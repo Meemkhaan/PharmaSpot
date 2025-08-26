@@ -64,8 +64,6 @@ console.log("CSV upload single function:", csvUpload.single('csvFile'));
 
 app.use(bodyParser.json());
 
-module.exports = app;
-
 let inventoryDB = new Datastore({
     filename: dbPath,
     autoload: true,
@@ -367,10 +365,52 @@ app.post("/bulk-import", csvUpload.single('csvFile'), function (req, res) {
     };
     const skipDuplicates = parseBool(req.body.skipDuplicates);
     const updateExisting = parseBool(req.body.updateExisting);
+    let createManufacturers = parseBool(req.body.createManufacturers);
+    let createSuppliers = parseBool(req.body.createSuppliers);
+    
+    // Check settings for auto-create manufacturers if not explicitly set
+    if (!createManufacturers) {
+        try {
+            const settingsDB = new Datastore({
+                filename: path.join(process.env.APPDATA, process.env.APPNAME, "server", "databases", "settings.db"),
+                autoload: true
+            });
+            
+            settingsDB.findOne({ _id: 1 }, (err, settings) => {
+                if (!err && settings && settings.settings && settings.settings.autoCreateManufacturers) {
+                    createManufacturers = true;
+                    console.log('- Auto-create manufacturers enabled from settings');
+                }
+            });
+        } catch (err) {
+            console.log('- Could not load settings for manufacturer auto-creation');
+        }
+    }
+    
+    // Check settings for auto-create suppliers if not explicitly set
+    if (!createSuppliers) {
+        try {
+            const settingsDB = new Datastore({
+                filename: path.join(process.env.APPDATA, process.env.APPNAME, "server", "databases", "settings.db"),
+                autoload: true
+            });
+            
+            settingsDB.findOne({ _id: 1 }, (err, settings) => {
+                if (!err && settings && settings.settings && settings.settings.autoCreateSuppliers) {
+                    createSuppliers = true;
+                    console.log('- Auto-create suppliers enabled from settings');
+                }
+            });
+        } catch (err) {
+            console.log('- Could not load settings for supplier auto-creation');
+        }
+    }
 
     console.log('Bulk import started with options:');
     console.log('- Skip Duplicates:', skipDuplicates);
     console.log('- Update Existing:', updateExisting);
+    console.log('- Create Manufacturers:', createManufacturers);
+    console.log('- Create Suppliers:', createSuppliers);
     console.log('- Default Category:', req.body.defaultCategory);
     console.log('- File:', req.file.originalname);
 
@@ -402,7 +442,33 @@ app.post("/bulk-import", csvUpload.single('csvFile'), function (req, res) {
     function processRowsSequentially(rows, index) {
         if (index >= rows.length) {
             // All rows processed, send response
-            fs.unlinkSync(req.file.path);
+            // Safe file cleanup with error handling
+            try {
+                if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+                    fs.unlinkSync(req.file.path);
+                }
+            } catch (cleanupError) {
+                console.log(`File cleanup warning: ${cleanupError.message}`);
+            }
+            
+            // Force database reload to ensure fresh data
+            console.log("Forcing database reload after bulk import...");
+            try {
+                // Reload all relevant databases
+                const categoryDBPath = path.join(appData, appName, "server", "databases", "categories.db");
+                const manufacturerDBPath = path.join(appData, appName, "server", "databases", "manufacturers.db");
+                const supplierDBPath = path.join(appData, appName, "server", "databases", "suppliers.db");
+                
+                // Force reload by creating new instances
+                const categoryDB = new Datastore({ filename: categoryDBPath, autoload: true });
+                const manufacturerDB = new Datastore({ filename: manufacturerDBPath, autoload: true });
+                const supplierDB = new Datastore({ filename: supplierDBPath, autoload: true });
+                
+                console.log("Databases reloaded successfully");
+            } catch (reloadError) {
+                console.log(`Database reload warning: ${reloadError.message}`);
+            }
+            
             res.json({
                 success: true,
                 message: `Import completed. Processed ${processed} products.`,
@@ -610,13 +676,171 @@ app.post("/bulk-import", csvUpload.single('csvFile'), function (req, res) {
         }
     }
 
+    // Function to create or find manufacturer
+    function processManufacturer(manufacturerName, callback) {
+        if (!manufacturerName || manufacturerName.trim() === '') {
+            return callback(null, null);
+        }
+
+        const manufacturerDBPath = path.join(appData, appName, "server", "databases", "manufacturers.db");
+        const manufacturerDB = new Datastore({
+            filename: manufacturerDBPath,
+            autoload: true,
+            onload: function(err) {
+                if (err) {
+                    console.error(`Manufacturer database load error: ${err.message}`);
+                }
+            }
+        });
+
+        const cleanName = validator.escape(manufacturerName.trim());
+        
+        // Check if manufacturer exists
+        manufacturerDB.findOne({ name: cleanName }, function (err, existingManufacturer) {
+            if (err) {
+                console.error(`Manufacturer lookup error for ${cleanName}:`, err);
+                return callback(err, null);
+            }
+            
+            if (existingManufacturer) {
+                console.log(`- Using existing manufacturer: ${cleanName} (ID: ${existingManufacturer._id})`);
+                return callback(null, existingManufacturer._id);
+            }
+            
+            // Create new manufacturer if createManufacturers is enabled
+            if (createManufacturers) {
+                const newManufacturer = {
+                    _id: Math.floor(Date.now() / 1000) + Math.floor(Math.random() * 1000),
+                    name: cleanName,
+                    code: cleanName.substring(0, 5).toUpperCase(), // Auto-generate code from name
+                    status: 'active',
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                };
+                
+                console.log(`- Creating new manufacturer: ${cleanName} (ID: ${newManufacturer._id})`);
+                
+                try {
+                    manufacturerDB.insert(newManufacturer, function (err, manufacturer) {
+                        if (err) {
+                            console.error(`Manufacturer creation error for ${cleanName}:`, err);
+                            return callback(err, null);
+                        }
+                        
+                        console.log(`- Successfully created new manufacturer: ${cleanName} (ID: ${manufacturer._id})`);
+                        // Compact database to prevent corruption
+                        try {
+                            manufacturerDB.compactDatafile();
+                        } catch (compactError) {
+                            console.log(`- Database compaction warning: ${compactError.message}`);
+                        }
+                        // Force database sync
+                        try {
+                            manufacturerDB.loadDatabase();
+                        } catch (syncError) {
+                            console.log(`- Database sync warning: ${syncError.message}`);
+                        }
+                        return callback(null, manufacturer._id);
+                    });
+                } catch (dbError) {
+                    console.error(`Manufacturer database operation error for ${cleanName}:`, dbError);
+                    return callback(dbError, null);
+                }
+            } else {
+                console.log(`- Manufacturer not found and auto-creation disabled: ${cleanName}`);
+                return callback(null, null);
+            }
+        });
+    }
+
+    // Function to create or find supplier
+    function processSupplier(supplierName, callback) {
+        if (!supplierName || supplierName.trim() === '') {
+            return callback(null, null);
+        }
+
+        const supplierDBPath = path.join(appData, appName, "server", "databases", "suppliers.db");
+        const supplierDB = new Datastore({
+            filename: supplierDBPath,
+            autoload: true,
+            onload: function(err) {
+                if (err) {
+                    console.error(`Supplier database load error: ${err.message}`);
+                }
+            }
+        });
+
+        const cleanName = validator.escape(supplierName.trim());
+        
+        // Check if supplier exists
+        supplierDB.findOne({ name: cleanName }, function (err, existingSupplier) {
+            if (err) {
+                console.error(`Supplier lookup error for ${cleanName}:`, err);
+                return callback(err, null);
+            }
+            
+            if (existingSupplier) {
+                console.log(`- Using existing supplier: ${cleanName} (ID: ${existingSupplier._id})`);
+                return callback(null, existingSupplier._id);
+            }
+            
+            // Create new supplier if createSuppliers is enabled
+            if (createSuppliers) {
+                const newSupplier = {
+                    _id: Math.floor(Date.now() / 1000) + Math.floor(Math.random() * 1000),
+                    name: cleanName,
+                    code: `SUPP-${cleanName.substring(0, 3).toUpperCase()}-${Date.now()}`,
+                    status: 'active',
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                };
+                
+                console.log(`- Creating new supplier: ${cleanName} (ID: ${newSupplier._id})`);
+                
+                try {
+                    supplierDB.insert(newSupplier, function (err, supplier) {
+                        if (err) {
+                            console.error(`Supplier creation error for ${cleanName}:`, err);
+                            return callback(err, null);
+                        }
+                        
+                        console.log(`- Successfully created new supplier: ${cleanName} (ID: ${supplier._id})`);
+                        // Compact database to prevent corruption
+                        try {
+                            supplierDB.compactDatafile();
+                        } catch (compactError) {
+                            console.log(`- Database compaction warning: ${compactError.message}`);
+                        }
+                        // Force database sync
+                        try {
+                            supplierDB.loadDatabase();
+                        } catch (syncError) {
+                            console.log(`- Database sync warning: ${syncError.message}`);
+                        }
+                        return callback(null, supplier._id);
+                    });
+                } catch (dbError) {
+                    console.error(`Supplier database operation error for ${cleanName}:`, dbError);
+                    return callback(dbError, null);
+                }
+            } else {
+                console.log(`- Supplier not found and auto-creation disabled: ${cleanName}`);
+                return callback(null, null);
+            }
+        });
+    }
+
     function processProductWithCategory(data, defaultCategory, updateExisting, existingProductId, callback) {
         // Handle category - check if it exists in the database, if not create it
         let categoryId = defaultCategory; // Default to the selected category
         
+        // Handle manufacturer - check if it exists in the database, if not create it
+        let manufacturerId = null;
+        
         console.log(`Processing category for product: ${data.Name}`);
         console.log(`- CSV Category: "${data.Category}"`);
         console.log(`- Default Category: ${defaultCategory}`);
+        console.log(`- CSV Manufacturer: "${data.Manufacturer || 'Not specified'}"`);
         
         if (data.Category && data.Category.trim() !== '') {
             // Try to find existing category by name
@@ -663,12 +887,46 @@ app.post("/bulk-import", csvUpload.single('csvFile'), function (req, res) {
                     // Use default category if lookup fails
                     console.log(`- Using default category due to lookup error: ${defaultCategory}`);
                     categoryId = defaultCategory;
-                    processProductData(data, categoryId, updateExisting, null, callback);
+                    // Process manufacturer and supplier after category
+                    processManufacturer(data.Manufacturer, (err, manufacturerId) => {
+                        if (err) {
+                            console.log(`- Manufacturer processing error: ${err.message}`);
+                            manufacturerId = null;
+                        }
+                        
+                        // Process supplier
+                        processSupplier(data.Supplier, (err2, supplierId) => {
+                            if (err2) {
+                                console.log(`- Supplier processing error: ${err2.message}`);
+                                supplierId = null;
+                            }
+                            
+                            // Now process the product with all the resolved IDs
+                            processProductData(data, categoryId, updateExisting, null, callback);
+                        });
+                    });
                 } else if (existingCategory) {
                     // Use existing category ID
                     categoryId = existingCategory._id;
                     console.log(`- Using existing category: ${categoryName} (ID: ${categoryId})`);
-                    processProductData(data, categoryId, updateExisting, null, callback);
+                    // Process manufacturer and supplier after category
+                    processManufacturer(data.Manufacturer, (err, manufacturerId) => {
+                        if (err) {
+                            console.log(`- Manufacturer processing error: ${err.message}`);
+                            manufacturerId = null;
+                        }
+                        
+                        // Process supplier
+                        processSupplier(data.Supplier, (err2, supplierId) => {
+                            if (err2) {
+                                console.log(`- Supplier processing error: ${err2.message}`);
+                                supplierId = null;
+                            }
+                            
+                            // Now process the product with all the resolved IDs
+                            processProductData(data, categoryId, updateExisting, null, callback);
+                        });
+                    });
                 } else {
                     // Create new category
                     const newCategory = {
@@ -696,8 +954,31 @@ app.post("/bulk-import", csvUpload.single('csvFile'), function (req, res) {
                                 categoryId = newCategory._id;
                                 console.log(`- Successfully created new category: ${categoryName} (ID: ${categoryId})`);
                                 console.log(`- Inserted category object:`, category);
+                                // Force database sync for categories
+                                try {
+                                    categoryDB.loadDatabase();
+                                } catch (syncError) {
+                                    console.log(`- Category database sync warning: ${syncError.message}`);
+                                }
                             }
-                            processProductData(data, categoryId, updateExisting, null, callback);
+                            // Process manufacturer and supplier after category
+                            processManufacturer(data.Manufacturer, (err, manufacturerId) => {
+                                if (err) {
+                                    console.log(`- Manufacturer processing error: ${err.message}`);
+                                    manufacturerId = null;
+                                }
+                                
+                                // Process supplier
+                                processSupplier(data.Supplier, (err2, supplierId) => {
+                                    if (err2) {
+                                        console.log(`- Supplier processing error: ${err2.message}`);
+                                        supplierId = null;
+                                    }
+                                    
+                                    // Now process the product with all the resolved IDs
+                                    processProductData(data, categoryId, updateExisting, null, callback);
+                                });
+                            });
                         });
                     });
                 }
@@ -705,12 +986,35 @@ app.post("/bulk-import", csvUpload.single('csvFile'), function (req, res) {
         } else {
             // No category specified, use default
             console.log(`- No category specified in CSV, using default: ${defaultCategory}`);
-            processProductData(data, categoryId, updateExisting, null, callback);
+            // Process manufacturer and supplier after category
+            processManufacturer(data.Manufacturer, (err, manufacturerId) => {
+                if (err) {
+                    console.log(`- Manufacturer processing error: ${err.message}`);
+                    manufacturerId = null;
+                }
+                
+                // Process supplier
+                processSupplier(data.Supplier, (err2, supplierId) => {
+                    if (err2) {
+                        console.log(`- Supplier processing error: ${err2.message}`);
+                        supplierId = null;
+                    }
+                    
+                    // Now process the product with all the resolved IDs
+                    processProductData(data, categoryId, updateExisting, existingProductId, callback);
+                });
+            });
         }
     }
+    
+
 
     function processProductData(data, categoryId, updateExisting, existingProductId, callback) {
         const sellingPriceField = (typeof data.SellingPrice !== 'undefined' && data.SellingPrice !== '') ? data.SellingPrice : data.Price;
+        
+        // Get manufacturer name from the data (this should already be processed)
+        const manufacturerName = data.Manufacturer ? validator.escape(data.Manufacturer.toString()) : "";
+        
         const productData = {
             barcode: parseInt(data.Barcode),
             name: validator.escape(data.Name),
@@ -718,7 +1022,7 @@ app.post("/bulk-import", csvUpload.single('csvFile'), function (req, res) {
             // Accept both PurchasePrice (new) and ActualPrice (legacy)
             actualPrice: validator.escape((data.PurchasePrice !== undefined && data.PurchasePrice !== "") ? data.PurchasePrice : (data.ActualPrice || "")),
             genericName: validator.escape((data.GenericName || "").toString()),
-            manufacturer: validator.escape((data.Manufacturer || "").toString()),
+            manufacturer: manufacturerName,
             supplier: validator.escape((data.Supplier || "").toString()),
             batchNumber: validator.escape((data.BatchNumber || "").toString()),
             category: categoryId,
@@ -1020,3 +1324,5 @@ app.decrementInventory = function (products) {
 console.log("Multer imported:", multer);
 console.log("Multer type:", typeof multer);
 console.log("Multer methods:", Object.getOwnPropertyNames(Object.getPrototypeOf(multer)).filter(name => typeof multer[name] === 'function'));
+
+module.exports = app;
