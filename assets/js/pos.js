@@ -99,6 +99,220 @@ $(document).on('click', '#clearAlerts', function() {
     $(".notiflix-notify-wrap, .notiflix-notify").remove();
   }
 });
+
+// Add keyboard support for Notiflix Report modals
+$(document).on('keydown', function(e) {
+  // Check if any Notiflix Report modal is open
+  const reportModal = $('.notiflix-report-modal');
+  if (reportModal.length > 0) {
+    // Escape key to close modal
+    if (e.keyCode === 27) { // ESC key
+      e.preventDefault();
+      $('.notiflix-report-modal .notiflix-report-button').click();
+    }
+    // Enter key to close modal (same as clicking OK button)
+    if (e.keyCode === 13) { // Enter key
+      e.preventDefault();
+      $('.notiflix-report-modal .notiflix-report-button').click();
+    }
+    // Space key to close modal
+    if (e.keyCode === 32) { // Space key
+      e.preventDefault();
+      $('.notiflix-report-modal .notiflix-report-button').click();
+    }
+  }
+});
+
+// Enhanced auto-focus for Notiflix Report modals
+function focusNotiflixModal() {
+  // Try both possible modal classes
+  const modal = $('.notiflix-report-modal, .notiflix-report-content');
+  if (modal.length > 0) {
+    // Force focus on the modal
+    modal.attr('tabindex', '0');
+    
+    // Try multiple focus strategies with immediate focus
+    // Strategy 1: Immediate focus on button by ID (most reliable)
+    const buttonById = $('#NXReportButton');
+    if (buttonById.length) {
+      buttonById.attr('tabindex', '0').focus();
+    }
+    
+    // Strategy 2: Focus with delay for other elements
+    setTimeout(() => {
+      // Focus the modal container
+      modal.focus();
+      
+      // Focus the button by class
+      const button = modal.find('.notiflix-report-button');
+      if (button.length) {
+        button.attr('tabindex', '0').focus();
+      }
+      
+      // Focus any focusable element in the modal
+      const focusableElements = modal.find('button, [tabindex], input, select, textarea');
+      if (focusableElements.length > 0) {
+        focusableElements.first().focus();
+      }
+    }, 25); // Reduced delay for faster response
+  }
+}
+
+// Modern MutationObserver to catch modal appearance (no deprecated events)
+
+// Use MutationObserver as primary detection method
+if (typeof MutationObserver !== 'undefined') {
+  const observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(mutation) {
+      mutation.addedNodes.forEach(function(node) {
+        // Check for both possible modal classes
+        if (node.nodeType === 1 && node.classList && 
+            (node.classList.contains('notiflix-report-modal') || 
+             node.classList.contains('notiflix-report-content'))) {
+          focusNotiflixModal();
+        }
+      });
+    });
+  });
+  
+  // Start observing immediately
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+}
+
+// Aggressive polling fallback for stubborn modals
+setInterval(function() {
+  const modal = $('.notiflix-report-modal, .notiflix-report-content');
+  if (modal.length > 0) {
+    const isFocused = document.activeElement && 
+                     (document.activeElement.closest('.notiflix-report-modal') || 
+                      document.activeElement.closest('.notiflix-report-content'));
+    if (!isFocused) {
+      focusNotiflixModal();
+    }
+  }
+}, 100); // Check every 100ms for better responsiveness
+
+// Override Notiflix Report to force focus
+if (window.notiflix && notiflix.Report) {
+  const originalInfo = notiflix.Report.info;
+  const originalSuccess = notiflix.Report.success;
+  const originalWarning = notiflix.Report.warning;
+  const originalFailure = notiflix.Report.failure;
+  
+  // Override info method
+  notiflix.Report.info = function(title, message, buttonText) {
+    const result = originalInfo.call(this, title, message, buttonText);
+    
+    // Immediate focus attempt
+    setTimeout(focusNotiflixModal, 50);
+    
+    // Additional focus attempts with delays
+    setTimeout(focusNotiflixModal, 150);
+    setTimeout(focusNotiflixModal, 300);
+    
+    return result;
+  };
+  
+  // Override success method
+  notiflix.Report.success = function(title, message, buttonText) {
+    const result = originalSuccess.call(this, title, message, buttonText);
+    
+    // Immediate focus attempt
+    setTimeout(focusNotiflixModal, 50);
+    
+    // Additional focus attempts with delays
+    setTimeout(focusNotiflixModal, 150);
+    setTimeout(focusNotiflixModal, 300);
+    
+    return result;
+  };
+  
+  // Override warning method
+  notiflix.Report.warning = function(title, message, buttonText) {
+    const result = originalWarning.call(this, title, message, buttonText);
+    
+    // Immediate focus attempt
+    setTimeout(focusNotiflixModal, 50);
+    
+    // Additional focus attempts with delays
+    setTimeout(focusNotiflixModal, 150);
+    setTimeout(focusNotiflixModal, 300);
+    
+    return result;
+  };
+  
+  // Override failure method
+  notiflix.Report.failure = function(title, message, buttonText) {
+    const result = originalFailure.call(this, title, message, buttonText);
+    
+    // Immediate focus attempt
+    setTimeout(focusNotiflixModal, 50);
+    
+    // Additional focus attempts with delays
+    setTimeout(focusNotiflixModal, 150);
+    setTimeout(focusNotiflixModal, 300);
+    
+    return result;
+  };
+}
+
+// Test function to manually trigger Stock Limit alert (for testing)
+window.testStockLimitAlert = function() {
+  notiflix.Report.info(
+    "Stock Limit!",
+    "Maximum available stock: 5",
+    "Ok"
+  );
+};
+
+// Global keyboard handler for Notiflix modals - Enter key only
+$(document).on('keydown', function(e) {
+  const modal = $('.notiflix-report-modal, .notiflix-report-content');
+  if (modal.length > 0) {
+    // Close modal with Enter key only (most reliable)
+    if (e.keyCode === 13) { // Enter key
+      e.preventDefault();
+      e.stopPropagation(); // Prevent event bubbling
+      
+      const button = modal.find('.notiflix-report-button, #NXReportButton');
+      if (button.length) {
+        button.click();
+      }
+    }
+  }
+});
+
+// Global keyboard handler for POS function keys
+$(document).on('keydown', function(e) {
+  // Only handle function keys when in POS view
+  if ($('#pos_view').is(':visible')) {
+    switch (e.keyCode) {
+      case 112: // F1 key - Pay Button
+        e.preventDefault();
+        if ($('#payButton').is(':visible')) {
+          $('#payButton').click();
+        }
+        break;
+        
+      case 113: // F2 key - Hold Button
+        e.preventDefault();
+        if ($('#hold').is(':visible')) {
+          $('#hold').click();
+        }
+        break;
+        
+      case 114: // F3 key - Cancel/Clear Cart
+        e.preventDefault();
+        if ($('button[onclick*="cancelOrder"]').is(':visible')) {
+          $('button[onclick*="cancelOrder"]').click();
+        }
+        break;
+    }
+  }
+});
 const {
   DATE_FORMAT,
   moneyFormat,
@@ -621,6 +835,17 @@ if (auth == undefined) {
                     </ul>
                   </div>
                   <div class="col-md-6">
+                    <h5>POS Button Shortcuts</h5>
+                    <ul class="list-unstyled">
+                      <li><kbd>F1</kbd> Pay Button</li>
+                      <li><kbd>F2</kbd> Hold Button</li>
+                      <li><kbd>F3</kbd> Cancel/Clear Cart</li>
+                      <li><kbd>Enter</kbd> Confirm Actions</li>
+                    </ul>
+                  </div>
+                </div>
+                <div class="row mt-3">
+                  <div class="col-md-6">
                     <h5>POS Form Navigation</h5>
                     <ul class="list-unstyled">
                       <li><kbd>Enter</kbd> Next Field / Submit</li>
@@ -874,7 +1099,7 @@ if (auth == undefined) {
                                         <div class="text-muted m-t-5 text-center">
                                         <div class="name" id="product_name">
                                           <span class="${
-                                            item_isExpired ? "text-danger" : ""
+                                          item_isExpired ? "text-danger" : ""
                                           }">${item.name}</span>
                                           ${item.manufacturer ? `<div><small class="text-success"><i class="fa fa-industry"></i> ${item.manufacturer}</small></div>` : ""}
                                           ${item.supplier ? `<div><small class="text-info"><i class="fa fa-truck"></i> ${item.supplier}</small></div>` : ""}
@@ -896,6 +1121,23 @@ if (auth == undefined) {
                         </div>`;
           $("#parent").append(item_info);
         });
+        
+        // Update product count display after products are loaded
+        if ($("#productCount").length) {
+          if (data.length === 0) {
+            $("#productCount").text("No products");
+          } else {
+            $("#productCount").text(`${data.length} of ${data.length} products`);
+          }
+        }
+        
+        // Now that products are fully rendered, initialize the filter system
+        if (typeof filterProducts === 'function') {
+          // Small delay to ensure DOM is fully ready
+          setTimeout(() => {
+            filterProducts();
+          }, 100);
+        }
       });
     }
 
@@ -1130,12 +1372,19 @@ if (auth == undefined) {
                   }).append($("<i>", { class: "fa fa-minus" })),
                 ),
                 $("<input>", {
-                  class: "form-control",
-                  type: "text",
-                  readonly: "",
+                  class: "form-control quantity-input",
+                  type: "number",
                   value: data.quantity,
                   min: "1",
+                  max: "999",
+                  "data-index": index,
+                  placeholder: "Qty",
                   onInput: "$(this).qtInput(" + index + ")",
+                  onKeyDown: "$(this).handleQuantityKeyDown(event, " + index + ")",
+                  onFocus: "$(this).select()",
+                  onChange: "$(this).qtInputComplete(" + index + ")",
+                  onContextMenu: "$(this).showQuantityContextMenu(event, " + index + ")",
+                  title: "Tab/Enter: Next product • Shift+Tab: Previous product • Ctrl+Tab: Next product • Esc: Cancel • Right-click: Options",
                 }),
                 $("<span>", { class: "input-group-btn" }).append(
                   $("<button>", {
@@ -1160,6 +1409,39 @@ if (auth == undefined) {
           ),
         );
       });
+      
+      // Auto-scroll to the latest added product (last item in cart)
+      if (cartList.length > 0) {
+        const cartContainer = $("#cartTable .card-body");
+        const lastItem = cartContainer.find(".row:last");
+        
+        // Debug: Log cart structure
+        console.log(`Cart rendered: ${cartList.length} items`);
+        console.log(`Cart container found: ${cartContainer.length}`);
+        console.log(`Cart rows found: ${cartContainer.find('.row').length}`);
+        console.log(`Last item found: ${lastItem.length}`);
+        
+        if (lastItem.length > 0) {
+          // Ensure the cart container is scrollable
+          if (cartContainer.height() > 300) {
+            // Smooth scroll to the latest item with offset for better visibility
+            cartContainer.animate({
+              scrollTop: lastItem.offset().top - cartContainer.offset().top + cartContainer.scrollTop() - 80
+            }, 400);
+          }
+          
+          // Highlight the latest item briefly with enhanced visual feedback
+          lastItem.addClass("highlight-new-item");
+          
+          // Add a subtle pulse effect
+          lastItem.css('animation', 'pulse-highlight 0.6s ease-in-out');
+          
+          setTimeout(() => {
+            lastItem.removeClass("highlight-new-item");
+            lastItem.css('animation', '');
+          }, 2500);
+        }
+      }
     };
 
     $.fn.deleteFromCart = function (index) {
@@ -1199,9 +1481,284 @@ if (auth == undefined) {
     };
 
     $.fn.qtInput = function (i) {
-      item = cart[i];
-      item.quantity = $(this).val();
+      // Don't update cart immediately - just store the current input value
+      // This allows users to type multi-digit numbers without losing focus
+      const input = $(this);
+      const currentValue = input.val();
+      
+      // Add visual feedback that user is typing
+      input.addClass('typing');
+      
+      // Store the current input value in the cart item temporarily
+      // but don't render the table yet
+      if (cart[i]) {
+        cart[i].tempQuantity = currentValue;
+      }
+    };
+    
+    // New function to handle when user finishes editing quantity
+    $.fn.qtInputComplete = function (i) {
+      const input = $(this);
+      let newQuantity = parseInt(input.val()) || 1;
+      
+      // Remove typing visual feedback
+      input.removeClass('typing');
+      
+      // Validate quantity
+      if (newQuantity < 1) {
+        newQuantity = 1;
+        input.val(1);
+      }
+      
+      // Check stock limit
+      let product = allProducts.filter(function (selected) {
+        return selected._id == parseInt(cart[i].id);
+      });
+      
+      if (product[0] && product[0].stock == 1) {
+        if (newQuantity > product[0].quantity) {
+          newQuantity = product[0].quantity;
+          input.val(newQuantity);
+          notiflix.Report.info(
+            "Stock Limit!",
+            `Maximum available stock: ${product[0].quantity}`,
+            "Ok",
+          );
+        }
+      }
+      
+      // Update the actual cart item
+      cart[i].quantity = newQuantity;
+      delete cart[i].tempQuantity; // Clean up temporary value
+      
+      // Now render the table to update totals
       $(this).renderTable(cart);
+      
+      // Don't blur the input - let user stay in the field
+      // User can manually click outside or use shortcuts to move away
+    };
+    
+    // Move to next product row in cart
+    $.fn.moveToNextProduct = function (currentIndex) {
+      const cartRows = $("#cartTable .card-body .row");
+      const nextIndex = currentIndex + 1;
+      
+      console.log(`Moving to next product: currentIndex=${currentIndex}, nextIndex=${nextIndex}, totalRows=${cartRows.length}`);
+      
+      if (nextIndex < cartRows.length) {
+        // Move to next product row
+        const nextRow = cartRows.eq(nextIndex);
+        const nextQuantityInput = nextRow.find('.quantity-input');
+        if (nextQuantityInput.length) {
+          console.log(`Focusing next quantity input at index ${nextIndex}`);
+          // Ensure the input is visible and focusable
+          nextQuantityInput[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Focus and select with a small delay to ensure DOM is ready
+          setTimeout(() => {
+            nextQuantityInput.focus().select();
+          }, 10);
+        } else {
+          console.log(`No quantity input found in next row at index ${nextIndex}`);
+        }
+      } else {
+        // At last product, move to checkout buttons
+        console.log('At last product, moving to checkout buttons');
+        const checkoutButtons = $("#pos_view .btn-success, #pos_view .btn-primary").first();
+        if (checkoutButtons.length) {
+          checkoutButtons.focus();
+        }
+      }
+    };
+    
+    // Move to previous product row in cart
+    $.fn.moveToPreviousProduct = function (currentIndex) {
+      const cartRows = $("#cartTable .card-body .row");
+      const prevIndex = currentIndex - 1;
+      
+      console.log(`Moving to previous product: currentIndex=${currentIndex}, prevIndex=${prevIndex}, totalRows=${cartRows.length}`);
+      
+      if (prevIndex >= 0) {
+        // Move to previous product row
+        const prevRow = cartRows.eq(prevIndex);
+        const prevQuantityInput = prevRow.find('.quantity-input');
+        if (prevQuantityInput.length) {
+          console.log(`Focusing previous quantity input at index ${prevIndex}`);
+          // Ensure the input is visible and focusable
+          prevQuantityInput[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Focus and select with a small delay to ensure DOM is ready
+          setTimeout(() => {
+            prevQuantityInput.focus().select();
+          }, 10);
+        } else {
+          console.log(`No quantity input found in previous row at index ${prevIndex}`);
+        }
+      } else {
+        // At first product, move to customer field or barcode input
+        console.log('At first product, moving to customer field');
+        const customerField = $("#customer");
+        if (customerField.length) {
+          customerField.focus();
+        }
+      }
+    };
+    
+    // Show context menu for quantity input
+    $.fn.showQuantityContextMenu = function (event, index) {
+      event.preventDefault();
+      
+      const input = $(event.target);
+      const currentValue = input.val();
+      
+      // Create context menu
+      const contextMenu = $(`
+        <div class="quantity-context-menu" style="
+          position: absolute;
+          background: white;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+          z-index: 1000;
+          min-width: 150px;
+          padding: 5px 0;
+        ">
+          <div class="context-item" data-action="complete" style="
+            padding: 8px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+          ">✓ Complete & Stay</div>
+          <div class="context-item" data-action="next" style="
+            padding: 8px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+          ">→ Complete & Next Product</div>
+          <div class="context-item" data-action="cancel" style="
+            padding: 8px 15px;
+            cursor: pointer;
+          ">✗ Cancel Changes</div>
+        </div>
+      `);
+      
+      // Position the menu
+      const inputOffset = input.offset();
+      contextMenu.css({
+        left: inputOffset.left + input.outerWidth() + 5,
+        top: inputOffset.top
+      });
+      
+      // Add to body
+      $('body').append(contextMenu);
+      
+      // Handle menu clicks
+      contextMenu.on('click', '.context-item', function() {
+        const action = $(this).data('action');
+        
+        switch(action) {
+          case 'complete':
+            // Complete input and stay in field
+            input.qtInputComplete(index);
+            input.focus();
+            break;
+          case 'next':
+            // Complete input and move to next field
+            input.qtInputComplete(index);
+            const nextInput = input.closest('.row').find('input, select, button').not(input).first();
+            if (nextInput.length) {
+              nextInput.focus();
+            }
+            break;
+          case 'cancel':
+            // Restore original value
+            input.val(cart[index].quantity);
+            input.removeClass('typing');
+            break;
+        }
+        
+        // Remove menu
+        contextMenu.remove();
+      });
+      
+      // Remove menu when clicking outside
+      $(document).one('click', function() {
+        contextMenu.remove();
+      });
+    };
+    
+    // Handle keyboard shortcuts for quantity input
+    $.fn.handleQuantityKeyDown = function (event, index) {
+      const key = event.key;
+      const input = $(event.target);
+      
+      // Debug: Log all key events to see what's being captured
+      console.log(`Key pressed: "${key}", Shift: ${event.shiftKey}, Ctrl: ${event.ctrlKey}, Alt: ${event.altKey}`);
+      
+      // Check for Shift+Tab combination first
+      if (event.shiftKey && key === 'Tab') {
+        event.preventDefault();
+        // Complete input and move to previous product row
+        console.log(`Shift+Tab pressed for index: ${index}`);
+        $(this).qtInputComplete(index);
+        // Add small delay to ensure DOM is updated before navigation
+        setTimeout(() => {
+          $(this).moveToPreviousProduct(index);
+        }, 50);
+        return;
+      }
+      
+      // Check for Ctrl+Tab combination
+      if (event.ctrlKey && key === 'Tab') {
+        event.preventDefault();
+        // Complete input and move to next product row
+        console.log(`Ctrl+Tab pressed for index: ${index}`);
+        $(this).qtInputComplete(index);
+        // Add small delay to ensure DOM is updated before navigation
+        setTimeout(() => {
+          $(this).moveToNextProduct(index);
+        }, 50);
+        return;
+      }
+      
+      // Handle single keys
+      switch (key) {
+        case 'Enter':
+          event.preventDefault();
+          // Complete input and move to next product row (or checkout if at last)
+          console.log(`Enter pressed for index: ${index}`);
+          $(this).qtInputComplete(index);
+          // Add small delay to ensure DOM is updated before navigation
+          setTimeout(() => {
+            $(this).moveToNextProduct(index);
+          }, 50);
+          break;
+        case 'Tab':
+          event.preventDefault();
+          // Complete input and move to next product row (or checkout if at last)
+          console.log(`Tab pressed for index: ${index}`);
+          $(this).qtInputComplete(index);
+          // Add small delay to ensure DOM is updated before navigation
+          setTimeout(() => {
+            $(this).moveToNextProduct(index);
+          }, 50);
+          break;
+        case 'Escape':
+          event.preventDefault();
+          // Restore original value and blur
+          input.val(cart[index].quantity);
+          input.blur();
+          break;
+        case 'ArrowUp':
+          event.preventDefault();
+          $(this).qtIncrement(index);
+          break;
+        case 'ArrowDown':
+          event.preventDefault();
+          $(this).qtDecrement(index);
+          break;
+        default:
+          // Allow number input and navigation keys
+          if (!/[\d]/.test(key) && !['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight'].includes(key)) {
+            event.preventDefault();
+          }
+      }
     };
 
     $.fn.cancelOrder = function () {
@@ -1813,6 +2370,71 @@ if (auth == undefined) {
       loadManufacturers();
     });
 
+    // Enhanced UX: Auto-focus and keyboard navigation for Products modal
+    $("#newProduct").on("shown.bs.modal", function () {
+      // Auto-focus on the first input field (Product Name)
+      $("#productName").focus();
+      
+      // Add keyboard shortcuts for the modal
+      $(this).off("keydown.modal").on("keydown.modal", function (e) {
+        // Enter key submits the form
+        if (e.keyCode === 13 && !$(e.target).is("textarea, select")) {
+          e.preventDefault();
+          $("#saveProduct").submit();
+        }
+        
+        // Escape key closes the modal
+        if (e.keyCode === 27) {
+          $("#newProduct").modal("hide");
+        }
+      });
+      
+      // Ensure dropdowns are populated
+      if (!$("#manufacturer option").length || $("#manufacturer option").length <= 1) {
+        console.log("Manufacturer dropdown empty, populating...");
+        loadManufacturers();
+      }
+      
+      if (!$("#supplier option").length || $("#supplier option").length <= 1) {
+        console.log("Supplier dropdown empty, populating...");
+        loadSuppliers();
+      }
+    });
+
+    // Enhanced UX: Tab navigation and form validation feedback
+    $("#saveProduct input, #saveProduct select").on("keydown", function (e) {
+      // Shift+Enter moves to previous field
+      if (e.keyCode === 13 && e.shiftKey) {
+        e.preventDefault();
+        $(this).closest(".form-group").prev().find("input, select").focus();
+      }
+      
+      // Enter moves to next field (except for submit button)
+      if (e.keyCode === 13 && !e.shiftKey && !$(this).is("#submitProduct")) {
+        e.preventDefault();
+        $(this).closest(".form-group").next().find("input, select").focus();
+      }
+    });
+
+    // Enhanced UX: Visual feedback for form validation
+    $("#saveProduct input, #saveProduct select").on("blur", function () {
+      const $field = $(this);
+      const $formGroup = $field.closest(".form-group");
+      
+      // Remove previous validation states
+      $formGroup.removeClass("has-success has-error");
+      
+      // Add success state for filled required fields
+      if ($field.attr("required") && $field.val().trim()) {
+        $formGroup.addClass("has-success");
+      }
+      
+      // Add error state for empty required fields
+      if ($field.attr("required") && !$field.val().trim()) {
+        $formGroup.addClass("has-error");
+      }
+    });
+
     $("#saveProduct").submit(function (e) {
       e.preventDefault();
 
@@ -1841,6 +2463,11 @@ if (auth == undefined) {
           }
           if (resp && resp.status === 'duplicate_product') {
             return notiflix.Report.warning("Duplicate Product","A product with the same Name, Batch Number and Manufacturer already exists.","Ok");
+          }
+
+          // Handle new detailed success messages
+          if (resp && resp.success && resp.message) {
+            notiflix.Report.success("Success", resp.message, "Ok");
           }
 
           $("#saveProduct").get(0).reset();
@@ -1878,6 +2505,45 @@ if (auth == undefined) {
       });
     });
 
+    // Enhanced UX: Auto-focus and keyboard navigation for Categories modal
+    $("#newCategory").on("shown.bs.modal", function () {
+      // Auto-focus on the category name field
+      $("#categoryName").focus();
+      
+      // Add keyboard shortcuts for the modal
+      $(this).off("keydown.modal").on("keydown.modal", function (e) {
+        // Enter key submits the form
+        if (e.keyCode === 13 && !$(e.target).is("textarea, select")) {
+          e.preventDefault();
+          $("#saveCategory").submit();
+        }
+        
+        // Escape key closes the modal
+        if (e.keyCode === 27) {
+          $("#newCategory").modal("hide");
+        }
+      });
+    });
+
+    // Enhanced UX: Visual feedback for form validation
+    $("#saveCategory input").on("blur", function () {
+      const $field = $(this);
+      const $formGroup = $field.closest(".form-group");
+      
+      // Remove previous validation states
+      $formGroup.removeClass("has-success has-error");
+      
+      // Add success state for filled required fields
+      if ($field.attr("required") && $field.val().trim()) {
+        $formGroup.addClass("has-success");
+      }
+      
+      // Add error state for empty required fields
+      if ($field.attr("required") && !$field.val().trim()) {
+        $formGroup.addClass("has-error");
+      }
+    });
+
     $("#saveCategory").submit(function (e) {
       e.preventDefault();
 
@@ -1892,6 +2558,11 @@ if (auth == undefined) {
         url: api + "categories/category",
         data: $(this).serialize(),
         success: function (data, textStatus, jqXHR) {
+          // Handle new detailed success messages
+          if (data && data.success && data.message) {
+            notiflix.Report.success("Success", data.message, "Ok");
+          }
+
           $("#saveCategory").get(0).reset();
           loadCategories();
           loadProducts();
@@ -1941,13 +2612,7 @@ if (auth == undefined) {
           );
         });
         
-        // Also populate the manufacturer filter in POS
-        $("#manufacturers").html(`<option value="">All Manufacturers</option>`);
-        allManufacturers.forEach((manufacturer) => {
-          $("#manufacturers").append(
-            `<option value="${manufacturer.name}">${manufacturer.name}${manufacturer.code ? ` (${manufacturer.code})` : ''}</option>`,
-          );
-        });
+        // Note: Manufacturer filter removed from POS for simplicity
       }).fail(function (jqXHR, textStatus, errorThrown) {
         console.error("Failed to load manufacturers:", errorThrown);
         notiflix.Notify.failure("Failed to load manufacturers");
@@ -2163,33 +2828,103 @@ if (auth == undefined) {
       $("#newManufacturer").modal("show");
     };
     
-    // Auto-generate manufacturer code when name is entered
+    // Enhanced Auto-generate manufacturer code when name is entered
     $("#manufacturerName").on("input", function() {
-      if (settings && settings.manufacturerCodeFormat === 'auto' && !$("#manufacturerCode").val()) {
-        const name = $(this).val().trim();
-        if (name) {
+      const name = $(this).val().trim();
+      if (name) {
+        // Always generate code for new manufacturers (not editing existing)
+        if (!$("#manufacturer_id").val()) {
           const code = generateManufacturerCode(name);
           $("#manufacturerCode").val(code);
+          
+          // Add visual feedback
+          $("#manufacturerCode").addClass("code-generated");
+          $("#manufacturerCodeHint").removeClass("duplicate").addClass("auto-generated").text("✓ Code auto-generated successfully");
+          
+          setTimeout(() => {
+            $("#manufacturerCode").removeClass("code-generated");
+          }, 2000);
         }
+      } else {
+        // Clear code and hint when name is empty
+        $("#manufacturerCode").val("");
+        $("#manufacturerCodeHint").removeClass("auto-generated duplicate").text("Code will be auto-generated when you enter the manufacturer name");
+      }
+    });
+
+    // Allow users to edit generated codes
+    $("#manufacturerCode").on("input", function() {
+      const code = $(this).val().trim();
+      if (code) {
+        // Remove generated class when user edits
+        $(this).removeClass("code-generated");
+        
+        // Add validation class
+        if (isCodeUnique(code, 'manufacturer')) {
+          $(this).removeClass("code-duplicate").addClass("code-unique");
+          $("#manufacturerCodeHint").removeClass("duplicate").addClass("auto-generated").text("✓ Code is unique and available");
+        } else {
+          $(this).removeClass("code-unique").addClass("code-duplicate");
+          $("#manufacturerCodeHint").removeClass("auto-generated").addClass("duplicate").text("⚠ This code already exists");
+        }
+      } else {
+        // Reset hint when field is empty
+        $("#manufacturerCodeHint").removeClass("auto-generated duplicate").text("Code will be auto-generated when you enter the manufacturer name");
       }
     });
     
-    // Auto-generate supplier code when name is entered
+    // Enhanced Auto-generate supplier code when name is entered
     $("#supplierName").on("input", function() {
-      if (settings && settings.supplierCodeFormat === 'auto' && !$("#supplierCode").val()) {
-        const name = $(this).val().trim();
-        if (name) {
+      const name = $(this).val().trim();
+      if (name) {
+        // Always generate code for new suppliers (not editing existing)
+        if (!$("#supplier_id").val()) {
           const code = generateSupplierCode(name);
           $("#supplierCode").val(code);
+          
+          // Add visual feedback
+          $("#supplierCode").addClass("code-generated");
+          $("#supplierCodeHint").removeClass("duplicate").addClass("auto-generated").text("✓ Code auto-generated successfully");
+          
+          setTimeout(() => {
+            $("#supplierCode").removeClass("code-generated");
+          }, 2000);
         }
+      } else {
+        // Clear code and hint when name is empty
+        $("#supplierCode").val("");
+        $("#supplierCodeHint").removeClass("auto-generated duplicate").text("Code will be auto-generated when you enter the supplier name");
+      }
+    });
+
+    // Allow users to edit generated codes
+    $("#supplierCode").on("input", function() {
+      const code = $(this).val().trim();
+      if (code) {
+        // Remove generated class when user edits
+        $(this).removeClass("code-generated");
+        
+        // Add validation class
+        if (isCodeUnique(code, 'supplier')) {
+          $(this).removeClass("code-duplicate").addClass("code-unique");
+          $("#supplierCodeHint").removeClass("duplicate").addClass("auto-generated").text("✓ Code is unique and available");
+        } else {
+          $(this).removeClass("code-unique").addClass("code-duplicate");
+          $("#supplierCodeHint").removeClass("auto-generated").addClass("duplicate").text("⚠ This code already exists");
+        }
+      } else {
+        // Reset hint when field is empty
+        $("#supplierCodeHint").removeClass("auto-generated duplicate").text("Code will be auto-generated when you enter the supplier name");
       }
     });
     
     function generateManufacturerCode(name) {
-      if (!name) return '';
+      if (!name || !name.trim()) return '';
       
-      // Generate code based on name (e.g., "ABC Pharma" -> "MANU-ABC")
-      const words = name.split(' ').filter(word => word.length > 0);
+      // Clean and normalize the name
+      const cleanName = name.trim().replace(/[^a-zA-Z0-9\s]/g, '');
+      const words = cleanName.split(' ').filter(word => word.length > 0);
+      
       let code = 'MANU-';
       
       if (words.length >= 2) {
@@ -2200,17 +2935,30 @@ if (auth == undefined) {
         code += words[0].substring(0, 2).toUpperCase();
       }
       
-      // Add a unique number
-      const existingCodes = allManufacturers.map(m => m.code).filter(c => c && c.startsWith(code));
-      const nextNumber = existingCodes.length + 1;
+      // Add timestamp for uniqueness
+      const timestamp = Date.now().toString().slice(-4);
+      code += timestamp;
       
-      return `${code}${nextNumber.toString().padStart(3, '0')}`;
+      // Ensure final uniqueness by checking existing codes
+      let finalCode = code;
+      let counter = 1;
+      const existingCodes = allManufacturers.map(m => m.code).filter(c => c);
+      
+      while (existingCodes.includes(finalCode)) {
+        finalCode = `${code}-${counter.toString().padStart(2, '0')}`;
+        counter++;
+      }
+      
+      return finalCode;
     }
     
     function generateSupplierCode(name) {
       if (!name || name.trim() === '') return '';
       
-      const words = name.split(' ').filter(word => word.length > 0);
+      // Clean and normalize the name
+      const cleanName = name.trim().replace(/[^a-zA-Z0-9\s]/g, '');
+      const words = cleanName.split(' ').filter(word => word.length > 0);
+      
       let code = 'SUPP-';
       
       if (words.length >= 2) {
@@ -2221,11 +2969,36 @@ if (auth == undefined) {
         code += name.substring(0, 2).toUpperCase();
       }
       
-      // Add a unique number
-      const existingCodes = allSuppliers.map(s => s.code).filter(c => c && c.startsWith(code));
-      const nextNumber = existingCodes.length + 1;
+      // Add timestamp for uniqueness
+      const timestamp = Date.now().toString().slice(-4);
+      code += timestamp;
       
-      return `${code}${nextNumber.toString().padStart(3, '0')}`;
+      // Ensure final uniqueness by checking existing codes
+      let finalCode = code;
+      let counter = 1;
+      const existingCodes = allSuppliers.map(s => s.code).filter(c => c);
+      
+      while (existingCodes.includes(finalCode)) {
+        finalCode = `${code}-${counter.toString().padStart(2, '0')}`;
+        counter++;
+      }
+      
+      return finalCode;
+    }
+
+    // Enhanced code uniqueness validation function
+    function isCodeUnique(code, type) {
+      if (!code || !code.trim()) return false;
+      
+      const currentId = type === 'manufacturer' ? $("#manufacturer_id").val() : $("#supplier_id").val();
+      const existingItems = type === 'manufacturer' ? allManufacturers : allSuppliers;
+      
+      // Check if code already exists (excluding current item if editing)
+      const duplicate = existingItems.find(item => 
+        item.code === code && item._id !== currentId
+      );
+      
+      return !duplicate;
     }
 
     $.fn.deleteManufacturer = function (manufacturerId) {
@@ -2270,6 +3043,65 @@ if (auth == undefined) {
 
     $("#refreshManufacturers").on("click", function() {
       loadManufacturers();
+    });
+
+    // Enhanced UX: Auto-focus and keyboard navigation for Manufacturers modal
+    $("#newManufacturer").on("shown.bs.modal", function () {
+      // Auto-focus on the manufacturer name field
+      $("#manufacturerName").focus();
+      
+      // Add keyboard shortcuts for the modal
+      $(this).off("keydown.modal").on("keydown.modal", function (e) {
+        // Enter key submits the form
+        if (e.keyCode === 13 && !$(e.target).is("textarea, select")) {
+          e.preventDefault();
+          $("#saveManufacturer").submit();
+        }
+        
+        // Escape key closes the modal
+        if (e.keyCode === 27) {
+          $("#newManufacturer").modal("hide");
+        }
+      });
+
+      // Add helpful hints for code generation
+      if (!$("#manufacturerCodeHint").length) {
+        $("#manufacturerCode").after('<small class="code-field-hint" id="manufacturerCodeHint">Code will be auto-generated when you enter the manufacturer name</small>');
+      }
+    });
+
+    // Enhanced UX: Tab navigation and form validation feedback for Manufacturers
+    $("#saveManufacturer input, #saveManufacturer select, #saveManufacturer textarea").on("keydown", function (e) {
+      // Shift+Enter moves to previous field
+      if (e.keyCode === 13 && e.shiftKey) {
+        e.preventDefault();
+        $(this).closest(".form-group").prev().find("input, select, textarea").focus();
+      }
+      
+      // Enter moves to next field (except for submit button)
+      if (e.keyCode === 13 && !e.shiftKey && !$(this).is("#submitManufacturer")) {
+        e.preventDefault();
+        $(this).closest(".form-group").next().find("input, select, textarea").focus();
+      }
+    });
+
+    // Enhanced UX: Visual feedback for form validation for Manufacturers
+    $("#saveManufacturer input, #saveManufacturer select, #saveManufacturer textarea").on("blur", function () {
+      const $field = $(this);
+      const $formGroup = $field.closest(".form-group");
+      
+      // Remove previous validation states
+      $formGroup.removeClass("has-success has-error");
+      
+      // Add success state for filled required fields
+      if ($field.attr("required") && $field.val().trim()) {
+        $formGroup.addClass("has-success");
+      }
+      
+      // Add error state for empty required fields
+      if ($field.attr("required") && !$field.val().trim()) {
+        $formGroup.addClass("has-error");
+      }
     });
 
     // Manufacturer modal events
@@ -2668,11 +3500,8 @@ if (auth == undefined) {
     function loadSuppliers() {
       // Fix: Call the suppliers API root route which should return suppliers data
       const suppliersUrl = api + "suppliers";
-      console.log("Calling suppliers API with URL:", suppliersUrl);
-      console.log("Original api variable:", api);
       
       $.get(suppliersUrl + "?_t=" + Date.now(), function (data) {
-        console.log("Suppliers API response:", data);
         
         // Ensure data is an array
         if (!Array.isArray(data)) {
@@ -2694,15 +3523,7 @@ if (auth == undefined) {
           });
         }
         
-        // Also populate the supplier filter in POS
-        $("#suppliers").html(`<option value="">All Suppliers</option>`);
-        if (allSuppliers.length > 0) {
-          allSuppliers.forEach((supplier) => {
-            $("#suppliers").append(
-              `<option value="${supplier.name}">${supplier.name}${supplier.code ? ` (${supplier.code})` : ''}</option>`,
-            );
-          });
-        }
+        // Note: Supplier filter removed from POS for simplicity
       }).fail(function (jqXHR, textStatus, errorThrown) {
         console.error("Failed to load suppliers:", errorThrown);
         console.error("Response:", jqXHR.responseText);
@@ -2809,6 +3630,11 @@ if (auth == undefined) {
         url: api + "suppliers/supplier" + ($("#supplier_id").val() ? "/" + $("#supplier_id").val() : ""),
         data: $(this).serialize(),
         success: function (data, textStatus, jqXHR) {
+          // Handle new detailed success messages
+          if (data && data.success && data.message) {
+            notiflix.Notify.success(data.message);
+          }
+          
           $("#saveSupplier").get(0).reset();
           $("#supplier_id").val("");
           $("#supplierStatus").val("active");
@@ -2884,7 +3710,12 @@ if (auth == undefined) {
             type: "DELETE",
             url: api + "suppliers/supplier/" + supplierId,
             success: function (data, textStatus, jqXHR) {
-              notiflix.Notify.success("Supplier deleted successfully");
+              // Handle new detailed success messages
+              if (data && data.success && data.message) {
+                notiflix.Notify.success(data.message);
+              } else {
+                notiflix.Notify.success("Supplier deleted successfully");
+              }
               loadSuppliers();
             },
             error: function (jqXHR, textStatus, errorThrown) {
@@ -2914,6 +3745,334 @@ if (auth == undefined) {
 
     $("#refreshSuppliers").on("click", function() {
       loadSuppliers();
+    });
+
+    // Enhanced Progress Bar Manager for Bulk Imports
+    class ImportProgressManager {
+        constructor() {
+            this.startTime = null;
+            this.currentProgress = 0;
+            this.totalItems = 0;
+            this.processedItems = 0;
+            this.currentOperation = '';
+            this.isRunning = false;
+            this.interval = null;
+        }
+
+        start(totalItems, operation = 'Import') {
+            this.startTime = Date.now();
+            this.totalItems = totalItems;
+            this.processedItems = 0;
+            this.currentOperation = operation;
+            this.isRunning = true;
+            this.currentProgress = 0;
+            
+            this.updateDisplay();
+            this.startProgressAnimation();
+        }
+
+        updateProgress(processed, operation = null) {
+            this.processedItems = processed;
+            this.currentProgress = Math.round((processed / this.totalItems) * 100);
+            if (operation) this.currentOperation = operation;
+            
+            this.updateDisplay();
+        }
+
+        updateDisplay() {
+            const progressBar = $("#importProgress .progress-bar");
+            const progressText = $("#progressText");
+            const importStatus = $("#importStatus");
+            const importDetails = $("#importDetails");
+            const importCount = $("#importCount");
+            const importSpeed = $("#importSpeed");
+
+            // Update progress bar
+            progressBar.css('width', this.currentProgress + '%');
+            progressText.text(this.currentProgress + '%');
+
+            // Update status text
+            importStatus.text(this.currentOperation);
+
+            // Update details
+            importDetails.text(`Processing item ${this.processedItems} of ${this.totalItems}`);
+
+            // Update count
+            importCount.text(`${this.processedItems} / ${this.totalItems} items`);
+
+            // Update speed and estimated time
+            if (this.startTime && this.processedItems > 0) {
+                const elapsed = (Date.now() - this.startTime) / 1000;
+                const rate = this.processedItems / elapsed;
+                const remainingItems = this.totalItems - this.processedItems;
+                const estimatedTime = remainingItems / rate;
+                
+                importSpeed.text(`${rate.toFixed(1)} items/sec`);
+                
+                // Add estimated time to details if more than 5 seconds
+                if (estimatedTime > 5) {
+                    const minutes = Math.floor(estimatedTime / 60);
+                    const seconds = Math.floor(estimatedTime % 60);
+                    if (minutes > 0) {
+                        importDetails.text(`Processing item ${this.processedItems} of ${this.totalItems} (${minutes}m ${seconds}s remaining)`);
+                    } else {
+                        importDetails.text(`Processing item ${this.processedItems} of ${this.totalItems} (${seconds}s remaining)`);
+                    }
+                } else {
+                    importDetails.text(`Processing item ${this.processedItems} of ${this.totalItems}`);
+                }
+            } else {
+                importDetails.text(`Processing item ${this.processedItems} of ${this.totalItems}`);
+            }
+
+            // Update progress bar color based on progress
+            if (this.currentProgress < 25) {
+                progressBar.removeClass('progress-bar-success progress-bar-warning').addClass('progress-bar-danger');
+            } else if (this.currentProgress < 75) {
+                progressBar.removeClass('progress-bar-danger progress-bar-success').addClass('progress-bar-warning');
+            } else {
+                progressBar.removeClass('progress-bar-danger progress-bar-warning').addClass('progress-bar-success');
+            }
+
+            // Save progress to localStorage for persistence
+            this.saveProgress();
+        }
+
+        saveProgress() {
+            const progressData = {
+                currentProgress: this.currentProgress,
+                processedItems: this.processedItems,
+                totalItems: this.totalItems,
+                currentOperation: this.currentOperation,
+                startTime: this.startTime,
+                timestamp: Date.now()
+            };
+            localStorage.setItem('importProgress', JSON.stringify(progressData));
+        }
+
+        loadProgress() {
+            const savedProgress = localStorage.getItem('importProgress');
+            if (savedProgress) {
+                try {
+                    const progressData = JSON.parse(savedProgress);
+                    const timeDiff = Date.now() - progressData.timestamp;
+                    
+                    // Only restore progress if it's recent (within last 5 minutes)
+                    if (timeDiff < 5 * 60 * 1000) {
+                        this.currentProgress = progressData.currentProgress;
+                        this.processedItems = progressData.processedItems;
+                        this.totalItems = progressData.totalItems;
+                        this.currentOperation = progressData.currentOperation;
+                        this.startTime = progressData.startTime;
+                        return true;
+                    }
+                } catch (e) {
+                    console.log('Could not parse saved progress:', e);
+                }
+            }
+            return false;
+        }
+
+        clearProgress() {
+            localStorage.removeItem('importProgress');
+        }
+
+        startProgressAnimation() {
+            this.interval = setInterval(() => {
+                if (this.isRunning && this.currentProgress < 100) {
+                    // Simulate progress for better UX
+                    const remaining = 100 - this.currentProgress;
+                    const increment = Math.min(remaining * 0.1, 2);
+                    this.currentProgress = Math.min(100, this.currentProgress + increment);
+                    this.updateDisplay();
+                }
+            }, 500);
+        }
+
+        complete() {
+            this.isRunning = false;
+            this.currentProgress = 100;
+            this.processedItems = this.totalItems;
+            this.currentOperation = 'Import completed';
+            
+            if (this.interval) {
+                clearInterval(this.interval);
+                this.interval = null;
+            }
+            
+            this.clearProgress();
+            this.updateDisplay();
+            
+            // Add completion animation
+            $("#importProgress .progress-bar").addClass('progress-animation');
+            setTimeout(() => {
+                $("#importProgress .progress-bar").removeClass('progress-animation');
+            }, 2000);
+        }
+
+        error(message) {
+            this.isRunning = false;
+            this.currentOperation = 'Import failed: ' + message;
+            
+            if (this.interval) {
+                clearInterval(this.interval);
+                this.interval = null;
+            }
+            
+            this.updateDisplay();
+            
+            // Show error state
+            $("#importProgress .progress-bar").removeClass('progress-bar-success progress-bar-warning').addClass('progress-bar-danger');
+        }
+
+        reset() {
+            this.isRunning = false;
+            this.currentProgress = 0;
+            this.processedItems = 0;
+            this.currentOperation = '';
+            
+            if (this.interval) {
+                clearInterval(this.interval);
+                this.interval = null;
+            }
+            
+            this.clearProgress();
+            this.updateDisplay();
+        }
+    }
+
+             // Initialize progress manager
+    const importProgressManager = new ImportProgressManager();
+
+    // Utility function to ensure dropdowns are populated
+    function ensureDropdownsPopulated() {
+      return new Promise((resolve) => {
+        let manufacturersLoaded = allManufacturers && allManufacturers.length > 0;
+        let suppliersLoaded = allSuppliers && allSuppliers.length > 0;
+        
+        if (manufacturersLoaded && suppliersLoaded) {
+          resolve();
+          return;
+        }
+        
+        const promises = [];
+        
+        if (!manufacturersLoaded) {
+          promises.push(
+            new Promise((resolveManufacturer) => {
+              $.get(api + "manufacturers/all?_t=" + Date.now(), function (data) {
+                allManufacturers = data;
+                console.log(`Loaded ${allManufacturers.length} manufacturers`);
+                
+                // Populate manufacturer dropdown
+                $("#manufacturer").html(`<option value="">Select Manufacturer</option>`);
+                allManufacturers.forEach((manufacturer) => {
+                  $("#manufacturer").append(
+                    `<option value="${manufacturer.name}">${manufacturer.name}${manufacturer.code ? ` (${manufacturer.code})` : ''}</option>`,
+                  );
+                });
+                resolveManufacturer();
+              }).fail(() => resolveManufacturer());
+            })
+          );
+        }
+        
+        if (!suppliersLoaded) {
+          promises.push(
+            new Promise((resolveSupplier) => {
+              $.get(api + "suppliers?_t=" + Date.now(), function (data) {
+                allSuppliers = data;
+                console.log(`Loaded ${allSuppliers.length} suppliers`);
+                
+                // Populate supplier dropdown
+                $("#supplier").html(`<option value="">Select Supplier</option>`);
+                allSuppliers.forEach((supplier) => {
+                  $("#supplier").append(
+                    `<option value="${supplier.name}">${supplier.name}${supplier.code ? ` (${supplier.code})` : ''}</option>`,
+                  );
+                });
+                resolveSupplier();
+              }).fail(() => resolveSupplier());
+            })
+          );
+        }
+        
+        Promise.all(promises).then(resolve);
+      });
+    }
+
+     // Bulk Import Modal Event Handlers
+     $("#bulkImport").on("shown.bs.modal", function() {
+         // Try to restore progress if available
+         if (importProgressManager.loadProgress()) {
+             $("#importProgress").show();
+             importProgressManager.updateDisplay();
+             console.log("Restored import progress from previous session");
+         }
+     });
+
+     $("#bulkImport").on("hidden.bs.modal", function() {
+         // Clear progress when modal is closed
+         importProgressManager.clearProgress();
+     });
+
+     // Enhanced UX: Auto-focus and keyboard navigation for Suppliers modal
+    $("#newSupplier").on("shown.bs.modal", function () {
+      // Auto-focus on the supplier name field
+      $("#supplierName").focus();
+      
+      // Add keyboard shortcuts for the modal
+      $(this).off("keydown.modal").on("keydown.modal", function (e) {
+        // Enter key submits the form
+        if (e.keyCode === 13 && !$(e.target).is("textarea, select")) {
+          e.preventDefault();
+          $("#saveSupplier").submit();
+        }
+        
+        // Escape key closes the modal
+        if (e.keyCode === 27) {
+          $("#newSupplier").modal("hide");
+        }
+      });
+
+      // Add helpful hints for code generation
+      if (!$("#supplierCodeHint").length) {
+        $("#supplierCode").after('<small class="code-field-hint" id="supplierCodeHint">Code will be auto-generated when you enter the supplier name</small>');
+      }
+    });
+
+    // Enhanced UX: Tab navigation and form validation feedback for Suppliers
+    $("#saveSupplier input, #saveSupplier select, #saveSupplier textarea").on("keydown", function (e) {
+      // Shift+Enter moves to previous field
+      if (e.keyCode === 13 && e.shiftKey) {
+        e.preventDefault();
+        $(this).closest(".form-group").prev().find("input, select, textarea").focus();
+      }
+      
+      // Enter moves to next field (except for submit button)
+      if (e.keyCode === 13 && !e.shiftKey && !$(this).is("#submitSupplier")) {
+        e.preventDefault();
+        $(this).closest(".form-group").next().find("input, select, textarea").focus();
+      }
+    });
+
+    // Enhanced UX: Visual feedback for form validation for Suppliers
+    $("#saveSupplier input, #saveSupplier select, #saveSupplier textarea").on("blur", function () {
+      const $field = $(this);
+      const $formGroup = $field.closest(".form-group");
+      
+      // Remove previous validation states
+      $formGroup.removeClass("has-success has-error");
+      
+      // Add success state for filled required fields
+      if ($field.attr("required") && $field.val().trim()) {
+        $formGroup.addClass("has-success");
+      }
+      
+      // Add error state for empty required fields
+      if ($field.attr("required") && !$field.val().trim()) {
+        $formGroup.addClass("has-error");
+      }
     });
 
     // Supplier modal events
@@ -3326,42 +4485,169 @@ if (auth == undefined) {
     $.fn.editProduct = function (index) {
       $("#Products").modal("hide");
 
-      // Load manufacturers first to ensure dropdown is populated
-      loadManufacturers();
+      // Get the product data
+      const product = allProducts[index];
+      if (!product) {
+        console.error("Product not found for index:", index);
+        notiflix.Notify.failure("Product data not found");
+        return;
+      }
 
+      // Function to populate the form after manufacturers are loaded
+      const populateForm = () => {
+        // Validate that dropdowns are populated
+        const manufacturerOptions = $("#manufacturer option").length;
+        const supplierOptions = $("#supplier option").length;
+        
+        console.log(`Dropdown validation:`, {
+          manufacturerOptions,
+          supplierOptions,
+          allManufacturers: allManufacturers ? allManufacturers.length : 'undefined',
+          allSuppliers: allSuppliers ? allSuppliers.length : 'undefined'
+        });
+        
+        if (manufacturerOptions <= 1) {
+          console.warn("Manufacturer dropdown not properly populated, retrying...");
+          loadManufacturers();
+          setTimeout(() => populateForm(), 500);
+          return;
+        }
+        
+        if (supplierOptions <= 1) {
+          console.warn("Supplier dropdown not properly populated, retrying...");
+          loadSuppliers();
+          setTimeout(() => populateForm(), 500);
+          return;
+        }
+        // Set category
       $("#category option")
         .filter(function () {
-          return $(this).val() == allProducts[index].category;
+            return $(this).val() == product.category;
         })
         .prop("selected", true);
 
-      $("#productName").val(allProducts[index].name);
-      $("#product_price").val(allProducts[index].price);
-      $("#quantity").val(allProducts[index].quantity);
-      $("#barcode").val(allProducts[index].barcode || allProducts[index]._id);
-      $("#expirationDate").val(allProducts[index].expirationDate);
-      $("#minStock").val(allProducts[index].minStock || 1);
-      $("#genericName").val(allProducts[index].genericName || "");
-      $("#manufacturer").val(allProducts[index].manufacturer || "");
-      $("#supplier").val(allProducts[index].supplier || "");
-      $("#batchNumber").val(allProducts[index].batchNumber || "");
-      $("#actual_price").val(allProducts[index].actualPrice || "");
-      $("#product_id").val(allProducts[index]._id);
-      $("#img").val(allProducts[index].img);
+        // Set basic product fields
+        $("#productName").val(product.name);
+        $("#product_price").val(product.price);
+        $("#quantity").val(product.quantity);
+        $("#barcode").val(product.barcode || product._id);
+        $("#expirationDate").val(product.expirationDate);
+        $("#minStock").val(product.minStock || 1);
+        $("#genericName").val(product.genericName || "");
+        $("#batchNumber").val(product.batchNumber || "");
+        $("#actual_price").val(product.actualPrice || "");
+        $("#product_id").val(product._id);
+        $("#img").val(product.img);
 
-      if (allProducts[index].img != "") {
+        // Handle manufacturer - check if it's an ID or name
+        if (product.manufacturer) {
+          const manufacturerValue = product.manufacturer;
+          console.log(`Processing manufacturer for product ${index}:`, {
+            manufacturerValue,
+            manufacturerType: typeof manufacturerValue,
+            allManufacturers: allManufacturers ? allManufacturers.length : 'undefined'
+          });
+          
+          // Debug: Check what options are available in the dropdown
+          const manufacturerOptions = $("#manufacturer option").map(function() {
+            return { value: $(this).val(), text: $(this).text() };
+          }).get();
+          console.log(`Available manufacturer options:`, manufacturerOptions);
+          
+          // Try to find by ID first, then by name
+          const manufacturerById = allManufacturers.find(m => m._id == manufacturerValue);
+          const manufacturerByName = allManufacturers.find(m => m.name === manufacturerValue);
+          
+          console.log(`Manufacturer lookup results:`, {
+            manufacturerById,
+            manufacturerByName,
+            searchValue: manufacturerValue
+          });
+          
+          const finalManufacturer = manufacturerById || manufacturerByName;
+          if (finalManufacturer) {
+            $("#manufacturer").val(finalManufacturer.name);
+            console.log(`Set manufacturer to: ${finalManufacturer.name}`);
+            
+            // Debug: Check if the value was set correctly
+            const actualValue = $("#manufacturer").val();
+            console.log(`Manufacturer field value after setting:`, actualValue);
+          } else {
+            $("#manufacturer").val(manufacturerValue);
+            console.log(`Set manufacturer to original value: ${manufacturerValue}`);
+            
+            // Debug: Check if the value was set correctly
+            const actualValue = $("#manufacturer").val();
+            console.log(`Manufacturer field value after setting:`, actualValue);
+          }
+        } else {
+          $("#manufacturer").val("");
+        }
+
+        // Handle supplier - check if it's an ID or name
+        if (product.supplier) {
+          const supplierValue = product.supplier;
+          console.log(`Processing supplier for product ${index}:`, {
+            supplierValue,
+            supplierType: typeof supplierValue,
+            allSuppliers: allSuppliers ? allSuppliers.length : 'undefined'
+          });
+          
+          // Try to find by ID first, then by name
+          const supplierById = allSuppliers.find(s => s._id == supplierValue);
+          const supplierByName = allSuppliers.find(s => s.name === supplierValue);
+          
+          console.log(`Supplier lookup results:`, {
+            supplierById,
+            supplierByName,
+            searchValue: supplierValue
+          });
+          
+          const finalSupplier = supplierById || supplierByName;
+          if (finalSupplier) {
+            $("#supplier").val(finalSupplier.name);
+            console.log(`Set supplier to: ${finalSupplier.name}`);
+          } else {
+            $("#supplier").val(supplierValue);
+            console.log(`Set supplier to original value: ${supplierValue}`);
+          }
+        } else {
+          $("#supplier").val("");
+        }
+
+        // Handle image
+        if (product.img && product.img !== "") {
         $("#imagename").hide();
         $("#current_img").html(
-          `<img src="${img_path + allProducts[index].img}" alt="">`,
+            `<img src="${img_path + product.img}" alt="">`,
         );
         $("#rmv_img").show();
+        } else {
+          $("#imagename").show();
+          $("#current_img").html("");
+          $("#rmv_img").hide();
       }
 
-      if (allProducts[index].stock == 0) {
+        // Handle stock status
+        if (product.stock == 0) {
         $("#stock").prop("checked", true);
+        } else {
+          $("#stock").prop("checked", false);
       }
 
+        // Show the modal
       $("#newProduct").modal("show");
+      };
+
+      // Ensure dropdowns are populated before proceeding
+      ensureDropdownsPopulated().then(() => {
+        console.log("Dropdowns populated, now populating form");
+        populateForm();
+      }).catch((error) => {
+        console.error("Failed to populate dropdowns:", error);
+        // Still try to populate form with available data
+        populateForm();
+      });
     };
 
     $("#userModal").on("hide.bs.modal", function () {
@@ -3419,7 +4705,12 @@ if (auth == undefined) {
             type: "DELETE",
             success: function (result) {
               loadProducts();
-              notiflix.Report.success("Done!", "Product deleted", "Ok");
+              // Handle new detailed success messages
+              if (result && result.success && result.message) {
+                notiflix.Notify.success(result.message);
+              } else {
+                notiflix.Notify.success("Product deleted successfully");
+              }
             },
           });
         },
@@ -3470,7 +4761,12 @@ if (auth == undefined) {
             type: "DELETE",
             success: function (result) {
               loadCategories();
-              notiflix.Report.success("Done!", "Category deleted", "Ok");
+              // Handle new detailed success messages
+              if (result && result.success && result.message) {
+                notiflix.Notify.success(result.message);
+              } else {
+                notiflix.Notify.success("Category deleted successfully");
+              }
             },
           });
         },
@@ -3550,8 +4846,8 @@ if (auth == undefined) {
       e.preventDefault();
       
       const formData = new FormData(this);
-              formData.append('skipDuplicates', $("#skipDuplicates").is(':checked'));
-        formData.append('updateExisting', $("#updateExisting").is(':checked'));
+      formData.append('skipDuplicates', $("#skipDuplicates").is(':checked'));
+      formData.append('updateExisting', $("#updateExisting").is(':checked'));
         formData.append('createManufacturers', $("#createManufacturers").is(':checked'));
         formData.append('createSuppliers', $("#createSuppliers").is(':checked'));
       
@@ -3562,25 +4858,52 @@ if (auth == undefined) {
       }
       
       console.log("Bulk import parameters:");
-              console.log("- Skip Duplicates:", $("#skipDuplicates").is(':checked'));
-        console.log("- Update Existing:", $("#updateExisting").is(':checked'));
+      console.log("- Skip Duplicates:", $("#skipDuplicates").is(':checked'));
+      console.log("- Update Existing:", $("#updateExisting").is(':checked'));
         console.log("- Create Manufacturers:", $("#createManufacturers").is(':checked'));
         console.log("- Create Suppliers:", $("#createSuppliers").is(':checked'));
-        console.log("- Default Category:", defaultCategory);
+      console.log("- Default Category:", defaultCategory);
       
       $("#submitBulkImport").prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Importing...');
       $("#importProgress").show();
-      $("#importStatus").text("Starting import...");
+      $("#cancelImport").show();
       
-      $.ajax({
+      // Start enhanced progress tracking
+      importProgressManager.start(100, "Starting import...");
+      
+      // Start progress simulation
+      window.progressSimulation = setInterval(() => {
+        if (importProgressManager.isRunning) {
+          const currentProgress = importProgressManager.currentProgress;
+          if (currentProgress < 90) {
+            importProgressManager.updateProgress(
+              Math.min(importProgressManager.totalItems, 
+              Math.floor(importProgressManager.totalItems * (currentProgress + 5) / 100)),
+              "Processing products..."
+            );
+          }
+        }
+      }, 2000);
+
+      // Store the AJAX request for potential cancellation
+      window.currentImportRequest = $.ajax({
         url: api + "inventory/bulk-import",
         type: "POST",
         data: formData,
         processData: false,
         contentType: false,
         success: function (response) {
+          // Clear progress simulation
+          if (window.progressSimulation) {
+            clearInterval(window.progressSimulation);
+          }
+          
           $("#submitBulkImport").prop('disabled', false).html('<i class="fa fa-upload"></i> Import Products');
           $("#importProgress").hide();
+          $("#cancelImport").hide();
+          
+          // Complete progress tracking
+          importProgressManager.complete();
           
           if (response.success) {
             let message = response.message;
@@ -3591,12 +4914,12 @@ if (auth == undefined) {
               });
             }
             
-                      notiflix.Report.success(
-            "Import Completed",
-            message,
-            "OK"
-          );
-          
+            notiflix.Report.success(
+              "Import Completed",
+              message,
+              "OK"
+            );
+            
           // Add a longer delay to ensure backend processing and database sync is complete
           setTimeout(() => {
             console.log("Starting to refresh lists after bulk import...");
@@ -3613,8 +4936,8 @@ if (auth == undefined) {
               
               // Refresh all relevant lists
               console.log("Refreshing products...");
-              loadProducts();
-              
+             loadProducts();
+             
               console.log("Refreshing categories...");
               loadCategories();
               
@@ -3628,7 +4951,7 @@ if (auth == undefined) {
               setTimeout(() => {
                 if (allSuppliers && allSuppliers.length > 0) {
                   console.log("All lists refreshed successfully, closing modal...");
-                  $("#bulkImport").modal("hide");
+             $("#bulkImport").modal("hide");
                 } else {
                   console.log(`Suppliers not loaded, retrying... (${retryCount + 1}/3)`);
                   refreshLists(retryCount + 1);
@@ -3641,13 +4964,21 @@ if (auth == undefined) {
           }
         },
         error: function (jqXHR, textStatus, errorThrown) {
+          // Clear progress simulation
+          if (window.progressSimulation) {
+            clearInterval(window.progressSimulation);
+          }
+          
           $("#submitBulkImport").prop('disabled', false).html('<i class="fa fa-upload"></i> Import Products');
           $("#importProgress").hide();
+          $("#cancelImport").hide();
           
+          // Show error in progress tracking
           let errorMessage = "An error occurred during import.";
           if (jqXHR.responseJSON && jqXHR.responseJSON.message) {
             errorMessage = jqXHR.responseJSON.message;
           }
+          importProgressManager.error(errorMessage);
           
           notiflix.Report.failure(
             "Import Failed",
@@ -3656,6 +4987,32 @@ if (auth == undefined) {
           );
         }
             });
+     });
+
+     // Cancel Import Functionality
+     $("#cancelImport").on("click", function() {
+         if (confirm("Are you sure you want to cancel the import? This action cannot be undone.")) {
+             // Reset progress
+             importProgressManager.reset();
+             
+             // Reset UI
+             $("#submitBulkImport").prop('disabled', false).html('<i class="fa fa-upload"></i> Import Products');
+             $("#importProgress").hide();
+             $("#cancelImport").hide();
+             
+             // Clear progress simulation
+             if (window.progressSimulation) {
+                 clearInterval(window.progressSimulation);
+             }
+             
+             // Abort any ongoing AJAX request
+             if (window.currentImportRequest) {
+                 window.currentImportRequest.abort();
+                 window.currentImportRequest = null;
+             }
+             
+             notiflix.Notify.info("Import cancelled successfully");
+         }
      });
 
      // Bulk Remove Functions
@@ -5621,6 +6978,119 @@ enhanceKeyboardNavigation();
         }
       });
       
+      // Enhanced Search Field Functionality
+      function enhanceSearchFields() {
+        // Add loading state to search fields
+        $('#search').on('input', function() {
+          const $this = $(this);
+          const $container = $this.closest('.pos-product-search');
+          
+          // Add loading animation
+          $container.addClass('pos-search-loading');
+          
+          // Clear loading after a short delay (simulating search)
+          setTimeout(() => {
+            $container.removeClass('pos-search-loading');
+          }, 300);
+        });
+        
+        // DISABLED: JavaScript focus class management - CSS handles focus styles now
+        // Enhanced barcode search field
+        // $('#skuCode').on('focus', function() {
+        //   const $container = $(this).closest('.pos-search-container');
+        //   $container.addClass('focused');
+        // }).on('blur', function() {
+        //   const $container = $(this).closest('.pos-search-container');
+        //   $container.removeClass('focused');
+        // });
+        
+        // Enhanced product search field
+        // $('#search').on('focus', function() {
+        //   const $container = $(this).closest('.pos-product-search');
+        //   $container.addClass('focused');
+        // }).on('blur', function() {
+        //   $container.removeClass('focused');
+        // });
+        
+        // Filter dropdown enhancements
+        $('.pos-filter-row select').on('change', function() {
+          const $this = $(this);
+          const $container = $this.closest('.pos-search-container');
+          
+          // Add highlight effect when filters change
+          $container.addClass('pos-search-highlight');
+          setTimeout(() => {
+            $container.removeClass('pos-search-highlight');
+          }, 2000);
+        });
+        
+        // Clear filters button enhancement
+        $('#clearFilters').on('click', function() {
+          const $this = $(this);
+          const $container = $this.closest('.pos-search-container');
+          
+          // Add click animation
+          $this.addClass('clicked');
+          setTimeout(() => {
+            $this.removeClass('clicked');
+          }, 200);
+          
+          // Add success highlight
+          $container.addClass('pos-search-highlight');
+          setTimeout(() => {
+            $container.removeClass('pos-search-highlight');
+          }, 1500);
+        });
+        
+        // Add keyboard shortcuts for search fields
+        $(document).on('keydown', function(e) {
+          // Ctrl/Cmd + K to focus product search
+          if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+            e.preventDefault();
+            $('#search').focus();
+          }
+          
+          // Ctrl/Cmd + L to focus barcode search
+          if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
+            e.preventDefault();
+            $('#skuCode').focus();
+          }
+          
+          // Escape to clear search fields
+          if (e.key === 'Escape') {
+            if ($('#search').is(':focus')) {
+              $('#search').val('').blur();
+            } else if ($('#skuCode').is(':focus')) {
+              $('#skuCode').val('').blur();
+            }
+          }
+        });
+        
+        // Add search field hints
+        addSearchFieldHints();
+      }
+      
+      // Add helpful hints to search fields
+      function addSearchFieldHints() {
+        // Barcode search hints
+        if (!$('#skuCodeHint').length) {
+          $('#skuCode').after(`
+            <div class="search-hints" style="margin-top: 8px; font-size: 12px; color: #6c757d;">
+              <i class="fa fa-info-circle"></i> 
+              <strong>Shortcuts:</strong> Enter to search • Ctrl+L to focus • Esc to clear
+            </div>
+          `);
+        }
+        
+        // Product search hints
+        if (!$('#searchHint').length) {
+          
+        }
+      }
+      
+      // Initialize enhanced search fields
+      enhanceSearchFields();
+      
       // POS Category Filter
       $(document).on('keydown', function(e) {
         if (e.altKey && e.keyCode >= 49 && e.keyCode <= 57) { // Alt+1-9 for categories
@@ -5655,3 +7125,231 @@ enhanceKeyboardNavigation();
     
     // Initialize POS navigation enhancements
     enhancePOSNavigation();
+
+    // Navigation button hover effects (JavaScript-based to bypass CSS conflicts)
+    $(document).ready(function() {
+        // Add hover effects to navigation buttons (excluding specific buttons)
+        $('.nav-btn-icon').each(function() {
+            const $button = $(this);
+            const title = $button.attr('title');
+            const buttonId = $button.attr('id');
+            
+            // Skip specific buttons that shouldn't have hover effects
+            if (buttonId === 'newProductModal' || 
+                buttonId === 'newCategoryModal' || 
+                buttonId === 'newManufacturerModal' || 
+                buttonId === 'newSupplierModal' || 
+                buttonId === 'add-user' ||
+                buttonId === 'settings' ||
+                buttonId === 'keyboardHelp' ||
+                buttonId === 'clearAlerts' ||
+                buttonId === 'log-out') {
+                return; // Skip this button
+            }
+            
+            // Create text label element
+            const $label = $('<span class="nav-hover-label"></span>')
+                .text(title)
+                .css({
+                    'position': 'absolute',
+                    'right': '8px',
+                    'top': '50%',
+                    'transform': 'translateY(-50%) translateX(100%)',
+                    'color': 'white',
+                    'font-size': '12px',
+                    'font-weight': '500',
+                    'white-space': 'nowrap',
+                    'opacity': '0',
+                    'transition': 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    'pointer-events': 'none',
+                    'text-shadow': '0 1px 2px rgba(0, 0, 0, 0.3)',
+                    'z-index': '1000'
+                });
+            
+            // Append label to button
+            $button.append($label);
+            
+            // Mouse enter event
+            $button.on('mouseenter', function() {
+                // Calculate dynamic padding based on label text length
+                const labelWidth = $label.outerWidth();
+                const dynamicPadding = Math.max(60, labelWidth + 20); // Minimum 60px, or label width + 20px
+                
+                $button.css({
+                    'width': 'auto',
+                    'min-width': '40px',
+                    'padding-right': dynamicPadding + 'px'
+                });
+                $label.css({
+                    'opacity': '1',
+                    'transform': 'translateY(-50%) translateX(0)'
+                });
+            });
+            
+            // Mouse leave event
+            $button.on('mouseleave', function() {
+                $button.css({
+                    'width': '40px',
+                    'padding-right': '8px'
+                });
+                $label.css({
+                    'opacity': '0',
+                    'transform': 'translateY(-50%) translateX(100%)'
+                });
+            });
+        });
+    });
+
+    // Enhanced Focus Management and Keyboard Navigation
+    // ================================================
+    
+    // Add focus indicators and keyboard hints
+    $.fn.enhanceFocusVisibility = function() {
+      // Add focus indicators to all interactive elements
+      $('input, select, textarea, button, a, [tabindex]').each(function() {
+        const $el = $(this);
+        
+        // DISABLED: JavaScript focus class addition - CSS handles focus styles now
+        // Add focus class for enhanced styling
+        // $el.on('focus', function() {
+        //   $(this).addClass('element-focused');
+        //   
+        //   // Add visual focus indicator
+        //   if (!$(this).hasClass('focus-indicator')) {
+        //     $(this).addClass('focus-indicator');
+        //   }
+        // });
+        
+        // DISABLED: JavaScript focus class removal - CSS handles focus styles now
+        // $el.on('blur', function() {
+        //   $(this).removeClass('element-focused focus-indicator');
+        // });
+      });
+      
+      // Enhanced table row focus
+      $('.table tbody tr').each(function() {
+        $(this).attr('tabindex', '0');
+        // DISABLED: JavaScript focus class addition - CSS handles focus styles now
+        // $(this).on('focus', function() {
+        //   $(this).addClass('row-focused');
+        // });
+        // DISABLED: JavaScript focus class removal - CSS handles focus styles now
+        // $(this).on('blur', function() {
+        //   $(this).removeClass('row-focused');
+        // });
+      });
+      
+      // Enhanced product grid focus
+      $('#parent .widget-panel').each(function() {
+        $(this).attr('tabindex', '0');
+        // DISABLED: JavaScript focus class addition - CSS handles focus styles now
+        // $(this).on('focus', function() {
+        //   $(this).addClass('product-focused');
+        // });
+        // DISABLED: JavaScript focus class removal - CSS handles focus styles now
+        // $(this).on('blur', function() {
+        //   $(this).removeClass('product-focused');
+        // });
+      });
+    };
+    
+    // Enhanced keyboard navigation for tables
+    $.fn.enhanceTableNavigation = function() {
+      $('.table tbody tr').on('keydown', function(e) {
+        const $currentRow = $(this);
+        const $rows = $('.table tbody tr');
+        const currentIndex = $rows.index($currentRow);
+        
+        switch(e.key) {
+          case 'ArrowDown':
+            e.preventDefault();
+            if (currentIndex < $rows.length - 1) {
+              $rows.eq(currentIndex + 1).focus();
+            }
+            break;
+          case 'ArrowUp':
+            e.preventDefault();
+            if (currentIndex > 0) {
+              $rows.eq(currentIndex - 1).focus();
+            }
+            break;
+          case 'Enter':
+          case ' ':
+            e.preventDefault();
+            $currentRow.trigger('dblclick');
+            break;
+        }
+      });
+    };
+    
+    // Enhanced keyboard navigation for product grid
+    $.fn.enhanceProductGridNavigation = function() {
+      $('#parent .widget-panel').on('keydown', function(e) {
+        const $currentProduct = $(this);
+        const $products = $('#parent .widget-panel');
+        const currentIndex = $products.index($currentProduct);
+        const colsPerRow = 6; // Assuming 6 columns per row
+        
+        switch(e.key) {
+          case 'ArrowRight':
+            e.preventDefault();
+            if (currentIndex < $products.length - 1) {
+              $products.eq(currentIndex + 1).focus();
+            }
+            break;
+          case 'ArrowLeft':
+            e.preventDefault();
+            if (currentIndex > 0) {
+              $products.eq(currentIndex - 1).focus();
+            }
+            break;
+          case 'ArrowDown':
+            e.preventDefault();
+            const nextRowIndex = currentIndex + colsPerRow;
+            if (nextRowIndex < $products.length) {
+              $products.eq(nextRowIndex).focus();
+            }
+            break;
+          case 'ArrowUp':
+            e.preventDefault();
+            const prevRowIndex = currentIndex - colsPerRow;
+            if (prevRowIndex >= 0) {
+              $products.eq(prevRowIndex).focus();
+            }
+            break;
+          case 'Enter':
+          case ' ':
+            e.preventDefault();
+            $currentProduct.trigger('click');
+            break;
+        }
+      });
+    };
+    
+    // Initialize enhanced focus management
+    $(document).ready(function() {
+      $.fn.enhanceFocusVisibility();
+      $.fn.enhanceTableNavigation();
+      $.fn.enhanceProductGridNavigation();
+      
+      // Add CSS for focus indicators
+      $('<style>')
+        .prop('type', 'text/css')
+        .html(`
+          .element-focused { 
+            position: relative !important; 
+            z-index: 1000 !important; 
+          }
+
+          .row-focused { 
+            background-color: #e3f2fd !important; 
+            box-shadow: inset 0 0 0 2px #17a2b8 !important; 
+          }
+          .product-focused { 
+            transform: scale(1.05) !important; 
+            z-index: 10 !important; 
+          }
+
+        `)
+        .appendTo('head');
+    });

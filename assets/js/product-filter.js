@@ -1,133 +1,90 @@
 $(document).ready(function () {
+  // Debounce function to prevent excessive calls
+  function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  }
+
+  // Only category filter remains - simplified
   $("#categories").on("change", function () {
     filterProducts();
   });
 
-  $("#manufacturers").on("change", function () {
-    filterProducts();
-  });
-
-  $("#suppliers").on("change", function () {
-    filterProducts();
-  });
-
+  // Clear filters button
   $("#clearFilters").on("click", function () {
     $("#categories").val("0");
-    $("#manufacturers").val("");
-    $("#suppliers").val("");
     $("#search").val("");
     filterProducts();
-    searchProducts();
   });
 
+  // Main filtering function - simplified
   function filterProducts() {
     let selectedCategory = $("#categories option:selected").val();
-    let selectedManufacturer = $("#manufacturers option:selected").val();
-    let selectedSupplier = $("#suppliers option:selected").val();
-    
-    console.log("Filtering products:", {
-      category: selectedCategory,
-      manufacturer: selectedManufacturer,
-      supplier: selectedSupplier,
-      totalProducts: $(".box").length
-    });
+    let searchTerm = $("#search").val().toLowerCase().trim();
     
     // Show all products first
     $(".box").show();
     
     // Apply category filter
-    if (selectedCategory != "0") {
-      let categoryProducts = $(".box." + selectedCategory);
-      console.log("Category filter:", selectedCategory, "Products found:", categoryProducts.length);
+    if (selectedCategory && selectedCategory !== "0") {
       $(".box").not("." + selectedCategory).hide();
     }
     
-    // Apply manufacturer filter if a manufacturer is selected
-    if (selectedManufacturer) {
-      let visibleProducts = $(".box:visible");
-      let manufacturerMatches = 0;
-      
-      console.log("Checking manufacturer filter for:", selectedManufacturer);
-      console.log("Visible products to check:", visibleProducts.length);
-      
-      visibleProducts.each(function() {
+    // Apply search filter if there's a search term
+    if (searchTerm) {
+      $(".box:visible").each(function() {
         let $product = $(this);
-        let productText = $product.find(".name").text();
+        let productText = $product.find(".name, .sku").text().toLowerCase();
         
-        console.log("Product text:", productText);
-        console.log("Looking for:", selectedManufacturer);
-        
-        // Check if the product contains the selected manufacturer
-        if (!productText.toLowerCase().includes(selectedManufacturer.toLowerCase())) {
+        if (!productText.includes(searchTerm)) {
           $product.hide();
-        } else {
-          manufacturerMatches++;
         }
       });
-      
-      console.log("Manufacturer filter:", selectedManufacturer, "Products matching:", manufacturerMatches);
     }
     
-    // Apply supplier filter if a supplier is selected
-    if (selectedSupplier) {
-      let visibleProducts = $(".box:visible");
-      let supplierMatches = 0;
-      
-      console.log("Checking supplier filter for:", selectedSupplier);
-      console.log("Visible products to check:", visibleProducts.length);
-      
-      visibleProducts.each(function() {
-        let $product = $(this);
-        let productText = $product.find(".name").text();
-        
-        console.log("Product text:", productText);
-        console.log("Looking for:", selectedSupplier);
-        
-        // Check if the product contains the selected supplier
-        if (!productText.toLowerCase().includes(selectedSupplier.toLowerCase())) {
-          $product.hide();
-    } else {
-          supplierMatches++;
-        }
-      });
-      
-      console.log("Supplier filter:", selectedSupplier, "Products matching:", supplierMatches);
-    }
+    // Update product count display
+    let visibleCount = $(".box:visible").length;
+    let totalCount = $(".box").length;
     
-    let finalVisible = $(".box:visible").length;
-    console.log("Final visible products:", finalVisible);
+    // Optional: Update a product count display if it exists
+    if ($("#productCount").length) {
+      $("#productCount").text(`${visibleCount} of ${totalCount} products`);
+    }
   }
 
-  function searchProducts() {
-    var matcher = new RegExp($("#search").val(), "gi");
-    
-    $(".box").each(function() {
-      let $product = $(this);
-      let productText = $product.find(".name, .sku").text();
-      let matchesSearch = matcher.test(productText);
-      
-      // Show product only if it matches search
-      if (matchesSearch) {
-        $product.show();
-      } else {
-        $product.hide();
-      }
-    });
-    
-    // After search, apply category and manufacturer filters
+  // Debounced search function
+  const debouncedSearch = debounce(function() {
     filterProducts();
-  }
+  }, 300);
 
-  let $search = $("#search").on("input", function () {
-    searchProducts();
+  // Search input handler with debouncing
+  $("#search").on("input", function () {
+    debouncedSearch();
   });
 
+  // Clear search on escape key
+  $("#search").on("keydown", function(e) {
+    if (e.key === "Escape") {
+      $(this).val("");
+      filterProducts();
+    }
+  });
+
+  // Keyboard navigation for search
   $("body").on("click", "#jq-keyboard button", function (e) {
     if ($("#search").is(":focus")) {
-      searchProducts();
+      debouncedSearch();
     }
   });
 
+  // Search open orders functionality
   function searchOpenOrders() {
     var matcher = new RegExp($("#holdOrderInput").val(), "gi");
     $(".order")
@@ -148,6 +105,7 @@ $(document).ready(function () {
     }
   });
 
+  // Search customer orders functionality
   function searchCustomerOrders() {
     var matcher = new RegExp($("#holdCustomerOrderInput").val(), "gi");
     $(".customer-order")
@@ -159,9 +117,8 @@ $(document).ready(function () {
   }
 
   $("#holdCustomerOrderInput").on("input", function () {
-      searchCustomerOrders();
-    }
-  );
+    searchCustomerOrders();
+  });
 
   $("body").on("click", ".customerOrderKeyboard .key", function () {
     if ($("#holdCustomerOrderInput").is(":focus")) {
@@ -169,4 +126,6 @@ $(document).ready(function () {
     }
   });
 
+  // Don't initialize immediately - wait for products to load
+  // filterProducts() will be called from loadProducts() after products are loaded
 });

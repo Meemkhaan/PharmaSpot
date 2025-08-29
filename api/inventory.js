@@ -1,5 +1,16 @@
 const app = require("express")();
 const server = require("http").Server(app);
+
+// Global error handler for unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    // Don't exit the process, just log the error
+});
+
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+    // Don't exit the process, just log the error
+});
 const bodyParser = require("body-parser");
 const Datastore = require("@seald-io/nedb");
 const async = require("async");
@@ -67,6 +78,13 @@ app.use(bodyParser.json());
 let inventoryDB = new Datastore({
     filename: dbPath,
     autoload: true,
+    onload: function(err) {
+                if (err) {
+            console.error('Inventory database load error:', err);
+                } else {
+            console.log('Inventory database loaded successfully');
+        }
+    }
 });
 
 console.log("Inventory database path:", dbPath);
@@ -269,7 +287,12 @@ app.post("/product", function (req, res) {
                             message: "An unexpected error occurred.",
                         });
                     } else {
-                        res.sendStatus(200);
+                        console.log(`Product created successfully: ${Product.name}`);
+                        res.json({
+                            success: true,
+                            message: `Product "${Product.name}" created successfully!`,
+                            product: product
+                        });
                     }
                 });
             });
@@ -294,10 +317,15 @@ app.post("/product", function (req, res) {
                             message: "An unexpected error occurred.",
                         });
                     } else {
-                        res.sendStatus(200);
-                    }
-                },
-            );
+                        console.log(`Product updated successfully: ${Product.name}`);
+                        res.json({
+                            success: true,
+                            message: `Product "${Product.name}" updated successfully!`,
+                            product: Product
+                        });
+                        }
+                    },
+                );
         });
     }
     });
@@ -324,7 +352,12 @@ app.delete("/product/:productId", function (req, res) {
                     message: "An unexpected error occurred.",
                 });
             } else {
-                res.sendStatus(200);
+                console.log(`Product deleted successfully, ID: ${req.params.productId}`);
+                res.json({
+                    success: true,
+                    message: "Product deleted successfully!",
+                    deletedId: req.params.productId
+                });
             }
         },
     );
@@ -445,7 +478,7 @@ app.post("/bulk-import", csvUpload.single('csvFile'), function (req, res) {
             // Safe file cleanup with error handling
             try {
                 if (req.file && req.file.path && fs.existsSync(req.file.path)) {
-                    fs.unlinkSync(req.file.path);
+            fs.unlinkSync(req.file.path);
                 }
             } catch (cleanupError) {
                 console.log(`File cleanup warning: ${cleanupError.message}`);
@@ -467,6 +500,14 @@ app.post("/bulk-import", csvUpload.single('csvFile'), function (req, res) {
                 console.log("Databases reloaded successfully");
             } catch (reloadError) {
                 console.log(`Database reload warning: ${reloadError.message}`);
+            }
+            
+            // Safely compact and sync databases after bulk import completion
+            try {
+                console.log(`- Compacting inventory database...`);
+                inventoryDB.compactDatafile();
+            } catch (compactError) {
+                console.log(`- Inventory database compaction warning: ${compactError.message}`);
             }
             
             res.json({
@@ -683,6 +724,17 @@ app.post("/bulk-import", csvUpload.single('csvFile'), function (req, res) {
         }
 
         const manufacturerDBPath = path.join(appData, appName, "server", "databases", "manufacturers.db");
+        
+        // Add safety check for database file
+        const fs = require('fs');
+        if (!fs.existsSync(manufacturerDBPath)) {
+            console.log(`- Manufacturer database file does not exist, creating directory structure`);
+            const dbDir = path.dirname(manufacturerDBPath);
+            if (!fs.existsSync(dbDir)) {
+                fs.mkdirSync(dbDir, { recursive: true });
+            }
+        }
+        
         const manufacturerDB = new Datastore({
             filename: manufacturerDBPath,
             autoload: true,
@@ -728,18 +780,6 @@ app.post("/bulk-import", csvUpload.single('csvFile'), function (req, res) {
                         }
                         
                         console.log(`- Successfully created new manufacturer: ${cleanName} (ID: ${manufacturer._id})`);
-                        // Compact database to prevent corruption
-                        try {
-                            manufacturerDB.compactDatafile();
-                        } catch (compactError) {
-                            console.log(`- Database compaction warning: ${compactError.message}`);
-                        }
-                        // Force database sync
-                        try {
-                            manufacturerDB.loadDatabase();
-                        } catch (syncError) {
-                            console.log(`- Database sync warning: ${syncError.message}`);
-                        }
                         return callback(null, manufacturer._id);
                     });
                 } catch (dbError) {
@@ -760,6 +800,16 @@ app.post("/bulk-import", csvUpload.single('csvFile'), function (req, res) {
         }
 
         const supplierDBPath = path.join(appData, appName, "server", "databases", "suppliers.db");
+        
+        // Add safety check for database file
+        if (!fs.existsSync(supplierDBPath)) {
+            console.log(`- Supplier database file does not exist, creating directory structure`);
+            const dbDir = path.dirname(supplierDBPath);
+            if (!fs.existsSync(dbDir)) {
+                fs.mkdirSync(dbDir, { recursive: true });
+            }
+        }
+        
         const supplierDB = new Datastore({
             filename: supplierDBPath,
             autoload: true,
@@ -805,18 +855,6 @@ app.post("/bulk-import", csvUpload.single('csvFile'), function (req, res) {
                         }
                         
                         console.log(`- Successfully created new supplier: ${cleanName} (ID: ${supplier._id})`);
-                        // Compact database to prevent corruption
-                        try {
-                            supplierDB.compactDatafile();
-                        } catch (compactError) {
-                            console.log(`- Database compaction warning: ${compactError.message}`);
-                        }
-                        // Force database sync
-                        try {
-                            supplierDB.loadDatabase();
-                        } catch (syncError) {
-                            console.log(`- Database sync warning: ${syncError.message}`);
-                        }
                         return callback(null, supplier._id);
                     });
                 } catch (dbError) {
@@ -902,7 +940,7 @@ app.post("/bulk-import", csvUpload.single('csvFile'), function (req, res) {
                             }
                             
                             // Now process the product with all the resolved IDs
-                            processProductData(data, categoryId, updateExisting, null, callback);
+                    processProductData(data, categoryId, updateExisting, null, callback);
                         });
                     });
                 } else if (existingCategory) {
@@ -924,7 +962,7 @@ app.post("/bulk-import", csvUpload.single('csvFile'), function (req, res) {
                             }
                             
                             // Now process the product with all the resolved IDs
-                            processProductData(data, categoryId, updateExisting, null, callback);
+                    processProductData(data, categoryId, updateExisting, null, callback);
                         });
                     });
                 } else {
@@ -954,12 +992,6 @@ app.post("/bulk-import", csvUpload.single('csvFile'), function (req, res) {
                                 categoryId = newCategory._id;
                                 console.log(`- Successfully created new category: ${categoryName} (ID: ${categoryId})`);
                                 console.log(`- Inserted category object:`, category);
-                                // Force database sync for categories
-                                try {
-                                    categoryDB.loadDatabase();
-                                } catch (syncError) {
-                                    console.log(`- Category database sync warning: ${syncError.message}`);
-                                }
                             }
                             // Process manufacturer and supplier after category
                             processManufacturer(data.Manufacturer, (err, manufacturerId) => {
@@ -976,7 +1008,7 @@ app.post("/bulk-import", csvUpload.single('csvFile'), function (req, res) {
                                     }
                                     
                                     // Now process the product with all the resolved IDs
-                                    processProductData(data, categoryId, updateExisting, null, callback);
+                            processProductData(data, categoryId, updateExisting, null, callback);
                                 });
                             });
                         });

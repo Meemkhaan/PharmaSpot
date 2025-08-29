@@ -74,7 +74,14 @@ app.post("/category", function (req, res) {
                         message: "An unexpected error occurred.",
                     });
                 }
-        else{res.sendStatus(200);}
+        else{
+            console.log(`Category created successfully: ${newCategory.name}`);
+            res.json({
+                success: true,
+                message: `Category "${newCategory.name}" created successfully!`,
+                category: category
+            });
+        }
     });
 });
 
@@ -98,7 +105,14 @@ app.delete("/category/:categoryId", function (req, res) {
                         message: "An unexpected error occurred.",
                     });
                 }
-            else{res.sendStatus(200);}
+            else{
+                console.log(`Category deleted successfully, ID: ${req.params.categoryId}`);
+                res.json({
+                    success: true,
+                    message: "Category deleted successfully!",
+                    deletedId: req.params.categoryId
+                });
+            }
         },
     );
 });
@@ -125,7 +139,14 @@ app.put("/category", function (req, res) {
                         message: "An unexpected error occurred.",
                     });
                 }
-            else{res.sendStatus(200);}
+            else{
+                console.log(`Category updated successfully: ${req.body.name}`);
+                res.json({
+                    success: true,
+                    message: `Category "${req.body.name}" updated successfully!`,
+                    category: req.body
+                });
+            }
         },
     );
 });

@@ -1,0 +1,97 @@
+Name,Barcode,SellingPrice,PurchasePrice,GenericName,Manufacturer,Supplier,BatchNumber,Category,Quantity,MinStock,ExpirationDate
+Paracetamol 500mg,1454600,8.99,5.99,Paracetamol,Acme Pharma,MediSuppliers Ltd,BATCH-001,Medicines,100,10,31-Mar-26
+Ibuprofen 400mg,7126520,7.49,4.99,Ibuprofen,HealthCorp,MediSuppliers Ltd,BATCH-002,Medicines,50,5,28-Sep-25
+Aspirin 325mg,1779658,5.24,3.49,Aspirin,Wellness Labs,Global Pharma Distributors,BATCH-ASP-0325,Medicines,80,8,14-Dec-25
+Amoxicillin 500mg,6746528,11.99,7.99,Amoxicillin,Biomed Pharmaceuticals,HealthPlus Wholesale,BATCH-AMX-1124,Medicines,60,6,29-May-26
+Cough Syrup 100ml,9017213,9.74,6.49,Dextromethorphan,Wellness Labs,MediSuppliers Ltd,BATCH-SYR-0125,Medicines,40,5,28-Feb-26
+Loratadine 10mg,6849988,6.44,4.29,Loratadine,ClearPharm,Global Pharma Distributors,BATCH-LOR-1024,Medicines,70,7,29-Jun-26
+Omeprazole 20mg,6494243,13.49,8.99,Omeprazole,AcidGuard Pharma,HealthPlus Wholesale,BATCH-OME-0924,Medicines,45,5,29-Jul-25
+Metformin 500mg,6842811,14.24,9.49,Metformin,DiabetoMed,MediSuppliers Ltd,BATCH-MET-0824,Medicines,55,6,29-Aug-26
+Vitamin C 1000mg,4741703,5.99,3.99,Ascorbic Acid,VitaNature,HealthPlus Wholesale,BATCH-VC-0225,Supplements,120,12,29-Dec-25
+Multivitamin Tablets,2713567,19.49,12.99,Multivitamin,VitaNature,Global Pharma Distributors,BATCH-MV-1124,Supplements,90,9,29-Nov-25
+Band-Aids 20ct,4751445,3.74,2.49,Adhesive Bandage,FirstAid Co.,MediSuppliers Ltd,BATCH-BA-0325,First Aid,200,20,31-Mar-27
+Antiseptic Cream 30g,7402206,7.19,4.79,Chlorhexidine,FirstAid Co.,HealthPlus Wholesale,BATCH-AC-1024,First Aid,85,8,13-Oct-25
+Hand Sanitizer 50ml,4728820,4.49,2.99,Ethanol Alcohol,CleanCare,Global Pharma Distributors,BATCH-HS-0125,Personal Care,150,15,28-Sep-26
+Toothpaste 100g,6534471,4.94,3.29,Fluoride,SparkleOral,MediSuppliers Ltd,BATCH-TP-1224,Personal Care,100,10,29-Jan-26
+Shampoo 250ml,4523373,8.24,5.49,Various,SilkyLocks,HealthPlus Wholesale,BATCH-SH-0225,Personal Care,60,6,28-Feb-26
+Ibuprofen Gel 50g,4516279,10.49,6.99,Ibuprofen,HealthCorp,Global Pharma Distributors,BATCH-IBG-0125,Medicines,40,4,01-May-26
+Antihistamine Cream 30g,5770274,7.94,5.29,Diphenhydramine,DermaRelief,MediSuppliers Ltd,BATCH-AHC-0524,Medicines,50,5,29-May-25
+Zinc 50mg,4072252,7.49,4.99,Zinc Gluconate,VitaNature,HealthPlus Wholesale,BATCH-ZN-0624,Supplements,80,8,29-Jul-26
+Calcium 600mg,6925837,9.74,6.49,Calcium Carbonate,VitaNature,Global Pharma Distributors,BATCH-CA-0524,Supplements,70,7,29-Jun-25
+Gauze Pads 10ct,9754956,4.79,3.19,Sterile Gauze,FirstAid Co.,MediSuppliers Ltd,BATCH-GP-0325,First Aid,100,10,31-Mar-26
+Thermometer Digital,5922238,14.99,9.99,,MediTech Devices,HealthPlus Wholesale,BATCH-THERM-1024,Medical Devices,30,3,28-Sep-26
+Blood Pressure Monitor,1230343,74.99,49.99,,MediTech Devices,Global Pharma Distributors,BATCH-BPM-0924,Medical Devices,15,2,31-Mar-27
+Inhaler Spacer,8697920,18.74,12.49,,AsthmaCare,MediSuppliers Ltd,BATCH-IS-1124,Medical Devices,25,3,29-Dec-25
+Cotton Balls 100ct,1916263,2.99,1.99,Cotton,FirstAid Co.,HealthPlus Wholesale,BATCH-CB-1024,First Aid,200,20,29-Nov-25
+Face Masks 10ct,7938071,7.49,4.99,,SafeGuard,Global Pharma Distributors,BATCH-FM-0125,Personal Care,150,15,28-Feb-26
+Antacid Tablets 50ct,3301830,8.24,5.49,Calcium Carbonate,AcidGuard Pharma,MediSuppliers Ltd,BATCH-ANT-1224,Medicines,60,6,29-Jan-26
+Laxative 10mg,6492889,5.99,3.99,Bisacodyl,DigestWell,HealthPlus Wholesale,BATCH-LAX-1124,Medicines,70,7,29-May-26
+Eye Drops 10ml,2315802,6.44,4.29,Tetrahydrozoline,ClearSight,Global Pharma Distributors,BATCH-ED-0924,Medicines,50,5,28-Sep-25
+Nasal Spray 15ml,2505987,8.99,5.99,Oxymetazoline,BreatheEasy,MediSuppliers Ltd,BATCH-NS-0824,Medicines,40,4,29-Aug-25
+Vitamin D 2000IU,6922282,10.49,6.99,Cholecalciferol,VitaNature,HealthPlus Wholesale,BATCH-VD-0724,Supplements,80,8,29-Jul-26
+Omega-3 1000mg,2226527,14.99,9.99,Fish Oil,OmegaPure,Global Pharma Distributors,BATCH-OM3-0624,Supplements,60,6,29-Jun-25
+Adhesive Tape 10m,4624575,3.74,2.49,Cloth Tape,FirstAid Co.,MediSuppliers Ltd,BATCH-AT-0325,First Aid,100,10,31-Mar-26
+Alcohol Wipes 50ct,6825998,5.24,3.49,Isopropyl Alcohol,FirstAid Co.,HealthPlus Wholesale,BATCH-AW-0225,First Aid,120,12,28-Feb-26
+Body Lotion 200ml,9772986,7.49,4.99,,SoftSkin,Global Pharma Distributors,BATCH-BL-1224,Personal Care,70,7,29-Dec-25
+Sunscreen SPF50 100ml,1099864,11.99,7.99,,SunSafe,MediSuppliers Ltd,BATCH-SS-1124,Personal Care,50,5,29-Nov-25
+Dental Floss 50m,9550767,4.49,2.99,,SparkleOral,HealthPlus Wholesale,BATCH-DF-1024,Personal Care,80,8,28-Sep-26
+Pain Relief Patch 5ct,4306666,9.74,6.49,Lidocaine,ReliefPatch,Global Pharma Distributors,BATCH-PRP-0924,Medicines,40,4,29-Aug-25
+Cough Drops 20ct,7004654,3.74,2.49,Menthol,ThroatSoothe,MediSuppliers Ltd,BATCH-CD-0824,Medicines,100,10,29-May-26
+Iron Supplement 65mg,2546620,8.99,5.99,Ferrous Sulfate,VitaNature,HealthPlus Wholesale,BATCH-FE-0724,Supplements,60,6,29-Jul-25
+Magnesium 400mg,1258771,7.49,4.99,Magnesium Oxide,VitaNature,Global Pharma Distributors,BATCH-MG-0624,Supplements,70,7,29-Jun-26
+Sterile Gloves 10ct,2992690,5.99,3.99,Latex,FirstAid Co.,MediSuppliers Ltd,BATCH-SG-0325,First Aid,90,9,31-Mar-26
+Digital Pulse Oximeter,2247830,44.99,29.99,,MediTech Devices,HealthPlus Wholesale,BATCH-POX-1024,Medical Devices,20,2,28-Sep-26
+Infrared Thermometer,1334174,59.99,39.99,,MediTech Devices,Global Pharma Distributors,BATCH-IRTHERM-0924,Medical Devices,15,2,31-Mar-26
+Antibiotic Ointment 15g,7709026,6.74,4.49,Bacitracin,FirstAid Co.,MediSuppliers Ltd,BATCH-AO-0225,First Aid,60,6,28-Feb-26
+Lip Balm 5g,8476076,2.99,1.99,,SoftSkin,HealthPlus Wholesale,BATCH-LB-0125,Personal Care,100,10,29-Jan-26
+Deodorant 50ml,5402697,5.24,3.49,,FreshGuard,Global Pharma Distributors,BATCH-DEO-1224,Personal Care,80,8,29-Dec-25
+Acetaminophen 500mg,6577215,8.24,5.49,Acetaminophen,Acme Pharma,MediSuppliers Ltd,BATCH-ACE-1124,Medicines,90,9,29-Nov-25
+Hydrocortisone Cream 30g,2804663,7.49,4.99,Hydrocortisone,DermaRelief,HealthPlus Wholesale,BATCH-HC-1024,Medicines,50,5,29-May-26
+Probiotic 30ct,8765426,13.49,8.99,Lactobacillus,GutHealth,Global Pharma Distributors,BATCH-PRO-0924,Supplements,60,6,29-Jul-25
+Vitamin B12 1000mcg,9777361,9.74,6.49,Cyanocobalamin,VitaNature,MediSuppliers Ltd,BATCH-VB12-0824,Supplements,70,7,29-Jun-26
+Elastic Bandage 3in,1378049,4.94,3.29,Elastic,FirstAid Co.,HealthPlus Wholesale,BATCH-EB-0325,First Aid,100,10,31-Mar-26
+Hand Cream 75ml,4837239,6.44,4.29,,SoftSkin,Global Pharma Distributors,BATCH-HC-0225,Personal Care,80,8,28-Feb-26
+Mouthwash 500ml,5777437,8.99,5.99,Cetylpyridinium,SparkleOral,MediSuppliers Ltd,BATCH-MW-1224,Personal Care,60,6,29-Dec-25
+Antifungal Cream 15g,1142315,7.19,4.79,Clotrimazole,DermaRelief,HealthPlus Wholesale,BATCH-AF-1124,Medicines,50,5,29-Nov-25
+Cold Pack Reusable,9143117,10.49,6.99,,FirstAid Co.,Global Pharma Distributors,BATCH-CP-1024,First Aid,40,4,28-Sep-26
+Hot Pack Reusable,9344781,10.49,6.99,,FirstAid Co.,MediSuppliers Ltd,BATCH-HP-1024,First Aid,40,4,28-Sep-26
+Ear Drops 10ml,8505107,6.74,4.49,Antipyrine,ClearSight,HealthPlus Wholesale,BATCH-ED-0524,Medicines,50,5,29-May-25
+Throat Lozenges 16ct,6114925,4.49,2.99,Benzocaine,ThroatSoothe,Global Pharma Distributors,BATCH-TL-0824,Medicines,80,8,29-Aug-25
+Vitamin E 400IU,8460271,8.99,5.99,Alpha-Tocopherol,VitaNature,MediSuppliers Ltd,BATCH-VE-0724,Supplements,70,7,29-Jul-26
+Fish Oil 1200mg,1565158,14.24,9.49,Fish Oil,OmegaPure,HealthPlus Wholesale,BATCH-FO-0624,Supplements,60,6,29-Jun-25
+Wound Dressing 5ct,2027522,5.24,3.49,Sterile Dressing,FirstAid Co.,Global Pharma Distributors,BATCH-WD-0325,First Aid,100,10,31-Mar-26
+Face Wash 150ml,2877564,7.49,4.99,Salicylic Acid,ClearSkin,MediSuppliers Ltd,BATCH-FW-0225,Personal Care,70,7,28-Feb-26
+Moisturizer 100ml,1171463,8.24,5.49,,SoftSkin,HealthPlus Wholesale,BATCH-MOIST-1224,Personal Care,60,6,29-Dec-25
+Dandruff Shampoo 200ml,6178800,9.74,6.49,Ketoconazole,SilkyLocks,Global Pharma Distributors,BATCH-DS-1124,Personal Care,50,5,29-Nov-25
+Burn Gel 50g,5245247,7.49,4.99,Aloe Vera,FirstAid Co.,MediSuppliers Ltd,BATCH-BG-0924,First Aid,60,6,28-Sep-25
+Antibacterial Soap 100g,3819977,3.74,2.49,Triclosan,CleanCare,HealthPlus Wholesale,BATCH-AS-0125,Personal Care,80,8,29-Jan-26
+Naproxen 250mg,1503164,10.49,6.99,Naproxen,HealthCorp,Global Pharma Distributors,BATCH-NAP-1024,Medicines,50,5,29-May-26
+Antidiarrheal 2mg,8462379,6.74,4.49,Loperamide,DigestWell,MediSuppliers Ltd,BATCH-AD-0924,Medicines,60,6,29-Aug-25
+Collagen 1000mg,9145821,19.49,12.99,Collagen Peptides,VitaNature,HealthPlus Wholesale,BATCH-COL-0824,Supplements,40,4,29-Jul-26
+Glucosamine 1500mg,5698823,14.99,9.99,Glucosamine Sulfate,JointHealth,Global Pharma Distributors,BATCH-GLU-0724,Supplements,50,5,29-Jun-25
+Medical Tape 5m,5129527,3.44,2.29,Paper Tape,FirstAid Co.,MediSuppliers Ltd,BATCH-MT-0325,First Aid,100,10,31-Mar-26
+Nebulizer Kit,1940992,29.99,19.99,,AsthmaCare,HealthPlus Wholesale,BATCH-NEB-1024,Medical Devices,20,2,28-Sep-26
+Pulse Oximeter Clip,5711508,37.49,24.99,,MediTech Devices,Global Pharma Distributors,BATCH-POXC-0924,Medical Devices,15,2,31-Mar-26
+Antiseptic Spray 50ml,1932952,5.99,3.99,Povidone-Iodine,FirstAid Co.,MediSuppliers Ltd,BATCH-AS-0225,First Aid,80,8,28-Feb-26
+Body Wash 250ml,3701404,6.74,4.49,,CleanCare,HealthPlus Wholesale,BATCH-BW-1224,Personal Care,70,7,29-Dec-25
+Conditioner 200ml,6110594,7.49,4.99,,SilkyLocks,Global Pharma Distributors,BATCH-COND-1124,Personal Care,60,6,29-Nov-25
+Allergy Relief 10mg,7491015,8.24,5.49,Cetirizine,ClearPharm,MediSuppliers Ltd,BATCH-AR-1024,Medicines,50,5,29-May-26
+Digestive Enzymes 30ct,2811577,11.99,7.99,Enzyme Blend,GutHealth,HealthPlus Wholesale,BATCH-DE-0924,Supplements,40,4,29-Jul-25
+Vitamin A 5000IU,3784248,7.49,4.99,Retinol,VitaNature,Global Pharma Distributors,BATCH-VA-0824,Supplements,70,7,29-Jun-26
+First Aid Kit Small,9688888,22.49,14.99,,FirstAid Co.,MediSuppliers Ltd,BATCH-FAK-0325,First Aid,30,3,31-Mar-26
+Cotton Swabs 200ct,2606231,2.99,1.99,Cotton,FirstAid Co.,HealthPlus Wholesale,BATCH-CS-1024,First Aid,150,15,28-Sep-26
+Shaving Cream 150ml,4839903,5.24,3.49,,SmoothShave,Global Pharma Distributors,BATCH-SC-0225,Personal Care,80,8,28-Feb-26
+Razor Blades 5ct,8940847,8.99,5.99,,SmoothShave,MediSuppliers Ltd,BATCH-RB-1224,Personal Care,60,6,29-Dec-25
+Muscle Relaxant Cream 50g,2939098,9.74,6.49,Menthol,ReliefPatch,HealthPlus Wholesale,BATCH-MRC-1124,Medicines,50,5,29-Nov-25
+Sleep Aid 25mg,6626942,8.99,5.99,Diphenhydramine,RestWell,Global Pharma Distributors,BATCH-SA-1024,Medicines,40,4,29-May-26
+Biotin 5000mcg,3416522,10.49,6.99,Biotin,VitaNature,MediSuppliers Ltd,BATCH-BIO-0924,Supplements,60,6,29-Jul-25
+CoQ10 100mg,1917052,14.99,9.99,Coenzyme Q10,VitaNature,HealthPlus Wholesale,BATCH-COQ-0824,Supplements,50,5,29-Jun-26
+Splint Small,7590541,11.24,7.49,,FirstAid Co.,Global Pharma Distributors,BATCH-SPL-0325,First Aid,30,3,31-Mar-26
+Nail Clippers,3157744,4.49,2.99,,PersonalCare Co.,MediSuppliers Ltd,BATCH-NC-1024,Personal Care,100,10,28-Sep-26
+Foot Cream 75g,8759778,6.74,4.49,Urea,SoftSkin,HealthPlus Wholesale,BATCH-FC-0225,Personal Care,70,7,28-Feb-26
+Insect Repellent 100ml,1020476,8.24,5.49,DEET,OutdoorGuard,Global Pharma Distributors,BATCH-IR-1224,Personal Care,60,6,29-Dec-25
+Anti-Itch Cream 30g,9733043,6.44,4.29,Hydrocortisone,DermaRelief,MediSuppliers Ltd,BATCH-AIC-1124,Medicines,50,5,29-Nov-25
+Melatonin 5mg,6383508,8.99,5.99,Melatonin,RestWell,HealthPlus Wholesale,BATCH-MEL-1024,Supplements,60,6,29-May-26
+Adhesive Bandages 50ct,9491794,5.24,3.49,Adhesive Bandage,FirstAid Co.,Global Pharma Distributors,BATCH-AB-0325,First Aid,100,10,31-Mar-26
+Hand Wash 250ml,8618222,5.99,3.99,,CleanCare,MediSuppliers Ltd,BATCH-HW-0225,Personal Care,80,8,28-Feb-26
+Facial Tissue 100ct,3390591,2.99,1.99,,SoftSkin,HealthPlus Wholesale,BATCH-FT-1024,Personal Care,120,12,28-Sep-26
