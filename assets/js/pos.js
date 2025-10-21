@@ -61,8 +61,8 @@ let storage = new Store();
 let settings;
 let platform;
 let user = {};
-let start = moment().startOf("month");
-let end = moment();
+let start = moment().subtract(1, "year").startOf("year");
+let end = moment().add(1, "year").endOf("year");
 let start_date = moment(start).toDate().toJSON();
 let end_date = moment(end).toDate().toJSON();
 let by_till = 0;
@@ -86,8 +86,311 @@ notiflix.Notify.init({
   closeButton: true
 });
 
+// Add keyboard support for notiflix popups
+notiflix.Report.init({
+  className: "notiflix-report",
+  width: "320px",
+  backgroundColor: "#f8f9fa",
+  borderRadius: "25px",
+  rtl: false,
+  zindex: 4002,
+  backOverlay: true,
+  backOverlayColor: "rgba(0,0,0,0.5)",
+  fontFamily: "Quicksand",
+  svgSize: "110px",
+  plainText: true,
+  titleMaxLength: 34,
+  messageMaxLength: 400,
+  buttonFontSize: "14px",
+  buttonMaxLength: 34,
+  cssAnimation: true,
+  cssAnimationDuration: 360,
+  cssAnimationStyle: "fade",
+  success: {
+    svgColor: "#32c682",
+    titleColor: "#1e1e1e",
+    messageColor: "#242424",
+    buttonBackground: "#32c682",
+    buttonColor: "#fff",
+    backOverlayColor: "rgba(50,198,130,0.2)",
+  },
+  failure: {
+    svgColor: "#ff5549",
+    titleColor: "#1e1e1e",
+    messageColor: "#242424",
+    buttonBackground: "#ff5549",
+    buttonColor: "#fff",
+    backOverlayColor: "rgba(255,85,73,0.2)",
+  },
+  warning: {
+    svgColor: "#eebf31",
+    titleColor: "#1e1e1e",
+    messageColor: "#242424",
+    buttonBackground: "#eebf31",
+    buttonColor: "#fff",
+    backOverlayColor: "rgba(238,191,49,0.2)",
+  },
+  info: {
+    svgColor: "#26c0d3",
+    titleColor: "#1e1e1e",
+    messageColor: "#242424",
+    buttonBackground: "#26c0d3",
+    buttonColor: "#fff",
+    backOverlayColor: "rgba(38,192,211,0.2)",
+  },
+});
+
+// Add global keyboard support for closing popups
+$(document).on('keydown', function(e) {
+  // ESC key to close notiflix popups
+  if (e.keyCode === 27) { // ESC key
+    // Close any open notiflix reports
+    if ($('.notiflix-report').length > 0) {
+      $('.notiflix-report').remove();
+      $('.notiflix-report-back').remove();
+    }
+    
+    // Close any open notiflix notifications
+    if (notiflix && notiflix.Notify && typeof notiflix.Notify.dismiss === 'function') {
+      notiflix.Notify.dismiss();
+    }
+  }
+  
+  // F5 key to dismiss all alerts
+  if (e.keyCode === 116) { // F5 key
+    e.preventDefault();
+    dismissAllAlerts();
+  }
+  
+    // F6 key to create test transaction (only in transactions view)
+    if (e.keyCode === 117) { // F6 key
+      e.preventDefault();
+      if ($("#transactions_view").is(":visible")) {
+        createTestTransaction();
+      }
+    }
+    
+    // F7 key to refresh transactions (only in transactions view)
+    if (e.keyCode === 118) { // F7 key
+      e.preventDefault();
+      if ($("#transactions_view").is(":visible")) {
+        loadTransactions();
+      }
+    }
+});
+
+// Enhanced transaction view event handlers
+$(document).ready(function() {
+  // Refresh transactions button
+  $(document).on('click', '#refresh_transactions', function() {
+    loadTransactions();
+  });
+  
+  // Export transactions button
+  $(document).on('click', '#export_transactions', function() {
+    if ($.fn.DataTable.isDataTable('#transactionList')) {
+      $('#transactionList').DataTable().button('.buttons-csv').trigger();
+    }
+  });
+  
+  // Print summary button
+  $(document).on('click', '#print_summary', function() {
+    if ($.fn.DataTable.isDataTable('#transactionList')) {
+      $('#transactionList').DataTable().button('.buttons-print').trigger();
+    }
+  });
+  
+  // View toggle buttons
+  $(document).on('click', '#view_table', function() {
+    $(this).addClass('active');
+    $('#view_cards').removeClass('active');
+    $('#transaction_table_view').show();
+    $('#transaction_cards_view').hide();
+  });
+  
+  $(document).on('click', '#view_cards', function() {
+    $(this).addClass('active');
+    $('#view_table').removeClass('active');
+    $('#transaction_table_view').hide();
+    $('#transaction_cards_view').show();
+    generateTransactionCards();
+  });
+  
+  // Search functionality
+  $(document).on('input', '#transaction_search', function() {
+    const searchTerm = $(this).val().toLowerCase();
+    if ($.fn.DataTable.isDataTable('#transactionList')) {
+      $('#transactionList').DataTable().search(searchTerm).draw();
+    }
+  });
+  
+  // Clear search button
+  $(document).on('click', '#clear_search', function() {
+    $('#transaction_search').val('');
+    if ($.fn.DataTable.isDataTable('#transactionList')) {
+      $('#transactionList').DataTable().search('').draw();
+    }
+  });
+});
+
+// Generate transaction cards for card view
+function generateTransactionCards() {
+  if (!allTransactions || allTransactions.length === 0) {
+    $('#transaction_cards_container').html(`
+      <div class="col-12">
+        <div class="alert alert-info text-center">
+          <i class="fa fa-info-circle"></i> No transactions found
+          <br><small>Try adjusting the date range or create some transactions first</small>
+        </div>
+      </div>
+    `);
+    return;
+  }
+  
+  let cardsHtml = '';
+  allTransactions.forEach((trans, index) => {
+    const isPaid = trans.paid !== "" && trans.paid !== null;
+    const statusClass = isPaid ? 'success' : 'warning';
+    const statusIcon = isPaid ? 'check' : 'clock-o';
+    const paymentMethodIcon = trans.payment_type === 'Cash' ? 'money' : 'credit-card';
+    
+    cardsHtml += `
+      <div class="col-md-6 col-lg-4 mb-3">
+        <div class="card transaction-card">
+          <div class="card-header">
+            <div class="row">
+              <div class="col-8">
+                <h6 class="mb-0"><i class="fa fa-file-text-o"></i> ${trans.order}</h6>
+              </div>
+              <div class="col-4 text-right">
+                <span class="badge badge-${statusClass}">
+                  <i class="fa fa-${statusIcon}"></i> ${isPaid ? 'Paid' : 'Unpaid'}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="row mb-2">
+              <div class="col-6">
+                <small class="text-muted">Date</small><br>
+                <strong>${moment(new Date(trans.date)).format("DD-MMM-YYYY")}</strong>
+              </div>
+              <div class="col-6">
+                <small class="text-muted">Time</small><br>
+                <strong>${moment(new Date(trans.date)).format("HH:mm:ss")}</strong>
+              </div>
+            </div>
+            <div class="row mb-2">
+              <div class="col-6">
+                <small class="text-muted">Total</small><br>
+                <strong class="text-primary">${validator.unescape(settings.symbol)}${moneyFormat(trans.total)}</strong>
+              </div>
+              <div class="col-6">
+                <small class="text-muted">Paid</small><br>
+                <strong>${trans.paid == "" ? '-' : validator.unescape(settings.symbol) + moneyFormat(trans.paid)}</strong>
+              </div>
+            </div>
+            <div class="row mb-2">
+              <div class="col-6">
+                <small class="text-muted">Method</small><br>
+                <i class="fa fa-${paymentMethodIcon}"></i> ${trans.payment_type || '-'}
+              </div>
+              <div class="col-6">
+                <small class="text-muted">Till</small><br>
+                <span class="badge badge-light">${trans.till}</span>
+              </div>
+            </div>
+            <div class="row">
+              <div class="col-12">
+                <small class="text-muted">Cashier</small><br>
+                <i class="fa fa-user text-muted"></i> ${trans.user}
+              </div>
+            </div>
+          </div>
+          <div class="card-footer">
+            <div class="btn-group btn-group-sm w-100" role="group">
+              ${trans.paid == "" 
+                ? '<button class="btn btn-outline-secondary" disabled><i class="fa fa-eye"></i> View</button>'
+                : `<button onClick="$(this).viewTransaction(${index})" class="btn btn-info"><i class="fa fa-receipt"></i> View Receipt</button>`
+              }
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+  
+  $('#transaction_cards_container').html(cardsHtml);
+}
+
+// Auto-focus barcode search input when no modals are open
+function autoFocusBarcodeInput() {
+  // Check if any modals are open
+  const hasOpenModals = $('.modal.in, .modal.show').length > 0;
+  const hasOpenPopups = $('.notiflix-report, .notiflix-notify').length > 0;
+  
+  // Only focus if no modals or popups are open and we're in POS view
+  if (!hasOpenModals && !hasOpenPopups && $('#pos_view').is(':visible')) {
+    const barcodeInput = $('#skuCode');
+    if (barcodeInput.length && !barcodeInput.is(':focus')) {
+      barcodeInput.focus();
+    }
+  }
+}
+
+// Focus barcode input on page load
+$(document).ready(function() {
+  setTimeout(autoFocusBarcodeInput, 500); // Small delay to ensure everything is loaded
+});
+
+// Auto-focus barcode input when POS view becomes visible
+$(document).on('click', '#pos', function() {
+  setTimeout(autoFocusBarcodeInput, 200);
+});
+
+// Auto-focus barcode input when switching to POS view via keyboard
+$(document).on('keydown', function(e) {
+  // Check if user is trying to navigate to POS view
+  if (e.keyCode === 112 && $('#pos').length) { // F1 key
+    setTimeout(autoFocusBarcodeInput, 200);
+  }
+});
+
+// Auto-focus barcode input when modals close
+$(document).on('hidden.bs.modal', function() {
+  setTimeout(autoFocusBarcodeInput, 100); // Small delay to ensure modal is fully closed
+});
+
+// Auto-focus barcode input when popups close
+$(document).on('click', '.notiflix-report button, .notiflix-notify button', function() {
+  setTimeout(autoFocusBarcodeInput, 100);
+});
+
+// Auto-focus barcode input when clicking outside of modals
+$(document).on('click', function(e) {
+  // If click is not on a modal or its children, focus barcode input
+  if (!$(e.target).closest('.modal').length && !$(e.target).closest('.notiflix-report').length) {
+    setTimeout(autoFocusBarcodeInput, 50);
+  }
+});
+
+// Prevent focus loss when typing in barcode input
+$('#skuCode').on('blur', function() {
+  // Only refocus if no modals are open
+  const hasOpenModals = $('.modal.in, .modal.show').length > 0;
+  const hasOpenPopups = $('.notiflix-report, .notiflix-notify').length > 0;
+  
+  if (!hasOpenModals && !hasOpenPopups) {
+    setTimeout(() => {
+      if (!$(this).is(':focus')) {
+        $(this).focus();
+      }
+    }, 10);
+  }
+});
+
 // Dismiss all stacked notifications (expiry/low-stock, etc.)
-$(document).on('click', '#clearAlerts', function() {
+function dismissAllAlerts() {
   try {
     if (notiflix && notiflix.Notify && typeof notiflix.Notify.dismiss === 'function') {
       notiflix.Notify.dismiss();
@@ -98,6 +401,11 @@ $(document).on('click', '#clearAlerts', function() {
   } catch (_) {
     $(".notiflix-notify-wrap, .notiflix-notify").remove();
   }
+}
+
+// Click handler for clear alerts button
+$(document).on('click', '#clearAlerts', function() {
+  dismissAllAlerts();
 });
 
 // Add keyboard support for Notiflix Report modals
@@ -840,6 +1148,9 @@ if (auth == undefined) {
                       <li><kbd>F1</kbd> Pay Button</li>
                       <li><kbd>F2</kbd> Hold Button</li>
                       <li><kbd>F3</kbd> Cancel/Clear Cart</li>
+                      <li><kbd>F5</kbd> Dismiss All Alerts</li>
+                      <li><kbd>F6</kbd> Create Test Transaction (Debug)</li>
+                      <li><kbd>F7</kbd> Refresh Transactions (Transactions View)</li>
                       <li><kbd>Enter</kbd> Confirm Actions</li>
                     </ul>
                   </div>
@@ -1228,6 +1539,10 @@ if (auth == undefined) {
             $("#basic-addon2").append(
               $("<i>", { class: "glyphicon glyphicon-ok" }),
             );
+            // Refocus barcode input after successful product addition
+            setTimeout(() => {
+              autoFocusBarcodeInput();
+            }, 100);
           } else if (expired) {
             notiflix.Report.failure(
               "Expired!",
@@ -1252,6 +1567,10 @@ if (auth == undefined) {
             $("#basic-addon2").append(
               $("<i>", { class: "glyphicon glyphicon-ok" }),
             );
+            // Refocus barcode input after error
+            setTimeout(() => {
+              autoFocusBarcodeInput();
+            }, 100);
           }
         },
         error: function (err) {
@@ -1847,7 +2166,7 @@ if (auth == undefined) {
         case 1:
           type = "Cash";
           break;
-        case 3:
+        case 2:
           type = "Card";
           break;
       }
@@ -1896,6 +2215,11 @@ if (auth == undefined) {
       }
 
       $(".loading").show();
+      
+      // Show loading state on hold order button
+      if (status == 0) {
+        $("#holdOrderBtn").prop("disabled", true).html('<i class="fa fa-spinner fa-spin"></i> Holding Order...');
+      }
 
       if (holdOrder != 0) {
         orderNumber = holdOrder;
@@ -2032,20 +2356,42 @@ if (auth == undefined) {
           receipt = DOMPurify.sanitize(receipt,{ ALLOW_UNKNOWN_PROTOCOLS: true });
           $("#viewTransaction").html("");
           $("#viewTransaction").html(receipt);
+          
+          // Show different behavior for hold orders vs completed orders
+          if (status == 0) {
+            // Hold order - show success message and close modal
+            notiflix.Report.success(
+              "Order Held Successfully!",
+              `Order has been held with reference: ${refNumber}`,
+              "Ok"
+            );
+            $("#dueModal").modal("hide");
+          } else {
+            // Completed order - show receipt modal
           $("#orderModal").modal("show");
+          }
+          
           loadProducts();
           loadCustomers();
           $(".loading").hide();
-          $("#dueModal").modal("hide");
           $("#paymentModel").modal("hide");
           $(this).getHoldOrders();
           $(this).getCustomerOrders();
           $(this).renderTable(cart);
+          
+          // Reset button states
+          $("#holdOrderBtn").prop("disabled", false).html('<i class="fa fa-hand-paper-o"></i> Hold Order');
+          $("#confirmPayment").prop("disabled", false).html('<i class="fa fa-check"></i> Confirm Payment');
         },
 
         error: function (data) {
           $(".loading").hide();
           $("#dueModal").modal("toggle");
+          
+          // Reset button states
+          $("#holdOrderBtn").prop("disabled", false).html('<i class="fa fa-hand-paper-o"></i> Hold Order');
+          $("#confirmPayment").prop("disabled", false).html('<i class="fa fa-check"></i> Confirm Payment');
+          
           notiflix.Report.failure(
             "Something went wrong!",
             "Please refresh this page and try again",
@@ -2324,13 +2670,31 @@ if (auth == undefined) {
     $("#confirmPayment").on("click", function () {
       if ($("#payment").val() == "") {
         notiflix.Report.warning(
-          "Nope!",
-          "Please enter the amount that was paid!",
+          "Payment Required!",
+          "Please enter the amount that was paid!<br><small>Press ESC to close this message</small>",
           "Ok",
         );
-      } else {
-        $(this).submitDueOrder(1);
+        return;
       }
+      
+      // Check if payment is sufficient
+      var payablePrice = parseFloat($("#payablePrice").val().replace(",", "")) || 0;
+      var payment = parseFloat($("#payment").val().replace(",", "")) || 0;
+      
+      if (payment < payablePrice) {
+        notiflix.Report.warning(
+          "Insufficient Payment!",
+          `Payment of ${utils.moneyFormat(payment.toFixed(2))} is less than the total amount of ${utils.moneyFormat(payablePrice.toFixed(2))}.<br><small>Press ESC to close this message</small>`,
+          "Ok",
+        );
+        return;
+      }
+      
+      // Show loading state
+      $(this).prop("disabled", true).html('<i class="fa fa-spinner fa-spin"></i> Processing...');
+      
+      // Process payment
+      $(this).submitDueOrder(1);
     });
 
     $("#transactions").on("click", function () {
@@ -5670,6 +6034,61 @@ $.fn.print = function () {
   printJS({ printable: receipt, type: "raw-html" });
 };
 
+// Test function to create a sample transaction (for debugging)
+function createTestTransaction() {
+  const testTransaction = {
+    order: "TEST-" + Date.now(),
+    date: new Date().toISOString(),
+    total: 25.50,
+    paid: 25.50,
+    change: 0,
+    payment_type: "Cash",
+    till: "Till-1",
+    user_id: user._id || 1,
+    user: user.fullname || "Test User",
+    status: 1,
+    ref_number: "",
+    customer: "0",
+    items: [
+      {
+        id: "test-product-1",
+        product_name: "Test Product 1",
+        price: 15.50,
+        quantity: 1,
+        purchasePrice: 10.00
+      },
+      {
+        id: "test-product-2", 
+        product_name: "Test Product 2",
+        price: 10.00,
+        quantity: 1,
+        purchasePrice: 7.50
+      }
+    ]
+  };
+  
+  console.log('Creating test transaction:', testTransaction);
+  
+  $.ajax({
+    url: api + "transactions/new",
+    type: "POST",
+    data: JSON.stringify(testTransaction),
+    contentType: "application/json; charset=utf-8",
+    success: function() {
+      console.log('Test transaction created successfully');
+      notiflix.Report.success("Test Transaction Created", "A sample transaction has been created for testing purposes.", "Ok");
+      // Reload transactions after creating test transaction
+      setTimeout(() => {
+        loadTransactions();
+      }, 1000);
+    },
+    error: function(xhr, status, error) {
+      console.error('Failed to create test transaction:', error);
+      notiflix.Report.failure("Error", "Failed to create test transaction: " + error, "Ok");
+    }
+  });
+}
+
 function loadTransactions() {
   let tills = [];
   let users = [];
@@ -5685,9 +6104,53 @@ function loadTransactions() {
   let query = `by-date?start=${start_date}&end=${end_date}&user=${by_user}&status=${by_status}&till=${by_till}`;
 
   $.get(api + query, function (transactions) {
+    console.log('Loading transactions with query:', query);
+    console.log('Found transactions:', transactions.length);
+    
+    // If no transactions found with date filter, try without date filter
+    if (transactions.length === 0) {
+      console.log('No transactions found with date filter, trying without date filter...');
+      $.get(api + "all", function (allTransactions) {
+        console.log('Found all transactions:', allTransactions.length);
+        if (allTransactions.length > 0) {
+          // Use all transactions but still apply other filters
+          let filteredTransactions = allTransactions;
+          
+          // Apply status filter
+          if (by_status !== 'all') {
+            filteredTransactions = filteredTransactions.filter(t => t.status == by_status);
+          }
+          
+          // Apply user filter
+          if (by_user != 0) {
+            filteredTransactions = filteredTransactions.filter(t => t.user_id == by_user);
+          }
+          
+          // Apply till filter
+          if (by_till != 0) {
+            filteredTransactions = filteredTransactions.filter(t => t.till == by_till);
+          }
+          
+          console.log('Filtered transactions:', filteredTransactions.length);
+          processTransactions(filteredTransactions);
+        } else {
+          console.log('No transactions found in database at all');
+          showEmptyState();
+        }
+      }).fail(function(xhr, status, error) {
+        console.error('Failed to load all transactions:', error);
+        showEmptyState();
+      });
+    } else {
+      processTransactions(transactions);
+    }
+    
+    function processTransactions(transactions) {
     if (transactions.length > 0) {
       $("#transaction_list").empty();
+      if ($.fn.DataTable.isDataTable('#transactionList')) {
       $("#transactionList").DataTable().destroy();
+      }
 
       allTransactions = [...transactions];
 
@@ -5708,48 +6171,60 @@ function loadTransactions() {
         }
 
         counter++;
-        transaction_list += `<tr>
-                                <td>${trans.order}</td>
-                                <td class="nobr">${moment(trans.date).format(
-                                  "DD-MMM-YYYY HH:mm:ss",
-                                )}</td>
-                                <td>${
-                                  validator.unescape(settings.symbol) + moneyFormat(trans.total)
-                                }</td>
-                                <td>${
-                                  trans.paid == ""
-                                    ? ""
-                                    : validator.unescape(settings.symbol) + moneyFormat(trans.paid)
-                                }</td>
-                                <td>${
-                                  trans.change
-                                    ? validator.unescape(settings.symbol) +
-                                      moneyFormat(
-                                        Math.abs(trans.change).toFixed(2),
-                                      )
-                                    : ""
-                                }</td>
-                                <td>${
-                                  trans.paid == ""
-                                    ? ""
-                                    : trans.payment_type
-                                }</td>
-                                <td>${trans.till}</td>
-                                <td>${trans.user}</td>
-                                <td>${
-                                  trans.paid == ""
-                                    ? '<button class="btn btn-dark"><i class="fa fa-search-plus"></i></button>'
-                                    : '<button onClick="$(this).viewTransaction(' +
-                                      index +
-                                      ')" class="btn btn-info"><i class="fa fa-search-plus"></i></button></td>'
-                                }</tr>
-                    `;
+        // Determine payment status and styling
+        const isPaid = trans.paid !== "" && trans.paid !== null;
+        const statusBadge = isPaid 
+          ? '<span class="badge badge-success"><i class="fa fa-check"></i> Paid</span>'
+          : '<span class="badge badge-warning"><i class="fa fa-clock-o"></i> Unpaid</span>';
+        
+        const paymentMethodIcon = trans.payment_type === 'Cash' 
+          ? '<i class="fa fa-money text-success"></i>' 
+          : '<i class="fa fa-credit-card text-info"></i>';
+        
+        const viewButton = trans.paid == ""
+          ? '<button class="btn btn-sm btn-outline-secondary" title="View Details"><i class="fa fa-eye"></i></button>'
+          : '<button onClick="$(this).viewTransaction(' + index + ')" class="btn btn-sm btn-info" title="View Receipt"><i class="fa fa-eye"></i></button>';
+
+        transaction_list += `<tr class="transaction-row" data-status="${isPaid ? 'paid' : 'unpaid'}">
+                                <td><strong>${trans.order}</strong></td>
+                                <td class="nobr">
+                                  <i class="fa fa-calendar text-muted"></i> 
+                                  ${moment(new Date(trans.date)).format("DD-MMM-YYYY")}<br>
+                                  <small class="text-muted">${moment(new Date(trans.date)).format("HH:mm:ss")}</small>
+                                </td>
+                                <td class="text-right">
+                                  <strong>${validator.unescape(settings.symbol)}${moneyFormat(trans.total)}</strong>
+                                </td>
+                                <td class="text-right">
+                                  ${trans.paid == "" ? '<span class="text-muted">-</span>' : 
+                                    '<strong>' + validator.unescape(settings.symbol) + moneyFormat(trans.paid) + '</strong>'}
+                                </td>
+                                <td class="text-right">
+                                  ${trans.change
+                                    ? '<span class="text-success">' + validator.unescape(settings.symbol) +
+                                      moneyFormat(Math.abs(trans.change).toFixed(2)) + '</span>'
+                                    : '<span class="text-muted">-</span>'}
+                                </td>
+                                <td class="text-center">
+                                  ${trans.paid == "" ? '<span class="text-muted">-</span>' : 
+                                    paymentMethodIcon + ' ' + trans.payment_type}
+                                </td>
+                                <td class="text-center">
+                                  <span class="badge badge-light">${trans.till}</span>
+                                </td>
+                                <td>
+                                  <i class="fa fa-user text-muted"></i> ${trans.user}
+                                </td>
+                                <td class="text-center">
+                                  ${viewButton}
+                                </td>
+                            </tr>`;
 
         if (counter == transactions.length) {
-          $("#total_sales #counter").text(
+          $("#total_sales #sales_counter").text(
             validator.unescape(settings.symbol) + moneyFormat(parseFloat(sales).toFixed(2)),
           );
-          $("#total_transactions #counter").text(transact);
+          $("#total_transactions #transactions_counter").text(transact);
 
           const result = {};
 
@@ -5789,11 +6264,14 @@ function loadTransactions() {
           loadSoldProducts();
 
           if (by_user == 0 && by_till == 0) {
+            if (allUsers && allUsers.length > 0) {
             userFilter(users);
+            }
             tillFilter(tills);
           }
 
           $("#transaction_list").html(transaction_list);
+          $("#transaction_count").text(`${transactions.length} transactions`);
           $("#transactionList").DataTable({
             order: [[1, "desc"]],
             autoWidth: false,
@@ -5801,8 +6279,30 @@ function loadTransactions() {
             JQueryUI: true,
             ordering: true,
             paging: true,
+            responsive: true,
+            pageLength: 25,
+            lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
             dom: "Bfrtip",
-            buttons: ["csv", "excel", "pdf"],
+            buttons: ["copy", "csv", "excel", "pdf", "print"],
+            language: {
+              search: "Search transactions:",
+              lengthMenu: "Show _MENU_ transactions per page",
+              info: "Showing _START_ to _END_ of _TOTAL_ transactions",
+              infoEmpty: "No transactions found",
+              infoFiltered: "(filtered from _MAX_ total transactions)",
+              zeroRecords: "No matching transactions found",
+              paginate: {
+                first: "First",
+                last: "Last",
+                next: "Next",
+                previous: "Previous"
+              }
+            },
+            columnDefs: [
+              { targets: [2, 3, 4], className: 'text-right' },
+              { targets: [5, 6, 8], className: 'text-center' },
+              { targets: [0], className: 'font-weight-bold' }
+            ]
           });
         }
       });
@@ -5834,15 +6334,84 @@ function loadTransactions() {
         });
         const overallLoss = lossPartialExpiry + lossTotalExpired;
         const netProfit = 0 - overallLoss;
-        $("#total_sales_profit #counter").text(validator.unescape(settings.symbol) + moneyFormat((0).toFixed(2)));
-        $("#loss_partial_expiry #counter").text(validator.unescape(settings.symbol) + moneyFormat(lossPartialExpiry.toFixed(2)));
-        $("#loss_total_expired #counter").text(validator.unescape(settings.symbol) + moneyFormat(lossTotalExpired.toFixed(2)));
-        $("#loss_overall #counter").text(validator.unescape(settings.symbol) + moneyFormat(overallLoss.toFixed(2)));
-        $("#net_profit #counter").text(validator.unescape(settings.symbol) + moneyFormat(netProfit.toFixed(2)));
+        $("#total_sales_profit #sales_profit_counter").text(validator.unescape(settings.symbol) + moneyFormat((0).toFixed(2)));
+        $("#loss_partial_expiry #loss_partial_counter").text(validator.unescape(settings.symbol) + moneyFormat(lossPartialExpiry.toFixed(2)));
+        $("#loss_total_expired #loss_expired_counter").text(validator.unescape(settings.symbol) + moneyFormat(lossTotalExpired.toFixed(2)));
+        $("#loss_overall #loss_overall_counter").text(validator.unescape(settings.symbol) + moneyFormat(overallLoss.toFixed(2)));
+        $("#net_profit #net_profit_counter").text(validator.unescape(settings.symbol) + moneyFormat(netProfit.toFixed(2)));
       } catch (e) {
         // ignore
       }
     }
+    
+    function showEmptyState() {
+      console.log('Showing empty state');
+      // Clear statistics when no transactions found
+      $("#sales_counter").text("0");
+      $("#cost_counter").text("0");
+      $("#profit_counter").text("0");
+      $("#transactions_counter").text("0");
+      $("#items_counter").text("0");
+      $("#products_counter").text("0");
+      $("#sales_profit_counter").text("0");
+      $("#loss_partial_counter").text("0");
+      $("#loss_expired_counter").text("0");
+      $("#loss_overall_counter").text("0");
+      $("#net_profit_counter").text("0");
+      
+      // Clear transaction list
+      $("#transaction_list").empty();
+      if ($.fn.DataTable.isDataTable('#transactionList')) {
+        $("#transactionList").DataTable().destroy();
+      }
+      $("#transaction_count").text("0 transactions");
+      $("#transactionList").DataTable({
+        order: [[1, "desc"]],
+        autoWidth: false,
+        info: true,
+        JQueryUI: true,
+        responsive: true,
+        pageLength: 25,
+        lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+        dom: 'Bfrtip',
+        buttons: [
+          'copy', 'csv', 'excel', 'pdf', 'print'
+        ],
+        language: {
+          search: "Search transactions:",
+          lengthMenu: "Show _MENU_ transactions per page",
+          info: "Showing _START_ to _END_ of _TOTAL_ transactions",
+          infoEmpty: "No transactions found",
+          infoFiltered: "(filtered from _MAX_ total transactions)",
+          zeroRecords: "No matching transactions found",
+          paginate: {
+            first: "First",
+            last: "Last",
+            next: "Next",
+            previous: "Previous"
+          }
+        },
+        columnDefs: [
+          { targets: [2, 3, 4], className: 'text-right' },
+          { targets: [5, 6, 8], className: 'text-center' },
+          { targets: [0], className: 'font-weight-bold' }
+        ]
+      });
+      
+      // Show helpful message
+      $("#transaction_list").html(`
+        <tr>
+          <td colspan="9" class="text-center text-muted">
+            <i class="fa fa-info-circle"></i> No transactions found
+            <br><small>Try adjusting the date range or create some transactions first</small>
+          </td>
+        </tr>
+      `);
+    }
+    }
+  }).fail(function(xhr, status, error) {
+    console.error('Failed to load transactions:', error);
+    notiflix.Report.failure("Error Loading Transactions", "Failed to load transaction data. Please try again.<br><small>Press ESC to close this message</small>", "Ok");
   });
 }
 
@@ -5906,11 +6475,11 @@ function loadSoldProducts() {
             </tr>`;
 
     if (counter == sold.length) {
-      $("#total_items #counter").text(items);
-      $("#total_products #counter").text(products);
+      $("#total_items #items_counter").text(items);
+      $("#total_products #products_counter").text(products);
       $("#product_sales").html(sold_list);
-      $("#total_cost #counter").text(validator.unescape(settings.symbol) + moneyFormat(totalCostAll.toFixed(2)));
-      $("#total_profit #counter").text(validator.unescape(settings.symbol) + moneyFormat(totalProfitAll.toFixed(2)));
+      $("#total_cost #cost_counter").text(validator.unescape(settings.symbol) + moneyFormat(totalCostAll.toFixed(2)));
+      $("#total_profit #profit_counter").text(validator.unescape(settings.symbol) + moneyFormat(totalProfitAll.toFixed(2)));
 
       // Compute expiry-based losses and net profit using current inventory snapshot
       try {
@@ -5949,11 +6518,11 @@ function loadSoldProducts() {
         overallLoss = lossPartialExpiry + lossTotalExpired;
         netProfit = totalProfitAll - overallLoss;
 
-        $("#total_sales_profit #counter").text(validator.unescape(settings.symbol) + moneyFormat(totalProfitAll.toFixed(2)));
-        $("#loss_partial_expiry #counter").text(validator.unescape(settings.symbol) + moneyFormat(lossPartialExpiry.toFixed(2)));
-        $("#loss_total_expired #counter").text(validator.unescape(settings.symbol) + moneyFormat(lossTotalExpired.toFixed(2)));
-        $("#loss_overall #counter").text(validator.unescape(settings.symbol) + moneyFormat(overallLoss.toFixed(2)));
-        $("#net_profit #counter").text(validator.unescape(settings.symbol) + moneyFormat(netProfit.toFixed(2)));
+        $("#total_sales_profit #sales_profit_counter").text(validator.unescape(settings.symbol) + moneyFormat(totalProfitAll.toFixed(2)));
+        $("#loss_partial_expiry #loss_partial_counter").text(validator.unescape(settings.symbol) + moneyFormat(lossPartialExpiry.toFixed(2)));
+        $("#loss_total_expired #loss_expired_counter").text(validator.unescape(settings.symbol) + moneyFormat(lossTotalExpired.toFixed(2)));
+        $("#loss_overall #loss_overall_counter").text(validator.unescape(settings.symbol) + moneyFormat(overallLoss.toFixed(2)));
+        $("#net_profit #net_profit_counter").text(validator.unescape(settings.symbol) + moneyFormat(netProfit.toFixed(2)));
       } catch (e) {
         // ignore calculation errors to avoid blocking UI
       }
@@ -5970,7 +6539,11 @@ function userFilter(users) {
       return usr._id == user;
     });
 
+    if (u.length > 0 && u[0] && u[0].fullname) {
     $("#users").append(`<option value="${user}">${u[0].fullname}</option>`);
+    } else {
+      $("#users").append(`<option value="${user}">User ${user}</option>`);
+    }
   });
 }
 
@@ -6006,9 +6579,7 @@ $.fn.viewTransaction = function (index) {
     if (item.manufacturer) meta.push(`<small class="text-muted">${DOMPurify.sanitize(item.manufacturer)}</small>`);
     if (item.supplier) meta.push(`<small class="text-muted">Supplier: ${DOMPurify.sanitize(item.supplier)}</small>`);
     if (item.batchNumber) meta.push(`<small class="text-muted">Batch: ${DOMPurify.sanitize(item.batchNumber)}</small>`);
-    const purchaseLine = item.purchasePrice ? `<div><small>Purchase: ${DOMPurify.sanitize(validator.unescape(settings.symbol))}${moneyFormat(Math.abs(item.purchasePrice).toString())}</small></div>` : "";
-
-    items += `<tr><td>${DOMPurify.sanitize(item.product_name)}${meta.length ? `<div>${meta.join('<br>')}</div>` : ''}${purchaseLine}</td><td>${
+    items += `<tr><td>${DOMPurify.sanitize(item.product_name)}${meta.length ? `<div>${meta.join('<br>')}</div>` : ''}</td><td>${
       DOMPurify.sanitize(item.quantity)
     } </td><td class="text-right"> ${DOMPurify.sanitize(validator.unescape(settings.symbol))} ${moneyFormat(
       Math.abs(item.price).toFixed(2),
@@ -6070,12 +6641,12 @@ $.fn.viewTransaction = function (index) {
     <hr>
     <left>
         <p>
-        Invoice : ${orderNumber} <br>
-        Ref No : ${refNumber} <br>
+        Order No : ${orderNumber} <br>
+        Ref No : ${refNumber == "" ? orderNumber : _.escape(refNumber)} <br>
         Customer : ${
           allTransactions[index].customer == 0
-            ? "Walk in Customer"
-            : allTransactions[index].customer.name
+            ? "Walk in customer"
+            : _.escape(allTransactions[index].customer.name)
         } <br>
         Cashier : ${allTransactions[index].user} <br>
         Date : ${moment(allTransactions[index].date).format(
@@ -6122,8 +6693,8 @@ $.fn.viewTransaction = function (index) {
             <td><h5>Total</h5></td>
             <td><h5>:</h5></td>
             <td class="text-right">
-                <h5>${validator.unescape(settings.symbol)}${moneyFormat(
-                  allTransactions[index].total,
+                <h5>${validator.unescape(settings.symbol)} ${moneyFormat(
+                  parseFloat(allTransactions[index].total).toFixed(2),
                 )}</h5>
             </td>
         </tr>
@@ -6803,13 +7374,17 @@ enhanceKeyboardNavigation();
       // POS Payment Navigation
       $(document).on('keydown', '#paymentModel', function(e) {
         switch(e.keyCode) {
+          case 27: // ESC key - Close payment modal
+            e.preventDefault();
+            $('#paymentModel').modal('hide');
+            break;
           case 49: // 1 key - Cash payment
             e.preventDefault();
             $('.list-group-item[data-payment-type="1"]').click();
             break;
           case 50: // 2 key - Card payment
             e.preventDefault();
-            $('.list-group-item[data-payment-type="3"]').click();
+            $('.list-group-item[data-payment-type="2"]').click();
             break;
           case 67: // C key - Calculate change
             e.preventDefault();
@@ -6822,6 +7397,22 @@ enhanceKeyboardNavigation();
           case 72: // H key - Hold order
             e.preventDefault();
             $('#hold').click();
+            break;
+        }
+      });
+      
+      // Hold Order Modal Navigation
+      $(document).on('keydown', '#dueModal', function(e) {
+        switch(e.keyCode) {
+          case 27: // ESC key - Close hold order modal
+            e.preventDefault();
+            $('#dueModal').modal('hide');
+            break;
+          case 13: // Enter key - Submit hold order (if reference is entered)
+            e.preventDefault();
+            if ($('#refNumber').val().trim() !== '') {
+              $(this).submitDueOrder(0);
+            }
             break;
         }
       });

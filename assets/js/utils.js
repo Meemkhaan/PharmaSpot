@@ -86,6 +86,13 @@ const getFileHash = (filePath) => {
 };
 
 
+const validFileTypes = [
+    "image/jpg",
+    "image/jpeg",
+    "image/png",
+    "image/webp"
+];
+
 const filterFile = (req, file, callback) => {
     try {
       const isValidFile = checkFileType(file.mimetype, validFileTypes);
@@ -120,5 +127,7 @@ module.exports = {
   daysToExpire,
   checkFileExists,
   checkFileType,
+  filterFile,
+  validFileTypes,
   setContentSecurityPolicy
 };

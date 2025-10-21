@@ -10,6 +10,37 @@
 
 
     <style>
+        /* Barcode input styling for better visibility */
+        .barcode-input {
+            font-size: 16px !important;
+            padding: 12px 15px !important;
+            border: 2px solid #007bff !important;
+            box-shadow: 0 0 10px rgba(0, 123, 255, 0.3) !important;
+            transition: all 0.3s ease !important;
+        }
+        
+        .barcode-input:focus {
+            border-color: #0056b3 !important;
+            box-shadow: 0 0 15px rgba(0, 123, 255, 0.5) !important;
+            outline: none !important;
+        }
+        
+        .barcode-input::placeholder {
+            color: #6c757d !important;
+            font-style: italic !important;
+        }
+        
+        /* Add a subtle animation to indicate it's always ready */
+        .barcode-input:not(:focus) {
+            animation: barcode-pulse 2s infinite;
+        }
+        
+        @keyframes barcode-pulse {
+            0% { box-shadow: 0 0 10px rgba(0, 123, 255, 0.3); }
+            50% { box-shadow: 0 0 15px rgba(0, 123, 255, 0.5); }
+            100% { box-shadow: 0 0 10px rgba(0, 123, 255, 0.3); }
+        }
+        
         /* Compact stats tiles in Transactions view */
         #totals > div, #extra_totals > div {
             padding: 6px 8px !important;
@@ -26,10 +57,142 @@
             line-height: 1.1;
             white-space: nowrap;
         }
-        #totals #counter, #extra_totals #counter {
+        #totals span[id$="_counter"], #extra_totals span[id$="_counter"] {
             display: inline-block;
             font-size: 16px;
             line-height: 1.2;
+        }
+        
+        /* Enhanced Transactions View Styles */
+        .transaction-card {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            border: 1px solid #e3e6f0;
+        }
+        
+        .transaction-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        .transaction-card .card-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-bottom: none;
+        }
+        
+        .transaction-card .badge {
+            font-size: 0.75em;
+        }
+        
+        .transaction-card .card-body {
+            padding: 1rem;
+        }
+        
+        .transaction-card .card-footer {
+            background-color: #f8f9fa;
+            border-top: 1px solid #e3e6f0;
+            padding: 0.75rem;
+        }
+        
+        .transaction-card .btn-group .btn {
+            font-size: 0.875rem;
+        }
+        
+        /* Enhanced table styling */
+        #transactionList thead th {
+            background: #1a1a1a !important;
+            color: #ffffff !important;
+            border: none !important;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.9rem;
+            letter-spacing: 1px;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+            padding: 15px 12px !important;
+            border-bottom: 2px solid #333333 !important;
+        }
+        
+        #transactionList thead th:hover {
+            background: #2d2d2d !important;
+            color: #ffffff !important;
+            transform: translateY(-1px);
+            transition: all 0.2s ease;
+        }
+        
+        #transactionList thead th i {
+            color: #ffffff !important;
+            margin-right: 8px;
+        }
+        
+        #transactionList tbody tr:hover {
+            background-color: #f8f9fa;
+            transform: scale(1.01);
+            transition: all 0.2s ease;
+        }
+        
+        #transactionList tbody td {
+            vertical-align: middle;
+            border-color: #e3e6f0;
+        }
+        
+        /* Enhanced filter section */
+        .form-group label {
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 0.5rem;
+        }
+        
+        .btn-group .btn.active {
+            background-color: #007bff;
+            border-color: #007bff;
+            color: white;
+        }
+        
+        /* Enhanced statistics cards */
+        #totals .col-md-2, #extra_totals .col-md-2 {
+            transition: transform 0.2s ease;
+        }
+        
+        #totals .col-md-2:hover, #extra_totals .col-md-2:hover {
+            transform: translateY(-2px);
+        }
+        
+        /* Loading states */
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        /* Search input styling */
+        #transaction_search {
+            border-radius: 0.375rem;
+            border: 1px solid #ced4da;
+            transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+        }
+        
+        #transaction_search:focus {
+            border-color: #80bdff;
+            outline: 0;
+            box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+        }
+        
+        /* Responsive improvements */
+        @media (max-width: 768px) {
+            .transaction-card {
+                margin-bottom: 1rem;
+            }
+            
+            #totals .col-md-2, #extra_totals .col-md-2 {
+                margin-bottom: 1rem;
+            }
+            
+            .btn-group {
+                width: 100%;
+            }
+            
+            .btn-group .btn {
+                flex: 1;
+            }
         }
     </style>
 </head>
@@ -108,7 +271,7 @@
                         <button id="keyboardHelp" type="button" class="btn btn-info waves-effect waves-light nav-btn-icon" title="Keyboard Shortcuts (Ctrl+H)">
                             <i class="fa fa-keyboard-o"></i>
                         </button>
-                        <button id="clearAlerts" type="button" class="btn btn-warning waves-effect waves-light nav-btn-icon" title="Dismiss all alerts">
+                        <button id="clearAlerts" type="button" class="btn btn-warning waves-effect waves-light nav-btn-icon" title="Dismiss all alerts (F5)">
                             <i class="fa fa-bell-slash"></i>
                         </button>
                         <button id="transactions" type="button" class="btn btn-success waves-effect waves-light p_three nav-btn-icon" title="Transactions">
@@ -139,81 +302,92 @@
                     <div class="row text-center m-t-20" id="totals">
                         <div id="total_sales" class="col-md-2 py-2 bg-success">
                             <h5>SALES</h5>
-                            <span id="counter">0</span>
+                            <span id="sales_counter">0</span>
                         </div>
                         <div id="total_cost" class="col-md-2 py-2 bg-info">
                             <h5>COST</h5>
-                            <span id="counter">0</span>
+                            <span id="cost_counter">0</span>
                         </div>
                         <div id="total_profit" class="col-md-2 py-2 bg-primary">
                             <h5>PROFIT</h5>
-                            <span id="counter">0</span>
+                            <span id="profit_counter">0</span>
                         </div>
                         <div id="total_transactions" class="col-md-2 py-2 bg-warning">
                             <h5>TRANSACTIONS</h5>
-                            <span id="counter">0</span>
+                            <span id="transactions_counter">0</span>
                         </div>
                         <div id="total_items" class="col-md-2 py-2 bg-info">
                             <h5>ITEMS SOLD</h5>
-                            <span id="counter">0</span>
+                            <span id="items_counter">0</span>
                         </div>
                         <div id="total_products" class="col-md-2 py-2 bg-success">
                             <h5>PRODUCTS</h5>
-                            <span id="counter">0</span>
+                            <span id="products_counter">0</span>
                         </div>
                     </div>
                     <div class="row text-center m-t-10" id="extra_totals">
                         <div id="total_sales_profit" class="col-md-2 py-2 bg-primary">
                             <h5>SALES-PROFIT</h5>
-                            <span id="counter">0</span>
+                            <span id="sales_profit_counter">0</span>
                         </div>
                         <div id="loss_partial_expiry" class="col-md-2 py-2 bg-warning">
                             <h5>LOSS (PARTIAL EXP.)</h5>
-                            <span id="counter">0</span>
+                            <span id="loss_partial_counter">0</span>
                         </div>
                         <div id="loss_total_expired" class="col-md-2 py-2 bg-danger">
                             <h5>LOSS (EXPIRED)</h5>
-                            <span id="counter">0</span>
+                            <span id="loss_expired_counter">0</span>
                         </div>
                         <div id="loss_overall" class="col-md-2 py-2 bg-info">
                             <h5>OVERALL LOSS</h5>
-                            <span id="counter">0</span>
+                            <span id="loss_overall_counter">0</span>
                         </div>
                         <div id="net_profit" class="col-md-2 py-2 bg-success">
                             <h5>NET PROFIT</h5>
-                            <span id="counter">0</span>
+                            <span id="net_profit_counter">0</span>
                         </div>
                     </div>
-                    <div class="row p-t-10 p-b-10 bg-white m-t-10 m-b-20">
-                        <h3 class="col-md-2">Transactions</h3>
+                    <div class="row p-t-15 p-b-15 bg-white m-t-10 m-b-20 rounded shadow-sm">
+                        <div class="col-md-12">
+                            <div class="row">
                         <div class="col-md-2">
-                            <div class="input-group">
-                                <span class="input-group-addon" id="till-addon">Till</span>
-                                <select id="tills" class="form-control" aria-describedby="till-addon">
+                                    <h3><i class="fa fa-list-alt text-primary"></i> Transactions</h3>
+                                </div>
+                                <div class="col-md-2">
+                                    <button type="button" class="btn btn-info btn-sm" onclick="createTestTransaction()" title="Create a test transaction for debugging">
+                                        <i class="fa fa-plus"></i> Create Test Transaction
+                                    </button>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="form-group">
+                                        <label class="control-label"><i class="fa fa-desktop"></i> Till</label>
+                                        <select id="tills" class="form-control">
+                                            <option value="0">All Tills</option>
                                 </select>
                             </div>
                         </div>
                         <div class="col-md-2">
-                            <div class="input-group">
-                                <span class="input-group-addon" id="cashier-addon">Cashier</span>
-                                <select id="users" class="form-control" aria-describedby="cashier-addon">
+                                    <div class="form-group">
+                                        <label class="control-label"><i class="fa fa-user"></i> Cashier</label>
+                                        <select id="users" class="form-control">
+                                            <option value="0">All Cashiers</option>
                                 </select>
                             </div>
                         </div>
                         <div class="col-md-2">
-                            <div class="input-group">
-                                <span class="input-group-addon" id="status-addon">Status</span>
-                                <select id="status" class="form-control" aria-describedby="">
+                                    <div class="form-group">
+                                        <label class="control-label"><i class="fa fa-check-circle"></i> Status</label>
+                                        <select id="status" class="form-control">
                                     <option value="all" selected>All</option>
                                     <option value="1">Paid</option>
                                     <option value="0">Unpaid</option>
                                 </select>
                             </div>
                         </div>
-                        <div class="col-md-4">
-                            <div class="input-group">
-                                <span class="input-group-addon" id="date-addon">Date</span>
-                                <div id="reportrange">
+                                <div class="col-md-2">
+                                    <div class="form-group">
+                                        <label class="control-label"><i class="fa fa-calendar"></i> Date Range</label>
+                                        <div id="reportrange" class="form-control" style="cursor: pointer;">
                                     <i class="fa fa-calendar"></i>&nbsp;
                                     <span></span>&nbsp;<i class="fa fa-caret-down"></i>
                                 </div>
@@ -221,7 +395,53 @@
                         </div>
                     </div>
                     <div class="row">
-                        <div class="col-md-6 bg-white" id="productSales">
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label class="control-label"><i class="fa fa-search"></i> Search Transactions</label>
+                                        <div class="input-group">
+                                            <input type="text" id="transaction_search" class="form-control" placeholder="Search by invoice, customer, or cashier...">
+                                            <span class="input-group-btn">
+                                                <button class="btn btn-default" type="button" id="clear_search">
+                                                    <i class="fa fa-times"></i>
+                                                </button>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label class="control-label"><i class="fa fa-cog"></i> Quick Actions</label>
+                                        <div class="btn-group" role="group">
+                                            <button type="button" class="btn btn-primary" id="refresh_transactions">
+                                                <i class="fa fa-refresh"></i> Refresh
+                                            </button>
+                                            <button type="button" class="btn btn-success" id="export_transactions">
+                                                <i class="fa fa-download"></i> Export
+                                            </button>
+                                            <button type="button" class="btn btn-info" id="print_summary">
+                                                <i class="fa fa-print"></i> Print
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label class="control-label"><i class="fa fa-eye"></i> View Options</label>
+                                        <div class="btn-group" role="group">
+                                            <button type="button" class="btn btn-default active" id="view_table">
+                                                <i class="fa fa-table"></i> Table
+                                            </button>
+                                            <button type="button" class="btn btn-default" id="view_cards">
+                                                <i class="fa fa-th-large"></i> Cards
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-5 bg-white" id="productSales">
                             <div class="card-box">
                                 <div class="card-title">
                                     <h4>Products</h4>
@@ -243,28 +463,36 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-6" id="transactionDetails">
+                        <div class="col-md-7" id="transactionDetails">
                             <div class="card-box">
                                 <div class="card-title">
-                                    <h4>Transaction Details</h4>
+                                    <h4><i class="fa fa-list-alt"></i> Transaction Details</h4>
+                                    <div class="pull-right">
+                                        <span class="badge badge-info" id="transaction_count">0 transactions</span>
+                                    </div>
                                 </div>
                                 <div class="card-body">
-                                    <table class="table table-striped table-bordered table-responsive" id="transactionList">
-                                        <thead>
-                                            <tr>
-                                                <th>Invoice</th>
-                                                <th>Date</th>
-                                                <th>Total</th>
-                                                <th>Paid</th>
-                                                <th>Change</th>
-                                                <th>Method</th>
-                                                <th>Till</th>
-                                                <th>Cashier</th>
-                                                <th>View</th>
+                                    <div id="transaction_table_view">
+                                        <table class="table table-striped table-bordered table-responsive table-hover" id="transactionList">
+                                            <thead class="thead-dark">
+                                                <tr>
+                                                    <th><i class="fa fa-file-text-o"></i> Invoice</th>
+                                                    <th><i class="fa fa-calendar"></i> Date</th>
+                                                    <th><i class="fa fa-money"></i> Total</th>
+                                                    <th><i class="fa fa-credit-card"></i> Paid</th>
+                                                    <th><i class="fa fa-exchange"></i> Change</th>
+                                                    <th><i class="fa fa-payment"></i> Method</th>
+                                                    <th><i class="fa fa-desktop"></i> Till</th>
+                                                    <th><i class="fa fa-user"></i> Cashier</th>
+                                                    <th><i class="fa fa-cog"></i> Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody id="transaction_list"></tbody>
                                     </table>
+                                    </div>
+                                    <div id="transaction_cards_view" style="display: none;">
+                                        <div id="transaction_cards_container" class="row"></div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -291,7 +519,7 @@
                                         <form action="" id="searchBarCode">
                                                 <div class="pos-barcode-search">
                                             <div class="input-group">
-                                                <input type="text" required id="skuCode" name="skuCode" class="form-control number-input" placeholder="Scan barcode or type the number then hit enter" aria-label="barcode" aria-describedby="basic-addon2">
+                                                <input type="text" required id="skuCode" name="skuCode" class="form-control number-input barcode-input" placeholder="Scan barcode or type the number then hit enter" aria-label="barcode" aria-describedby="basic-addon2" autocomplete="off" autofocus>
                                                 <span class="input-group-btn">
                                                             <button type="submit" class="btn btn-default search-barcode-btn">
                                                                 <i class="fa fa-search"></i>
@@ -381,17 +609,19 @@
                 </div>
             </div>
         </div>
-        <div id="dueModal" class="modal fade bs-example-modal-sm" tabindex="-1" role="dialog" aria-labelledby="mySmallModalLabel" aria-hidden="true">
+        <div id="dueModal" class="modal fade bs-example-modal-sm" tabindex="-1" role="dialog" aria-labelledby="mySmallModalLabel" aria-hidden="true" style="z-index: 1055;">
             <div class="modal-dialog modal-sm">
                 <div class="modal-content">
                     <div class="modal-header">
                         <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
-                        <h4 class="modal-title" id="mySmallModalLabel">Hold Order
+                        <h4 class="modal-title" id="mySmallModalLabel">
+                            <i class="fa fa-hand-paper-o"></i> Hold Order
+                            <small class="text-muted">(ESC=Close, Enter=Submit)</small>
                         </h4>
                     </div>
                     <div class="modal-body">
                         <form action="">
-                            <input type="text" id="refNumber" placeholder="Enter a reference" class="form-control">
+                            <input type="text" id="refNumber" placeholder="Enter a reference" class="form-control" autocomplete="off">
                         </form>
                         <hr>
                         <div class="row">
@@ -432,7 +662,7 @@
                         <br>
                         <div class="row">
                             <div class="col-md-4">
-                                <button data-val="del" class="btn btn-warning btn-lg btn-block">⌫</button>
+                                <button data-val="del" data-isdue="true" class="btn btn-warning btn-lg btn-block keypad-btn">⌫</button>
                             </div>
                             <div class="col-md-4">
                                 <button data-val="0" data-isdue="true" class="btn btn-success btn-lg btn-block keypad-btn">0</button>
@@ -443,39 +673,51 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" onclick="$(this).submitDueOrder(0);" class="btn btn-primary btn-block btn-lg waves-effect waves-light">Hold Order</button>
+                        <button type="button" onclick="$(this).submitDueOrder(0);" class="btn btn-primary btn-block btn-lg waves-effect waves-light" id="holdOrderBtn">
+                            <i class="fa fa-hand-paper-o"></i> Hold Order
+                        </button>
                     </div>
                 </div><!-- /.modal-content -->
             </div><!-- /.modal-dialog -->
         </div><!-- /.modal -->
         <!--  Modal content for the above example -->
-        <div id="paymentModel" class="modal fade bs-example-modal-lg" tabindex="-1" role="dialog" aria-labelledby="myLargeModalLabel" aria-hidden="true">
+        <div id="paymentModel" class="modal fade bs-example-modal-lg" tabindex="-1" role="dialog" aria-labelledby="myLargeModalLabel" aria-hidden="true" style="z-index: 1050;">
             <div class="modal-dialog modal-lg">
                 <div class="modal-content">
                     <div class="modal-header">
                         <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
-                        <h4 class="modal-title" id="myLargeModalLabel">Payment</h4>
+                        <h4 class="modal-title" id="myLargeModalLabel">
+                            <i class="fa fa-credit-card"></i> Payment
+                            <small class="text-muted">(1=Cash, 2=Card, P=Process, H=Hold, ESC=Close)</small>
+                        </h4>
                     </div>
                     <div class="modal-body">
                         <div class="row">
                             <div class="col-md-4">
                                 <div class="list-group">
                                     <a href="javascript:void(0)" data-payment-method="Cash" data-payment-type="1" class="list-group-item active">
-                                        Cash
+                                        <i class="fa fa-money"></i> Cash
                                     </a>
-                                    <a href="javascript:void(0)" data-payment-method="Card" data-payment-type="3" class="list-group-item">Card</a>
+                                    <a href="javascript:void(0)" data-payment-method="Card" data-payment-type="2" class="list-group-item">
+                                        <i class="fa fa-credit-card"></i> Card
+                                    </a>
                                 </div>
                             </div>
                             <div class="col-md-8">
+                                <div class="form-group">
+                                    <label class="control-label">Total Amount</label>
                                 <div class="input-group">
-                                    <span class="input-group-addon" id="basic-addon3">Price <span id="price_curr"></span></span>
-                                    <input id="payablePrice" readonly type="text" class="form-control" aria-describedby="basic-addon3">
+                                        <span class="input-group-addon" id="basic-addon3"><span id="price_curr"></span></span>
+                                        <input id="payablePrice" readonly type="text" class="form-control input-lg" aria-describedby="basic-addon3">
                                 </div>
-                                <br>
+                                </div>
+                                <div class="form-group">
+                                    <label class="control-label">Amount Received</label>
                                 <div class="input-group">
-                                    <span class="input-group-addon" id="basic-addon3">Payment <span id="payment_curr"></span> </span>
-                                    <input type="text" placeholder="0.0" class="form-control" id="paymentText" aria-describedby="basic-addon3" readonly>
-                                    <input type="hidden" class="form-control" id="payment" aria-describedby="basic-addon3">
+                                        <span class="input-group-addon" id="basic-addon4"><span id="payment_curr"></span></span>
+                                        <input type="text" placeholder="0.00" class="form-control input-lg" id="paymentText" aria-describedby="basic-addon4">
+                                        <input type="hidden" class="form-control" id="payment" aria-describedby="basic-addon4">
+                                    </div>
                                 </div>
                                 <hr>
                                 <div class="row">
@@ -514,7 +756,7 @@
                                                 <button data-val="8" data-isdue="false" class="btn btn-success btn-lg btn-block keypad-btn">8</button>
                                             </div>
                                             <div class="col-md-3">
-                                                <button data-val="9" data-isdue="false" class="btn btn-success btn-outline-success btn-lg btn-block keypad-btn">9</button>
+                                                <button data-val="9" data-isdue="false" class="btn btn-success btn-lg btn-block keypad-btn">9</button>
                                             </div>
                                             <div class="col-md-3"></div>
                                         </div>
@@ -527,7 +769,7 @@
                                                 <button data-val="0" data-isdue="false" class="btn btn-success btn-lg btn-block keypad-btn">0</button>
                                             </div>
                                             <div class="col-md-3">
-                                                <button data-val="." data-isdue="false" class="btn btn-warning btn-lg btn-block">.</button>
+                                                <button data-val="." data-isdue="false" class="btn btn-warning btn-lg btn-block keypad-btn">.</button>
                                             </div>
                                             <div class="col-md-3"></div>
                                         </div>
@@ -547,11 +789,15 @@
                     <div class="modal-footer">
                         <div class="row">
                             <div class="col-md-6">
-                                <div class="btn btn-primary btn-block btn-lg waves-effect waves-light">Change <span id="change_curr"></span><span id="change"></span> </div>
+                                <div class="alert alert-info text-center" style="margin-bottom: 0;">
+                                    <strong>Change Due:</strong><br>
+                                    <span id="change_curr"></span><span id="change" style="font-size: 18px; font-weight: bold;">0.00</span>
+                                </div>
                             </div>
                             <div class="col-md-6">
-                                <button type="button" id="confirmPayment" class="btn btn-success btn-block btn-lg waves-effect waves-light">Confirm
-                                Payment</button>
+                                <button type="button" id="confirmPayment" class="btn btn-success btn-block btn-lg waves-effect waves-light">
+                                    <i class="fa fa-check"></i> Confirm Payment
+                                </button>
                             </div>
                         </div>
                     </div>

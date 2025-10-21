@@ -6,6 +6,7 @@ if (setupEvents.handleSquirrelEvent()) {
 }
 const server = require('./server');
 const { app, BrowserWindow, ipcMain, screen} = require("electron");
+const { autoUpdater } = require("electron-updater");
 const path = require("path");
 const contextMenu = require("electron-context-menu");
 let { Menu, template } = require("./assets/js/native_menu/menu");

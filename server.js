@@ -4,9 +4,19 @@ const server = http.createServer(express);
 const bodyParser = require("body-parser");
 const rateLimit = require("express-rate-limit");
 const pkg = require("./package.json");
-const {app} = require('electron');
-process.env.APPDATA = app.getPath('appData');
-process.env.APPNAME = pkg.name;
+
+// Initialize environment variables for Electron app
+try {
+    const {app} = require('electron');
+    if (app && app.getPath) {
+        process.env.APPDATA = app.getPath('appData');
+        process.env.APPNAME = pkg.name;
+    }
+} catch (error) {
+    // Fallback for non-Electron environments
+    process.env.APPDATA = process.env.APPDATA || require('os').homedir();
+    process.env.APPNAME = pkg.name;
+}
 const PORT = process.env.PORT || 0;
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
