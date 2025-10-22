@@ -3,6 +3,7 @@ const express = require("express")();
 const server = http.createServer(express);
 const bodyParser = require("body-parser");
 const rateLimit = require("express-rate-limit");
+const path = require("path");
 const pkg = require("./package.json");
 
 // Initialize environment variables for Electron app
@@ -15,6 +16,11 @@ try {
 } catch (error) {
     // Fallback for non-Electron environments
     process.env.APPDATA = process.env.APPDATA || require('os').homedir();
+    process.env.APPNAME = pkg.name;
+}
+
+// Ensure APPNAME is always set
+if (!process.env.APPNAME) {
     process.env.APPNAME = pkg.name;
 }
 const PORT = process.env.PORT || 0;
@@ -43,8 +49,12 @@ express.all("/*", function (req, res, next) {
     }
 });
 
+// Serve static files (CSS, JS, images, etc.)
+express.use(express.static(__dirname));
+
 express.get("/", function (req, res) {
-    res.send("POS Server Online.");
+    // Serve the main HTML file
+    res.sendFile(path.join(__dirname, "index.html"));
 });
 
 express.use("/api/inventory", require("./api/inventory"));
@@ -52,6 +62,7 @@ express.use("/api/customers", require("./api/customers"));
 express.use("/api/categories", require("./api/categories"));
 express.use("/api/manufacturers", require("./api/manufacturers"));
 express.use("/api/suppliers", require("./api/suppliers"));
+express.use("/api/purchase-orders", require("./api/purchase-orders"));
 express.use("/api/settings", require("./api/settings"));
 express.use("/api/users", require("./api/users"));
 express.use("/api", require("./api/transactions"));

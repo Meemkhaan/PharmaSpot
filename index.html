@@ -142,6 +142,55 @@
             margin-bottom: 0.5rem;
         }
         
+        /* Compact filter styling */
+        .form-group.mb-2 {
+            margin-bottom: 0.5rem !important;
+        }
+        
+        .control-label.small {
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            color: #6c757d;
+        }
+        
+        .input-sm, .form-control.input-sm {
+            height: 32px;
+            padding: 6px 10px;
+            font-size: 1rem;
+            line-height: 1.4;
+        }
+        
+        .btn-group-sm > .btn, .btn-sm {
+            padding: 4px 8px;
+            font-size: 0.75rem;
+            line-height: 1.25;
+        }
+        
+        .input-group-sm > .form-control {
+            height: 32px;
+            padding: 6px 10px;
+            font-size: 1rem;
+        }
+        
+        .input-group-sm > .input-group-btn > .btn {
+            height: 32px;
+            padding: 6px 10px;
+        }
+        
+        /* Button grouping improvements */
+        .btn-group .btn-group {
+            margin-left: 5px;
+        }
+        
+        .form-group.mb-1 {
+            margin-bottom: 0.25rem !important;
+        }
+        
+        .form-group.mb-0 {
+            margin-bottom: 0 !important;
+        }
+        
         .btn-group .btn.active {
             background-color: #007bff;
             border-color: #007bff;
@@ -255,6 +304,15 @@
                                 <i class="fa fa-plus"></i>
                             </button>
                         </div>
+                        <div class="btn-group p_purchase_orders">
+                            <button id="purchaseOrdersModal" data-toggle="modal" data-target="#PurchaseOrders" type="button" class="btn btn-success waves-effect waves-light nav-btn-icon" title="Purchase Orders">
+                                <i class="fa fa-file-text-o"></i>
+                                <span id="poNotificationBadge" class="badge badge-danger" style="position: absolute; top: -5px; right: -5px; display: none;">0</span>
+                            </button>
+                            <button id="newPurchaseOrderModal" data-toggle="modal" data-target="#newPurchaseOrder" type="button" class="btn btn-warning waves-effect waves-light nav-btn-icon" title="Create Purchase Order">
+                                <i class="fa fa-plus"></i>
+                            </button>
+                        </div>
                         <button id="viewRefOrders" data-toggle="modal" data-target="#holdOrdersModal" type="button" class="btn btn-info waves-effect waves-light nav-btn-icon" title="Open Tabs">
                             <i class="fa fa-shopping-basket"></i>
                         </button>
@@ -347,93 +405,90 @@
                             <span id="net_profit_counter">0</span>
                         </div>
                     </div>
-                    <div class="row p-t-15 p-b-15 bg-white m-t-10 m-b-20 rounded shadow-sm">
+                    <div class="row p-t-10 p-b-10 bg-white m-t-10 m-b-15 rounded shadow-sm">
                         <div class="col-md-12">
-                            <div class="row">
-                        <div class="col-md-2">
-                                    <h3><i class="fa fa-list-alt text-primary"></i> Transactions</h3>
+                            <!-- Title Row -->
+                            <div class="row mb-2">
+                                <div class="col-md-12">
+                                    <h4 class="mb-0"><i class="fa fa-list-alt text-primary"></i> Transactions</h4>
                                 </div>
-                                <div class="col-md-2">
-                                    <button type="button" class="btn btn-info btn-sm" onclick="createTestTransaction()" title="Create a test transaction for debugging">
-                                        <i class="fa fa-plus"></i> Create Test Transaction
-                                    </button>
-                                </div>
-                                <div class="col-md-2">
-                                    <div class="form-group">
-                                        <label class="control-label"><i class="fa fa-desktop"></i> Till</label>
-                                        <select id="tills" class="form-control">
-                                            <option value="0">All Tills</option>
+                            </div>
+                            
+                            <!-- Filter Fields Row -->
+                            <div class="row mb-2">
+                                <div class="col-md-1">
+                                    <div class="form-group mb-1">
+                                        <label class="control-label small"><i class="fa fa-desktop"></i> Till</label>
+                                        <select id="tills" class="form-control input-sm">
+                                            <option value="0">All</option>
                                 </select>
                             </div>
                         </div>
-                        <div class="col-md-2">
-                                    <div class="form-group">
-                                        <label class="control-label"><i class="fa fa-user"></i> Cashier</label>
-                                        <select id="users" class="form-control">
-                                            <option value="0">All Cashiers</option>
+                                <div class="col-md-1">
+                                    <div class="form-group mb-1">
+                                        <label class="control-label small"><i class="fa fa-user"></i> Cashier</label>
+                                        <select id="users" class="form-control input-sm">
+                                            <option value="0">All</option>
                                 </select>
                             </div>
                         </div>
-                        <div class="col-md-2">
-                                    <div class="form-group">
-                                        <label class="control-label"><i class="fa fa-check-circle"></i> Status</label>
-                                        <select id="status" class="form-control">
+                                <div class="col-md-1">
+                                    <div class="form-group mb-1">
+                                        <label class="control-label small"><i class="fa fa-check-circle"></i> Status</label>
+                                        <select id="status" class="form-control input-sm">
                                     <option value="all" selected>All</option>
                                     <option value="1">Paid</option>
                                     <option value="0">Unpaid</option>
                                 </select>
                             </div>
                         </div>
-                                <div class="col-md-2">
-                                    <div class="form-group">
-                                        <label class="control-label"><i class="fa fa-calendar"></i> Date Range</label>
-                                        <div id="reportrange" class="form-control" style="cursor: pointer;">
+                                <div class="col-md-3">
+                                    <div class="form-group mb-1">
+                                        <label class="control-label small"><i class="fa fa-calendar"></i> Date Range</label>
+                                        <div id="reportrange" class="form-control input-sm" style="cursor: pointer;">
                                     <i class="fa fa-calendar"></i>&nbsp;
                                     <span></span>&nbsp;<i class="fa fa-caret-down"></i>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                    <div class="row">
-                                <div class="col-md-4">
-                                    <div class="form-group">
-                                        <label class="control-label"><i class="fa fa-search"></i> Search Transactions</label>
-                                        <div class="input-group">
-                                            <input type="text" id="transaction_search" class="form-control" placeholder="Search by invoice, customer, or cashier...">
+                                <div class="col-md-6">
+                                    <div class="form-group mb-1">
+                                        <label class="control-label small"><i class="fa fa-search"></i> Search</label>
+                                        <div class="input-group input-group-sm">
+                                            <input type="text" id="transaction_search" class="form-control" placeholder="Search transactions...">
                                             <span class="input-group-btn">
-                                                <button class="btn btn-default" type="button" id="clear_search">
+                                                <button class="btn btn-default btn-sm" type="button" id="clear_search">
                                                     <i class="fa fa-times"></i>
                                                 </button>
                                             </span>
-                                        </div>
+                    </div>
                                     </div>
                                 </div>
-                                <div class="col-md-4">
-                                    <div class="form-group">
-                                        <label class="control-label"><i class="fa fa-cog"></i> Quick Actions</label>
-                                        <div class="btn-group" role="group">
-                                            <button type="button" class="btn btn-primary" id="refresh_transactions">
+                            </div>
+                            
+                            <!-- Buttons Row -->
+                    <div class="row">
+                                <div class="col-md-12">
+                                    <div class="form-group mb-0">
+                                        <label class="control-label small"><i class="fa fa-cog"></i> Actions & View Options</label>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <button type="button" class="btn btn-primary btn-sm" id="refresh_transactions">
                                                 <i class="fa fa-refresh"></i> Refresh
                                             </button>
-                                            <button type="button" class="btn btn-success" id="export_transactions">
+                                            <button type="button" class="btn btn-success btn-sm" id="export_transactions">
                                                 <i class="fa fa-download"></i> Export
                                             </button>
-                                            <button type="button" class="btn btn-info" id="print_summary">
+                                            <button type="button" class="btn btn-info btn-sm" id="print_summary">
                                                 <i class="fa fa-print"></i> Print
                                             </button>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="form-group">
-                                        <label class="control-label"><i class="fa fa-eye"></i> View Options</label>
-                                        <div class="btn-group" role="group">
-                                            <button type="button" class="btn btn-default active" id="view_table">
-                                                <i class="fa fa-table"></i> Table
-                                            </button>
-                                            <button type="button" class="btn btn-default" id="view_cards">
-                                                <i class="fa fa-th-large"></i> Cards
-                                            </button>
+                                            <div class="btn-group btn-group-sm" role="group">
+                                                <button type="button" class="btn btn-default btn-sm active" id="view_table">
+                                                    <i class="fa fa-table"></i> Table
+                                                </button>
+                                                <button type="button" class="btn btn-default btn-sm" id="view_cards">
+                                                    <i class="fa fa-th-large"></i> Cards
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -1492,6 +1547,388 @@
             </div>
         </div>
         
+        <!-- Purchase Orders Modal -->
+        <div id="PurchaseOrders" class="modal fade bs-example-modal-xl" tabindex="-1" role="dialog" aria-labelledby="purchaseOrdersModalLabel">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <div class="header-actions d-flex justify-content-between align-items-center w-100">
+                            <h4 class="modal-title" id="purchaseOrdersModalLabel">
+                                <i class="fa fa-file-text-o"></i> Purchase Orders Management
+                            </h4>
+                            <div>
+                                <button type="button" id="autoDraftPO" class="btn btn-warning btn-sm mr-2" title="Auto-Generate Draft Orders">
+                                    <i class="fa fa-magic"></i> Auto-Draft
+                                </button>
+                                <button type="button" id="createNewPO" class="btn btn-success btn-sm mr-2" title="Create New Purchase Order">
+                                    <i class="fa fa-plus"></i> New PO
+                                </button>
+                                <button type="button" id="refreshPOList" class="btn btn-info btn-sm mr-2" title="Refresh List">
+                                    <i class="fa fa-refresh"></i> Refresh
+                                </button>
+                                <button type="button" id="retryServerConnection" class="btn btn-warning btn-sm mr-2" title="Retry Server Connection" style="display: none;">
+                                    <i class="fa fa-wifi"></i> Retry
+                                </button>
+                                <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-body">
+                        <!-- Statistics Row -->
+                        <div class="row mb-3">
+                            <div class="col-md-2">
+                                <div class="card bg-primary text-white text-center">
+                                    <div class="card-body py-2">
+                                        <h6 class="card-title mb-1">Total</h6>
+                                        <h4 class="mb-0" id="poStatsTotal">0</h4>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="card bg-secondary text-white text-center">
+                                    <div class="card-body py-2">
+                                        <h6 class="card-title mb-1">Draft</h6>
+                                        <h4 class="mb-0" id="poStatsDraft">0</h4>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="card bg-info text-white text-center">
+                                    <div class="card-body py-2">
+                                        <h6 class="card-title mb-1">Sent</h6>
+                                        <h4 class="mb-0" id="poStatsSent">0</h4>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="card bg-warning text-white text-center">
+                                    <div class="card-body py-2">
+                                        <h6 class="card-title mb-1">Partial</h6>
+                                        <h4 class="mb-0" id="poStatsPartial">0</h4>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="card bg-success text-white text-center">
+                                    <div class="card-body py-2">
+                                        <h6 class="card-title mb-1">Completed</h6>
+                                        <h4 class="mb-0" id="poStatsCompleted">0</h4>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="card bg-dark text-white text-center">
+                                    <div class="card-body py-2">
+                                        <h6 class="card-title mb-1">Total Value</h6>
+                                        <h5 class="mb-0" id="poStatsValue">$0.00</h5>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Filters Row -->
+                        <div class="row mb-3">
+                            <div class="col-md-3">
+                                <select id="poStatusFilter" class="form-control">
+                                    <option value="">All Status</option>
+                                    <option value="draft">Draft</option>
+                                    <option value="sent">Sent</option>
+                                    <option value="partial">Partial</option>
+                                    <option value="completed">Completed</option>
+                                    <option value="cancelled">Cancelled</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <select id="poSupplierFilter" class="form-control">
+                                    <option value="">All Suppliers</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="input-group">
+                                    <input type="text" id="poSearchInput" class="form-control" placeholder="Search by PO number, supplier, or product...">
+                                    <span class="input-group-btn">
+                                        <button class="btn btn-default" type="button">
+                                            <i class="fa fa-search"></i>
+                                        </button>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Purchase Orders Table -->
+                        <div class="table-responsive">
+                            <table class="table table-striped table-bordered table-hover" id="purchaseOrdersTable">
+                                <thead class="thead-dark">
+                                    <tr>
+                                        <th><i class="fa fa-file-text-o"></i> PO Number</th>
+                                        <th><i class="fa fa-truck"></i> Supplier</th>
+                                        <th><i class="fa fa-calendar"></i> Date</th>
+                                        <th><i class="fa fa-cubes"></i> Items</th>
+                                        <th><i class="fa fa-money"></i> Total</th>
+                                        <th><i class="fa fa-flag"></i> Status</th>
+                                        <th><i class="fa fa-truck"></i> Expected Delivery</th>
+                                        <th><i class="fa fa-cog"></i> Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Purchase orders will be populated here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Create Purchase Order Modal -->
+        <div id="newPurchaseOrder" class="modal fade bs-example-modal-lg" tabindex="-1" role="dialog" aria-labelledby="newPurchaseOrderModalLabel">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
+                        <h4 class="modal-title" id="newPurchaseOrderModalLabel">
+                            <i class="fa fa-plus"></i> Create New Purchase Order
+                        </h4>
+                    </div>
+                    <div class="modal-body">
+                        <form id="createPOForm">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="poSupplierSelect">Supplier *</label>
+                                        <select id="poSupplierSelect" class="form-control" required>
+                                            <option value="">Select Supplier</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="poExpectedDelivery">Expected Delivery Date</label>
+                                        <input type="date" id="poExpectedDelivery" class="form-control">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="poNotes">Notes</label>
+                                <textarea id="poNotes" class="form-control" rows="2" placeholder="Additional notes for the supplier..."></textarea>
+                            </div>
+                            
+                            <hr>
+                            <h5><i class="fa fa-shopping-cart"></i> Add Items</h5>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label for="poProductSelect">Product</label>
+                                        <select id="poProductSelect" class="form-control">
+                                            <option value="">Select Product</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="form-group">
+                                        <label for="poQuantity">Quantity</label>
+                                        <input type="number" id="poQuantity" class="form-control" value="1" min="1">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label for="poUnitPrice">Unit Price</label>
+                                        <input type="number" id="poUnitPrice" class="form-control" step="0.01" min="0">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-group">
+                                        <label>&nbsp;</label>
+                                        <button type="button" id="addPOItem" class="btn btn-success btn-block">
+                                            <i class="fa fa-plus"></i> Add Item
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="table-responsive">
+                                <table class="table table-bordered" id="poItemsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Product</th>
+                                            <th>Barcode</th>
+                                            <th>Quantity</th>
+                                            <th>Unit Price</th>
+                                            <th>Total</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Items will be added here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="poTax">Tax</label>
+                                        <input type="number" id="poTax" class="form-control" step="0.01" min="0" value="0">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="poDiscount">Discount</label>
+                                        <input type="number" id="poDiscount" class="form-control" step="0.01" min="0" value="0">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label>Subtotal</label>
+                                        <div class="form-control-static" id="poSubtotal">$0.00</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label>Total Items</label>
+                                        <div class="form-control-static" id="poTotalItems">0</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label><strong>Total</strong></label>
+                                        <div class="form-control-static" id="poTotal"><strong>$0.00</strong></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+                        <button type="button" id="savePO" class="btn btn-success">
+                            <i class="fa fa-save"></i> Create Purchase Order
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- View Purchase Order Modal -->
+        <div id="viewPOModal" class="modal fade bs-example-modal-lg" tabindex="-1" role="dialog" aria-labelledby="viewPOModalLabel">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
+                        <h4 class="modal-title" id="viewPOModalLabel">
+                            <i class="fa fa-eye"></i> Purchase Order Details
+                        </h4>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <strong>PO Number:</strong> <span id="viewPONumber"></span><br>
+                                <strong>Supplier:</strong> <span id="viewPOSupplier"></span><br>
+                                <strong>Date:</strong> <span id="viewPODate"></span>
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Status:</strong> <span id="viewPOStatus"></span><br>
+                                <strong>Expected Delivery:</strong> <span id="viewPOExpectedDelivery"></span><br>
+                                <strong>Total:</strong> <span id="viewPOTotal"></span>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <strong>Notes:</strong>
+                            <div id="viewPONotes" class="form-control-static"></div>
+                        </div>
+                        
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="viewPOItemsTable">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Product</th>
+                                        <th>Barcode</th>
+                                        <th>Ordered</th>
+                                        <th>Received</th>
+                                        <th>Pending</th>
+                                        <th>Unit Price</th>
+                                        <th>Total</th>
+                                        <th>Progress</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Items will be populated here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Receive Items Modal -->
+        <div id="receiveItemsModal" class="modal fade bs-example-modal-lg" tabindex="-1" role="dialog" aria-labelledby="receiveItemsModalLabel">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
+                        <h4 class="modal-title" id="receiveItemsModalLabel">
+                            <i class="fa fa-check-square"></i> Receive Items
+                        </h4>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <div class="input-group">
+                                    <input type="text" id="receiveBarcodeInput" class="form-control" placeholder="Scan barcode to find item...">
+                                    <span class="input-group-btn">
+                                        <button class="btn btn-default" type="button">
+                                            <i class="fa fa-barcode"></i>
+                                        </button>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="alert alert-info">
+                                    <i class="fa fa-info-circle"></i> 
+                                    Scan barcodes or manually enter quantities for received items.
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="receiveItemsTable">
+                                <thead>
+                                    <tr>
+                                        <th>Product</th>
+                                        <th>Barcode</th>
+                                        <th>Ordered</th>
+                                        <th>Received</th>
+                                        <th>Pending</th>
+                                        <th>Receive Qty</th>
+                                        <th>Lot Number</th>
+                                        <th>Expiry Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Items will be populated here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+                        <button type="button" id="saveReceiveItems" class="btn btn-success">
+                            <i class="fa fa-check"></i> Receive Items
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <div id="bulkImport" class="modal fade bs-example-modal-lg" tabindex="-1" role="dialog" aria-labelledby="bulkImportModalLabel" aria-hidden="true">
             <div class="modal-dialog modal-lg">
                 <div class="modal-content">
@@ -1970,6 +2407,10 @@
         </div>
     </div>
     <script src="assets/dist/js/bundle.min.js"></script>
+    <script src="assets/js/purchase-orders.js"></script>
+    <script src="assets/js/po-scheduler.js"></script>
+    <script src="assets/js/whatsapp-integration.js"></script>
+    <script src="assets/js/po-notifications.js"></script>
     
 
 </body>

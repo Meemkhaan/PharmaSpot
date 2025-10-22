@@ -162,13 +162,6 @@ $(document).on('keydown', function(e) {
     dismissAllAlerts();
   }
   
-    // F6 key to create test transaction (only in transactions view)
-    if (e.keyCode === 117) { // F6 key
-      e.preventDefault();
-      if ($("#transactions_view").is(":visible")) {
-        createTestTransaction();
-      }
-    }
     
     // F7 key to refresh transactions (only in transactions view)
     if (e.keyCode === 118) { // F7 key
@@ -1149,7 +1142,6 @@ if (auth == undefined) {
                       <li><kbd>F2</kbd> Hold Button</li>
                       <li><kbd>F3</kbd> Cancel/Clear Cart</li>
                       <li><kbd>F5</kbd> Dismiss All Alerts</li>
-                      <li><kbd>F6</kbd> Create Test Transaction (Debug)</li>
                       <li><kbd>F7</kbd> Refresh Transactions (Transactions View)</li>
                       <li><kbd>Enter</kbd> Confirm Actions</li>
                     </ul>
@@ -6034,60 +6026,6 @@ $.fn.print = function () {
   printJS({ printable: receipt, type: "raw-html" });
 };
 
-// Test function to create a sample transaction (for debugging)
-function createTestTransaction() {
-  const testTransaction = {
-    order: "TEST-" + Date.now(),
-    date: new Date().toISOString(),
-    total: 25.50,
-    paid: 25.50,
-    change: 0,
-    payment_type: "Cash",
-    till: "Till-1",
-    user_id: user._id || 1,
-    user: user.fullname || "Test User",
-    status: 1,
-    ref_number: "",
-    customer: "0",
-    items: [
-      {
-        id: "test-product-1",
-        product_name: "Test Product 1",
-        price: 15.50,
-        quantity: 1,
-        purchasePrice: 10.00
-      },
-      {
-        id: "test-product-2", 
-        product_name: "Test Product 2",
-        price: 10.00,
-        quantity: 1,
-        purchasePrice: 7.50
-      }
-    ]
-  };
-  
-  console.log('Creating test transaction:', testTransaction);
-  
-  $.ajax({
-    url: api + "transactions/new",
-    type: "POST",
-    data: JSON.stringify(testTransaction),
-    contentType: "application/json; charset=utf-8",
-    success: function() {
-      console.log('Test transaction created successfully');
-      notiflix.Report.success("Test Transaction Created", "A sample transaction has been created for testing purposes.", "Ok");
-      // Reload transactions after creating test transaction
-      setTimeout(() => {
-        loadTransactions();
-      }, 1000);
-    },
-    error: function(xhr, status, error) {
-      console.error('Failed to create test transaction:', error);
-      notiflix.Report.failure("Error", "Failed to create test transaction: " + error, "Ok");
-    }
-  });
-}
 
 function loadTransactions() {
   let tills = [];

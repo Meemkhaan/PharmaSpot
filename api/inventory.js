@@ -253,6 +253,10 @@ app.post("/product", function (req, res) {
         name: validator.escape(req.body.name),
         stock: req.body.stock === "on" ? 0 : 1,
         minStock: validator.escape(req.body.minStock),
+        reorderPoint: validator.escape(req.body.reorderPoint || req.body.minStock || 5),
+        reorderQuantity: validator.escape(req.body.reorderQuantity || 10),
+        supplier_id: validator.escape(req.body.supplier_id || ""),
+        expiryAlertDays: validator.escape(req.body.expiryAlertDays || 30),
         img: image,
     };
 

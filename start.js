@@ -38,7 +38,14 @@ function createWindow() {
     mainWindow.maximize();
     mainWindow.show();
 
-    mainWindow.loadURL(`file://${path.join(__dirname, "index.html")}`);
+    // Load the HTML through the server instead of directly as a file
+    // This ensures API calls work properly
+    // Wait a moment for the server to start and set the port
+    setTimeout(() => {
+        const serverPort = process.env.PORT || 3000;
+        console.log(`Loading app from server on port ${serverPort}`);
+        mainWindow.loadURL(`http://localhost:${serverPort}`);
+    }, 1000);
 
     mainWindow.on("closed", () => {
         mainWindow = null;
