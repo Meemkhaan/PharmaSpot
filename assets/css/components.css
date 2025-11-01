@@ -1,6 +1,84 @@
 /* CLEAN AND ESSENTIAL STYLES ONLY */
 /* ============================== */
 
+/* Receive Items UX Improvements */
+.input-group.scanning {
+  animation: pulse 0.5s ease-in-out;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
+
+.table-success {
+  background-color: rgba(40, 167, 69, 0.1) !important;
+}
+
+.table-danger {
+  background-color: rgba(220, 53, 69, 0.1) !important;
+}
+
+.table-info {
+  background-color: rgba(23, 162, 184, 0.1) !important;
+}
+
+.table-warning {
+  background-color: rgba(255, 193, 7, 0.1) !important;
+}
+
+.form-control.is-invalid {
+  border-color: #dc3545;
+  box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+}
+
+.badge {
+  font-size: 0.75em;
+  padding: 0.25em 0.5em;
+}
+
+.spinner-border {
+  width: 2rem;
+  height: 2rem;
+}
+
+/* Enhanced modal styling */
+.modal-lg {
+  max-width: 1200px;
+}
+
+/* Better table styling */
+.table th {
+  background-color: #f8f9fa;
+  border-top: none;
+  font-weight: 600;
+  font-size: 0.9em;
+}
+
+.table td {
+  vertical-align: middle;
+}
+
+/* Input group enhancements */
+.input-group-sm .form-control {
+  font-size: 0.875rem;
+}
+
+.input-group-append .btn {
+  border-left: 0;
+}
+
+/* Alert enhancements */
+.alert {
+  border: none;
+  border-radius: 0.375rem;
+}
+
+.alert-dismissible .close {
+  padding: 0.75rem 1.25rem;
+}
+
 /* Basic Button Styles - Clean and Simple */
 .btn {
   border-radius: 3px;

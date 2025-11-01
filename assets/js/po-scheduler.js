@@ -10,6 +10,7 @@ class POScheduler {
         this.isRunning = false;
         this.scheduleInterval = null;
         this.lastRun = null;
+        this.isRunningAutoDraft = false; // Flag to prevent concurrent auto-draft runs
         this.init();
     }
 
@@ -19,10 +20,10 @@ class POScheduler {
     }
 
     setupEventListeners() {
-        // Manual auto-draft trigger
-        $(document).on('click', '#autoDraftPO', () => {
-            this.runAutoDraft();
-        });
+        // Manual auto-draft trigger - now handled by PurchaseOrderManager
+        // $(document).on('click', '#autoDraftPO', () => {
+        //     this.runAutoDraft();
+        // });
 
         // Schedule settings
         $(document).on('change', '#poScheduleEnabled', (e) => {
@@ -146,6 +147,11 @@ class POScheduler {
     }
 
     async runAutoDraft() {
+        if (this.isRunningAutoDraft) {
+            console.log('Auto-draft already running, skipping...');
+            return;
+        }
+
         if (this.isRunning && this.lastRun) {
             const timeSinceLastRun = Date.now() - this.lastRun.getTime();
             const intervalMs = this.getIntervalMs(this.settings.interval);
@@ -156,13 +162,13 @@ class POScheduler {
             }
         }
 
+        this.isRunningAutoDraft = true;
         try {
             console.log('Running auto-draft purchase order generation...');
             
-            const response = await $.post(this.api + '/auto-draft', {
-                reorderPointThreshold: this.settings.reorderThreshold,
-                expiryAlertDays: this.settings.expiryAlertDays
-            });
+            // Skip auto-draft generation - now handled by manual Auto-Draft Management
+            console.log('Auto-draft generation skipped - use Auto-Draft Management instead');
+            return;
 
             if (response.success && response.orders.length > 0) {
                 this.lastRun = new Date();
@@ -192,6 +198,8 @@ class POScheduler {
             if (typeof notiflix !== 'undefined') {
                 notiflix.Notify.failure('Auto-draft failed: ' + error.message);
             }
+        } finally {
+            this.isRunningAutoDraft = false;
         }
     }
 

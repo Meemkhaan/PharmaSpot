@@ -13,9 +13,10 @@ class PONotifications {
             showOverdueAlerts: true,
             showExpiryAlerts: true,
             autoRefresh: true,
-            refreshInterval: 30000 // 30 seconds
+            refreshInterval: 120000 // 2 minutes (reduced frequency)
         };
         this.refreshTimer = null;
+        this.isChecking = false; // Flag to prevent concurrent checks
         this.init();
     }
 
@@ -101,15 +102,18 @@ class PONotifications {
     }
 
     async checkForNotifications() {
-        if (!this.settings.enabled) {
+        if (!this.settings.enabled || this.isChecking) {
             return;
         }
 
+        this.isChecking = true;
         try {
             const notifications = await this.generateNotifications();
             this.updateNotificationDisplay(notifications);
         } catch (error) {
             console.error('Failed to check for notifications:', error);
+        } finally {
+            this.isChecking = false;
         }
     }
 
@@ -120,9 +124,16 @@ class PONotifications {
             // Get all purchase orders
             const orders = await $.get('/api/purchase-orders/all');
             
+            console.log('=== PONOTIFICATIONS GENERATE NOTIFICATIONS ===');
+            console.log('Total orders from API:', orders.length);
+            console.log('All order statuses:', orders.map(o => ({ id: o._id, status: o.status, poNumber: o.poNumber })));
+            
             // Check for draft orders
             if (this.settings.showDraftAlerts) {
                 const draftOrders = orders.filter(order => order.status === 'draft');
+                console.log('Draft orders found:', draftOrders.length);
+                console.log('Draft orders details:', draftOrders.map(o => ({ id: o._id, status: o.status, poNumber: o.poNumber })));
+                
                 if (draftOrders.length > 0) {
                     notifications.push({
                         id: 'draft-orders',
@@ -233,20 +244,20 @@ class PONotifications {
     }
 
     updateNotificationDisplay(notifications) {
+        console.log('=== PONOTIFICATIONS UPDATE DISPLAY ===');
+        console.log('Notifications received:', notifications);
+        console.log('Total notifications:', notifications.length);
+        console.log('Notification counts:', notifications.map(n => ({ id: n.id, count: n.count, type: n.type })));
+        
         this.notifications = notifications;
         this.updateNotificationBadge();
         this.updateNotificationPanel();
     }
 
     updateNotificationBadge() {
-        const totalCount = this.notifications.reduce((sum, notif) => sum + notif.count, 0);
-        const badge = $('#poNotificationBadge');
-        
-        if (totalCount > 0) {
-            badge.text(totalCount).show();
-        } else {
-            badge.hide();
-        }
+        // Don't update the badge here - let PurchaseOrderManager handle it
+        // This prevents conflicts between notification system and actual PO data
+        console.log('PONotifications: Skipping badge update - handled by PurchaseOrderManager');
     }
 
     updateNotificationPanel() {

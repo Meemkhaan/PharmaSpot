@@ -88,6 +88,9 @@ app.get("/get", function (req, res) {
  */
 
 app.post("/post", function (req, res) {
+    // Debug: Log request data for troubleshooting
+    console.log('Settings request data:', req.body);
+
     upload(req, res, function (err) {
 
         if (err) {
@@ -167,6 +170,13 @@ app.post("/post", function (req, res) {
             requireSupplierCode: req.body.requireSupplierCode === 'on',
             requireSupplierContact: req.body.requireSupplierContact === 'on',
             supplierCodeFormat: validator.escape(req.body.supplierCodeFormat || 'auto'),
+            
+            // Product-Supplier Linking Settings
+            productSupplierLinking: Boolean(req.body.productSupplierLinking === 'on' || req.body.productSupplierLinking === 'true' || req.body.productSupplierLinking === true),
+            autoSplitMasterPOs: Boolean(req.body.autoSplitMasterPOs === 'on' || req.body.autoSplitMasterPOs === 'true' || req.body.autoSplitMasterPOs === true),
+            defaultSupplierAssignment: validator.escape(req.body.defaultSupplierAssignment || 'auto'),
+            requireSupplierConfirmation: Boolean(req.body.requireSupplierConfirmation === 'on' || req.body.requireSupplierConfirmation === 'true' || req.body.requireSupplierConfirmation === true),
+            enableBulkSupplierAssignment: Boolean(req.body.enableBulkSupplierAssignment === 'on' || req.body.enableBulkSupplierAssignment === 'true' || req.body.enableBulkSupplierAssignment === true),
         },
     };
 

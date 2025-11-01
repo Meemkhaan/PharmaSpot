@@ -75,14 +75,24 @@ console.log("CSV upload single function:", csvUpload.single('csvFile'));
 
 app.use(bodyParser.json());
 
+// Flag to track if database is ready
+let inventoryDBReady = false;
+
 let inventoryDB = new Datastore({
     filename: dbPath,
     autoload: true,
     onload: function(err) {
-                if (err) {
+        if (err) {
             console.error('Inventory database load error:', err);
-                } else {
+            // If ENOENT error (missing temp file), database will create a new file on first write
+            // Mark as ready anyway to allow operations to proceed
+            if (err.code === 'ENOENT') {
+                console.log('Database file missing - will be created on first write');
+            }
+            inventoryDBReady = true;
+        } else {
             console.log('Inventory database loaded successfully');
+            inventoryDBReady = true;
         }
     }
 });
@@ -96,7 +106,20 @@ console.log("Direct properties:", Object.keys(inventoryDB));
 console.log("remove method exists:", typeof inventoryDB.remove === 'function');
 console.log("deleteOne method exists:", typeof inventoryDB.deleteOne === 'function');
 
-inventoryDB.ensureIndex({ fieldName: "_id", unique: true });
+// Ensure database is ready after a short delay (for autoload completion)
+setTimeout(() => {
+    if (!inventoryDBReady) {
+        console.log('Database autoload taking longer than expected - marking as ready');
+        inventoryDBReady = true;
+    }
+    inventoryDB.ensureIndex({ fieldName: "_id", unique: true });
+}, 1000);
+
+// Batches database for lot-level inventory tracking
+const inventoryBatchesDB = new Datastore({
+    filename: path.join(appData, appName, "server", "databases", "inventory-batches.db"),
+    autoload: true,
+});
 
 /**
  * GET endpoint: Get the welcome message for the Inventory API.
@@ -107,6 +130,388 @@ inventoryDB.ensureIndex({ fieldName: "_id", unique: true });
  */
 app.get("/", function (req, res) {
     res.send("Inventory API");
+});
+
+/**
+ * GET endpoint: Get all products from inventory.
+ *
+ * @param {Object} req request object.
+ * @param {Object} res response object.
+ * @returns {void}
+ */
+app.get("/products", function (req, res) {
+    console.log("Products endpoint called - fetching all products...");
+    
+    // Response guard to prevent duplicate responses
+    let responseSent = false;
+    const sendResponse = (data, statusCode = 200) => {
+        if (responseSent) {
+            console.warn('⚠️ Products response already sent, ignoring duplicate');
+            return;
+        }
+        responseSent = true;
+        if (!res.headersSent) {
+            if (statusCode !== 200) {
+                res.status(statusCode);
+            }
+            res.json(data);
+        }
+    };
+    
+    // Fallback timer - if the entire operation takes too long, return empty array
+    const fallbackTimer = setTimeout(() => {
+        if (!responseSent) {
+            console.warn('⏱️ Products endpoint timeout - returning empty array');
+            sendResponse([], 200);
+        }
+    }, 8000); // 8 second timeout
+    
+    // Wait for database to be ready (max 3 seconds)
+    const waitForDB = (attempts = 0) => {
+        if (inventoryDBReady || attempts >= 30) {
+            const queryStartTime = Date.now();
+            console.log(`Executing products query (DB ready: ${inventoryDBReady}, attempts: ${attempts})`);
+            
+            inventoryDB.find({}, function (err, products) {
+                const queryDuration = Date.now() - queryStartTime;
+                console.log(`Products query completed in ${queryDuration}ms`);
+                
+                clearTimeout(fallbackTimer);
+                
+                if (responseSent) {
+                    console.warn('⚠️ Response already sent via timeout, ignoring query result');
+                    return;
+                }
+                
+                if (err) {
+                    console.error("Error fetching products:", err);
+                    sendResponse({
+                        error: "Internal Server Error",
+                        message: "Failed to fetch products."
+                    }, 500);
+                    return;
+                }
+                
+                console.log(`Found ${products.length} products`);
+                sendResponse(products);
+            });
+        } else {
+            // Wait 100ms before retrying
+            setTimeout(() => waitForDB(attempts + 1), 100);
+        }
+    };
+    
+    waitForDB();
+});
+
+/**
+ * POST endpoint: Create a single product (form submission from UI).
+ * Accepts multipart/form-data (for optional image upload) and standard fields.
+ */
+app.post("/product", function (req, res) {
+    // Use multer to handle multipart form (image + fields)
+    upload(req, res, function (err) {
+        try {
+            if (err) {
+                console.error("Upload error:", err);
+                return res.status(400).json({
+                    error: "Upload Error",
+                    message: err.message || "Failed to upload file",
+                });
+            }
+
+            // req.body contains the text fields, req.file contains the uploaded file
+            const data = req.body || {};
+
+            // Basic validation
+            if (!data.name || !data.barcode || !data.price) {
+                return res.status(400).json({
+                    error: "Validation Error",
+                    message: "Name, Barcode and Selling Price are required.",
+                });
+            }
+
+            const product = {
+                _id: Math.floor(Date.now() / 1000) + Math.floor(Math.random() * 1000),
+                barcode: parseInt(data.barcode),
+                name: validator.escape(data.name.toString()),
+                price: validator.escape((data.price || "").toString()),
+                actualPrice: validator.escape((data.actualPrice || "").toString()),
+                genericName: validator.escape((data.genericName || "").toString()),
+                manufacturer: validator.escape((data.manufacturer || "").toString()),
+                supplier: validator.escape((data.supplier || "").toString()),
+                batchNumber: validator.escape((data.batchNumber || "").toString()),
+                category: data.category ? parseInt(data.category) || data.category : "",
+                quantity: parseInt(data.quantity) || 0,
+                minStock: parseInt(data.minStock) || 1,
+                stock: data.stock ? 0 : 1, // checkbox named 'stock' to disable stock check; invert to match existing schema
+                img: req.file ? req.file.filename : (data.img || ""),
+                expirationDate: data.expirationDate || "",
+                // Supplier linking fields
+                designatedSupplierId: data.designatedSupplierId ? parseInt(data.designatedSupplierId) : null,
+                supplierAssignmentDate: data.designatedSupplierId ? new Date() : null,
+                supplierAssignmentMethod: data.supplierAssignmentMethod || 'manual',
+                createdAt: new Date(),
+                updatedAt: new Date(),
+            };
+
+            // Duplicate checks: by barcode and by (name + batchNumber + manufacturer)
+            inventoryDB.findOne({ barcode: product.barcode }, function (errFind, existingByBarcode) {
+                if (errFind) {
+                    console.error("Database error on duplicate check:", errFind);
+                    return res.status(500).json({
+                        error: "Internal Server Error",
+                        message: "Failed to save product (duplicate check).",
+                    });
+                }
+
+                if (existingByBarcode) {
+                    return res.json({ status: 'duplicate_barcode', message: 'Product with this barcode already exists.' });
+                }
+
+                inventoryDB.findOne({
+                    name: product.name,
+                    batchNumber: product.batchNumber,
+                    manufacturer: product.manufacturer,
+                }, function (errDup, existingByCombo) {
+                    if (errDup) {
+                        console.error("Database error on combo duplicate check:", errDup);
+                        return res.status(500).json({
+                            error: "Internal Server Error",
+                            message: "Failed to save product (duplicate combo check).",
+                        });
+                    }
+
+                    if (existingByCombo) {
+                        return res.json({ status: 'duplicate_product', message: 'A product with the same Name, Batch Number and Manufacturer already exists.' });
+                    }
+
+                    // Insert the product
+                    inventoryDB.insert(product, function (errInsert, saved) {
+                        if (errInsert) {
+                            console.error("Insert error:", errInsert);
+                            return res.status(500).json({
+                                error: "Internal Server Error",
+                                message: "Failed to save product.",
+                            });
+                        }
+
+                        return res.json({ success: true, message: 'Product saved successfully.', data: saved });
+                    });
+                });
+            });
+        } catch (e) {
+            console.error("Unexpected error while saving product:", e);
+            return res.status(500).json({
+                error: "Internal Server Error",
+                message: e.message || "Unexpected error",
+            });
+        }
+    });
+});
+
+/**
+ * GET endpoint: Debug - Get sample products with supplier information.
+ *
+ * @param {Object} req request object.
+ * @param {Object} res response object.
+ * @returns {void}
+ */
+app.get("/products/debug", function (req, res) {
+    console.log("Products debug endpoint called - fetching sample products...");
+    
+    inventoryDB.find({}, function (err, products) {
+        if (err) {
+            console.error("Error fetching products for debug:", err);
+            res.status(500).json({
+                error: "Internal Server Error",
+                message: "Failed to fetch products for debug."
+            });
+            return;
+        }
+        
+        console.log(`Found ${products.length} products for debug`);
+        
+        // Return first 5 products with supplier information
+        const sampleProducts = products.slice(0, 5).map(product => ({
+            _id: product._id,
+            name: product.name,
+            supplier_id: product.supplier_id,
+            supplierId: product.supplierId,
+            supplier: product.supplier,
+            barcode: product.barcode
+        }));
+        
+        res.json({
+            totalProducts: products.length,
+            sampleProducts: sampleProducts,
+            allSupplierIds: [...new Set(products.map(p => p.supplier_id).filter(Boolean))],
+            allSupplierNames: [...new Set(products.map(p => p.supplier).filter(Boolean))]
+        });
+    });
+});
+
+/**
+ * GET endpoint: Debug - Get suppliers information.
+ *
+ * @param {Object} req request object.
+ * @param {Object} res response object.
+ * @returns {void}
+ */
+app.get("/suppliers/debug", function (req, res) {
+    console.log("Suppliers debug endpoint called - fetching suppliers...");
+    
+    const supplierDBPath = path.join(appData, appName, "server", "databases", "suppliers.db");
+    const supplierDB = new Datastore({
+        filename: supplierDBPath,
+        autoload: true
+    });
+    
+    supplierDB.find({}, function (err, suppliers) {
+        if (err) {
+            console.error("Error fetching suppliers for debug:", err);
+            res.status(500).json({
+                error: "Internal Server Error",
+                message: "Failed to fetch suppliers for debug."
+            });
+            return;
+        }
+        
+        console.log(`Found ${suppliers.length} suppliers for debug`);
+        
+        res.json({
+            totalSuppliers: suppliers.length,
+            suppliers: suppliers.map(supplier => ({
+                _id: supplier._id,
+                name: supplier.name,
+                code: supplier.code
+            }))
+        });
+    });
+});
+
+/**
+ * GET endpoint: Get products by supplier ID.
+ *
+ * @param {Object} req request object with supplier ID as a parameter.
+ * @param {Object} res response object.
+ * @returns {void}
+ */
+app.get("/products/supplier/:supplierId", function (req, res) {
+    const supplierId = req.params.supplierId;
+    console.log(`Products by supplier endpoint called for supplier: ${supplierId}`);
+    
+    if (!supplierId) {
+        res.status(400).json({
+            error: "Bad Request",
+            message: "Supplier ID is required."
+        });
+        return;
+    }
+    
+    // First, get the supplier name from the supplier ID
+    const supplierDBPath = path.join(appData, appName, "server", "databases", "suppliers.db");
+    const supplierDB = new Datastore({
+        filename: supplierDBPath,
+        autoload: true
+    });
+    
+    // Try both string and number lookups since there might be a data type mismatch
+    const numericSupplierId = parseInt(supplierId);
+    const stringSupplierId = supplierId.toString();
+    
+    console.log(`Looking for supplier with ID: ${supplierId} (numeric: ${numericSupplierId}, string: ${stringSupplierId})`);
+    
+    // Try numeric ID first
+    supplierDB.findOne({ _id: numericSupplierId }, function (err, supplier) {
+        if (err) {
+            console.error("Error fetching supplier with numeric ID:", err);
+            // Try string ID as fallback
+            supplierDB.findOne({ _id: stringSupplierId }, function (err2, supplier2) {
+                if (err2) {
+                    console.error("Error fetching supplier with string ID:", err2);
+                    res.status(500).json({
+                        error: "Internal Server Error",
+                        message: "Failed to fetch supplier information."
+                    });
+                    return;
+                }
+                processSupplierResult(supplier2, stringSupplierId);
+            });
+            return;
+        }
+        
+        if (supplier) {
+            processSupplierResult(supplier, numericSupplierId);
+        } else {
+            // Try string ID as fallback
+            console.log(`Supplier not found with numeric ID ${numericSupplierId}, trying string ID ${stringSupplierId}`);
+            supplierDB.findOne({ _id: stringSupplierId }, function (err2, supplier2) {
+                if (err2) {
+                    console.error("Error fetching supplier with string ID:", err2);
+                    res.status(500).json({
+                        error: "Internal Server Error",
+                        message: "Failed to fetch supplier information."
+                    });
+                    return;
+                }
+                processSupplierResult(supplier2, stringSupplierId);
+            });
+        }
+    });
+    
+    function processSupplierResult(supplier, usedId) {
+        console.log(`Supplier lookup result for ID ${usedId}:`, supplier);
+        
+        if (!supplier) {
+            console.log(`Supplier not found for ID: ${usedId}`);
+            res.json([]);
+            return;
+        }
+        
+        const supplierName = supplier.name;
+        console.log(`Supplier name for ID ${usedId}: ${supplierName}`);
+        
+        // Search for products with this supplier name (since products are linked by name, not ID)
+        const query = { supplier: supplierName };
+        
+        console.log("Search query:", JSON.stringify(query, null, 2));
+        
+        inventoryDB.find(query, function (err, products) {
+            if (err) {
+                console.error("Error fetching products for supplier:", err);
+                res.status(500).json({
+                    error: "Internal Server Error",
+                    message: "Failed to fetch products for supplier."
+                });
+                return;
+            }
+            
+            console.log(`Found ${products.length} products for supplier ${supplierName} (ID: ${usedId})`);
+            
+            // Debug: Log first few products to see their supplier fields
+            if (products.length > 0) {
+                console.log("Sample product supplier fields:", {
+                    supplier_id: products[0].supplier_id,
+                    supplier: products[0].supplier,
+                    name: products[0].name
+                });
+            } else {
+                console.log("No products found. Let's check if there are any products with similar supplier names...");
+                // Debug: Check if there are any products with similar supplier names
+                inventoryDB.find({}, function (err, allProducts) {
+                    if (!err && allProducts.length > 0) {
+                        const uniqueSuppliers = [...new Set(allProducts.map(p => p.supplier).filter(Boolean))];
+                        console.log("All supplier names in products:", uniqueSuppliers);
+                        console.log("Looking for supplier name:", supplierName);
+                        console.log("Exact match found:", uniqueSuppliers.includes(supplierName));
+                    }
+                });
+            }
+            
+            res.json(products);
+        });
+    }
 });
 
 // Test endpoint for debugging
@@ -161,18 +566,6 @@ app.get("/product/:productId", function (req, res) {
     }
 });
 
-/**
- * GET endpoint: Get details of all products.
- *
- * @param {Object} req request object.
- * @param {Object} res response object.
- * @returns {void}
- */
-app.get("/products", function (req, res) {
-    inventoryDB.find({}, function (err, docs) {
-        res.send(docs);
-    });
-});
 
 /**
  * POST endpoint: Create or update a product.
@@ -1321,39 +1714,159 @@ app.post("/product/sku", function (req, res) {
 
 /**
  * Decrement inventory quantities based on a list of products in a transaction.
+ * Uses FEFO (First-Expiry, First-Out) to deduct from batches.
  *
  * @param {Array} products - List of products in the transaction.
  * @returns {void}
  */
 app.decrementInventory = function (products) {
+    console.log('=== DECREMENT INVENTORY CALLED ===');
+    console.log('Products to decrement:', products);
+    
+    if (!products || products.length === 0) {
+        console.log('No products to decrement');
+        return;
+    }
+    
     async.eachSeries(products, function (transactionProduct, callback) {
+        const productId = parseInt(transactionProduct.id || transactionProduct._id || transactionProduct.productId);
+        const quantityToDeduct = parseInt(transactionProduct.quantity || transactionProduct.qty || 0);
+        
+        console.log(`Processing product ID: ${productId}, quantity: ${quantityToDeduct}`);
+        
+        if (!productId || isNaN(productId) || quantityToDeduct <= 0 || isNaN(quantityToDeduct)) {
+            console.log(`Skipping invalid product: id=${productId}, quantity=${quantityToDeduct}`);
+            callback();
+            return;
+        }
+        
         inventoryDB.findOne(
             {
-                _id: parseInt(transactionProduct.id),
+                _id: productId,
             },
             function (err, product) {
-                if (!product || !product.quantity) {
+                if (err) {
+                    console.error(`Error finding product ${productId}:`, err);
                     callback();
-                } else {
-                    let updatedQuantity =
-                        parseInt(product.quantity) -
-                        parseInt(transactionProduct.quantity);
-
-                    inventoryDB.update(
-                        {
-                            _id: parseInt(product._id),
-                        },
-                        {
-                            $set: {
-                                quantity: updatedQuantity,
-                            },
-                        },
-                        {},
-                        callback,
-                    );
+                    return;
                 }
+                
+                if (!product) {
+                    console.log(`Product ${productId} not found in inventory`);
+                    callback();
+                    return;
+                }
+                
+                if (!product.quantity || product.quantity <= 0) {
+                    console.log(`Product ${productId} has no quantity`);
+                    callback();
+                    return;
+                }
+                
+                console.log(`Found product: ${product.name || productId}, current quantity: ${product.quantity}`);
+                
+                // First, try to decrement from batches using FEFO (First-Expiry, First-Out)
+                inventoryBatchesDB.find(
+                    { productId: productId, quantity: { $gt: 0 } },
+                    { sort: { expiryDate: 1 } }, // Sort by expiry date (oldest first)
+                    function (batchErr, batches) {
+                        let remainingQty = quantityToDeduct;
+                        
+                        if (!batchErr && batches && batches.length > 0) {
+                            console.log(`Found ${batches.length} batches for product ${productId}`);
+                            
+                            // Deduct from batches using FEFO
+                            async.eachSeries(batches, function (batch, batchCallback) {
+                                if (remainingQty <= 0) {
+                                    batchCallback();
+                                    return;
+                                }
+                                
+                                const batchQty = parseInt(batch.quantity || 0);
+                                const deductFromBatch = Math.min(remainingQty, batchQty);
+                                
+                                if (deductFromBatch > 0) {
+                                    const newBatchQty = batchQty - deductFromBatch;
+                                    remainingQty -= deductFromBatch;
+                                    
+                                    console.log(`Deducting ${deductFromBatch} from batch ${batch._id}, new quantity: ${newBatchQty}`);
+                                    
+                                    if (newBatchQty > 0) {
+                                        // Update batch quantity
+                                        inventoryBatchesDB.update(
+                                            { _id: batch._id },
+                                            { $set: { quantity: newBatchQty } },
+                                            {},
+                                            batchCallback
+                                        );
+                                    } else {
+                                        // Remove batch if quantity is 0
+                                        inventoryBatchesDB.remove(
+                                            { _id: batch._id },
+                                            {},
+                                            batchCallback
+                                        );
+                                    }
+                                } else {
+                                    batchCallback();
+                                }
+                            }, function () {
+                                // After processing batches, update product quantity
+                                const finalQuantity = Math.max(0, parseInt(product.quantity) - quantityToDeduct);
+                                
+                                console.log(`Updating product ${productId} quantity from ${product.quantity} to ${finalQuantity}`);
+                                
+                                inventoryDB.update(
+                                    {
+                                        _id: productId,
+                                    },
+                                    {
+                                        $set: {
+                                            quantity: finalQuantity,
+                                        },
+                                    },
+                                    {},
+                                    function (updateErr) {
+                                        if (updateErr) {
+                                            console.error(`Error updating product ${productId}:`, updateErr);
+                                        } else {
+                                            console.log(`Successfully decremented product ${productId}`);
+                                        }
+                                        callback();
+                                    },
+                                );
+                            });
+                        } else {
+                            // No batches found, just update product quantity directly
+                            console.log(`No batches found for product ${productId}, updating quantity directly`);
+                            const finalQuantity = Math.max(0, parseInt(product.quantity) - quantityToDeduct);
+                            
+                            inventoryDB.update(
+                                {
+                                    _id: productId,
+                                },
+                                {
+                                    $set: {
+                                        quantity: finalQuantity,
+                                    },
+                                },
+                                {},
+                                function (updateErr) {
+                                    if (updateErr) {
+                                        console.error(`Error updating product ${productId}:`, updateErr);
+                                    } else {
+                                        console.log(`Successfully decremented product ${productId} to ${finalQuantity}`);
+                                    }
+                                    callback();
+                                },
+                            );
+                        }
+                    }
+                );
             },
         );
+    }, function () {
+        console.log('=== DECREMENT INVENTORY COMPLETED ===');
     });
 };
 

@@ -98,6 +98,29 @@ app.get("/suppliers", function (req, res) {
 });
 
 /**
+ * GET endpoint: Get details of all suppliers (alternative endpoint).
+ *
+ * @param {Object} req request object.
+ * @param {Object} res response object.
+ * @returns {void}
+ */
+app.get("/all", function (req, res) {
+    console.log("Suppliers /all API called - searching database...");
+    suppliersDB.find({}, function (err, docs) {
+        if (err) {
+            console.error("Database error:", err);
+            res.status(500).json({
+                error: "Internal Server Error",
+                message: "An unexpected error occurred.",
+            });
+        } else {
+            console.log(`Found ${docs.length} suppliers:`, docs);
+            res.send(docs);
+        }
+    });
+});
+
+/**
  * GET endpoint: Get supplier details by supplier ID.
  *
  * @param {Object} req request object with supplier ID as a parameter.
@@ -234,6 +257,12 @@ app.post("/supplier", function (req, res) {
  */
 app.put("/supplier/:supplierId", function (req, res) {
     let supplierId = req.params.supplierId;
+    
+    console.log('=== SUPPLIER UPDATE API CALLED ===');
+    console.log('Supplier ID from params:', supplierId);
+    console.log('Supplier ID type:', typeof supplierId);
+    console.log('Request body:', req.body);
+    
     let updateData = {
         name: validator.escape(req.body.name),
         code: validator.escape(req.body.code || ''),
@@ -260,25 +289,63 @@ app.put("/supplier/:supplierId", function (req, res) {
     }
 
     // Check if supplier exists
-    suppliersDB.findOne({ _id: supplierId }, function (err, existingSupplier) {
+    console.log('Looking for supplier with ID:', supplierId);
+    console.log('Query:', { _id: supplierId });
+    
+    // Try both string and number versions of the ID
+    const numericSupplierId = parseInt(supplierId);
+    const stringSupplierId = supplierId.toString();
+    
+    console.log('Trying numeric ID:', numericSupplierId);
+    console.log('Trying string ID:', stringSupplierId);
+    
+    suppliersDB.findOne({ _id: numericSupplierId }, function (err, existingSupplier) {
         if (err) {
-            console.error(err);
+            console.error('Database error:', err);
             return res.status(500).json({
                 error: "Internal Server Error",
                 message: "An unexpected error occurred.",
             });
         }
+        
+        console.log('Found supplier:', existingSupplier);
 
         if (!existingSupplier) {
-            return res.status(404).json({
-                error: "Not Found",
-                message: "Supplier not found."
+            console.log('Supplier not found with numeric ID, trying string ID...');
+            // Try with string ID as fallback
+            suppliersDB.findOne({ _id: stringSupplierId }, function (err2, existingSupplier2) {
+                if (err2) {
+                    console.error('Database error with string ID:', err2);
+                    return res.status(500).json({
+                        error: "Internal Server Error",
+                        message: "An unexpected error occurred.",
+                    });
+                }
+                
+                if (!existingSupplier2) {
+                    console.log('Supplier not found with either ID format');
+                    return res.status(404).json({
+                        error: "Not Found",
+                        message: "Supplier not found."
+                    });
+                }
+                
+                // Use the supplier found with string ID
+                processSupplierUpdate(existingSupplier2);
             });
+            return;
         }
+        
+        // Use the supplier found with numeric ID
+        processSupplierUpdate(existingSupplier);
+    });
+    
+    function processSupplierUpdate(existingSupplier) {
+        console.log('Processing supplier update for:', existingSupplier.name);
 
         // Check if name is being changed and if new name already exists
         if (updateData.name !== existingSupplier.name) {
-            suppliersDB.findOne({ name: updateData.name, _id: { $ne: supplierId } }, function (err, duplicateName) {
+            suppliersDB.findOne({ name: updateData.name, _id: { $ne: existingSupplier._id } }, function (err, duplicateName) {
                 if (err) {
                     console.error(err);
                     return res.status(500).json({
@@ -296,7 +363,7 @@ app.put("/supplier/:supplierId", function (req, res) {
 
                 // Check if code is being changed and if new code already exists
                 if (updateData.code && updateData.code !== existingSupplier.code) {
-                    suppliersDB.findOne({ code: updateData.code, _id: { $ne: supplierId } }, function (err, duplicateCode) {
+                    suppliersDB.findOne({ code: updateData.code, _id: { $ne: existingSupplier._id } }, function (err, duplicateCode) {
                         if (err) {
                             console.error(err);
                             return res.status(500).json({
@@ -347,34 +414,35 @@ app.put("/supplier/:supplierId", function (req, res) {
                 updateSupplier();
             }
         }
-    });
-
-    function updateSupplier() {
-        suppliersDB.update(
-            { _id: supplierId },
-            { $set: updateData },
-            {},
-            function (err, numReplaced) {
-                if (err) {
-                    console.error(err);
-                    res.status(500).json({
-                        error: "Internal Server Error",
-                        message: "An unexpected error occurred.",
-                    });
-                } else if (numReplaced === 0) {
-                    res.status(404).json({
-                        error: "Not Found",
-                        message: "Supplier not found."
-                    });
-                } else {
-                    console.log("Supplier updated successfully:", updateData.name);
-                    res.json({
-                        success: true,
-                        message: "Supplier updated successfully"
-                    });
-                }
-            },
-        );
+        
+        function updateSupplier() {
+            console.log('Updating supplier with ID:', existingSupplier._id);
+            suppliersDB.update(
+                { _id: existingSupplier._id },
+                { $set: updateData },
+                {},
+                function (err, numReplaced) {
+                    if (err) {
+                        console.error('Update error:', err);
+                        res.status(500).json({
+                            error: "Internal Server Error",
+                            message: "An unexpected error occurred.",
+                        });
+                    } else if (numReplaced === 0) {
+                        res.status(404).json({
+                            error: "Not Found",
+                            message: "Supplier not found."
+                        });
+                    } else {
+                        console.log("Supplier updated successfully:", updateData.name);
+                        res.json({
+                            success: true,
+                            message: "Supplier updated successfully"
+                        });
+                    }
+                },
+            );
+        }
     }
 });
 

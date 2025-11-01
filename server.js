@@ -1,6 +1,7 @@
 const http = require("http");
-const express = require("express")();
-const server = http.createServer(express);
+const express = require("express");
+const app = express();
+const server = http.createServer(app);
 const bodyParser = require("body-parser");
 const rateLimit = require("express-rate-limit");
 const path = require("path");
@@ -26,16 +27,20 @@ if (!process.env.APPNAME) {
 const PORT = process.env.PORT || 0;
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // 100 requests per window
+    max: 1000, // 1000 requests per window (increased for local app)
+    message: {
+        error: "Too Many Requests",
+        message: "Rate limit exceeded. Please try again later."
+    }
 });
 
 console.log("Server started");
 
-express.use(bodyParser.json());
-express.use(bodyParser.urlencoded({ extended: false }));
-express.use(limiter);
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(limiter);
 
-express.all("/*", function (req, res, next) {
+app.all("/*", function (req, res, next) {
     res.header("Access-Control-Allow-Origin", "*");
     res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS");
     res.header(
@@ -50,22 +55,22 @@ express.all("/*", function (req, res, next) {
 });
 
 // Serve static files (CSS, JS, images, etc.)
-express.use(express.static(__dirname));
+app.use(express.static(__dirname));
 
-express.get("/", function (req, res) {
+app.get("/", function (req, res) {
     // Serve the main HTML file
     res.sendFile(path.join(__dirname, "index.html"));
 });
 
-express.use("/api/inventory", require("./api/inventory"));
-express.use("/api/customers", require("./api/customers"));
-express.use("/api/categories", require("./api/categories"));
-express.use("/api/manufacturers", require("./api/manufacturers"));
-express.use("/api/suppliers", require("./api/suppliers"));
-express.use("/api/purchase-orders", require("./api/purchase-orders"));
-express.use("/api/settings", require("./api/settings"));
-express.use("/api/users", require("./api/users"));
-express.use("/api", require("./api/transactions"));
+app.use("/api/inventory", require("./api/inventory"));
+app.use("/api/customers", require("./api/customers"));
+app.use("/api/categories", require("./api/categories"));
+app.use("/api/manufacturers", require("./api/manufacturers"));
+app.use("/api/suppliers", require("./api/suppliers"));
+app.use("/api/purchase-orders", require("./api/purchase-orders"));
+app.use("/api/settings", require("./api/settings"));
+app.use("/api/users", require("./api/users"));
+app.use("/api", require("./api/transactions"));
 
 server.listen(PORT, () => {
     process.env.PORT = server.address().port;

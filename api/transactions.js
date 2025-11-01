@@ -141,19 +141,28 @@ app.get("/by-date", function (req, res) {
  */
 app.post("/new", function (req, res) {
   let newTransaction = req.body;
+  
+  console.log('=== NEW TRANSACTION RECEIVED ===');
+  console.log('Transaction data:', JSON.stringify(newTransaction, null, 2));
+  console.log('Paid:', newTransaction.paid, 'Total:', newTransaction.total);
+  console.log('Items:', newTransaction.items);
 
   transactionsDB.insert(newTransaction, function (err, transaction) {
     if (err) {
-      console.error(err);
+      console.error('Transaction insert error:', err);
       res.status(500).json({
         error: "Internal Server Error",
         message: "An unexpected error occurred.",
       });
     } else {
+      console.log('Transaction saved successfully:', transaction._id);
       res.sendStatus(200);
 
       if (newTransaction.paid >= newTransaction.total) {
+        console.log('Transaction fully paid - decrementing inventory...');
         Inventory.decrementInventory(newTransaction.items);
+      } else {
+        console.log(`Transaction NOT fully paid (paid: ${newTransaction.paid}, total: ${newTransaction.total}) - skipping inventory decrement`);
       }
     }
   });

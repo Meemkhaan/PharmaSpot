@@ -67,6 +67,8 @@ class WhatsAppIntegration {
     }
 
     async sendPurchaseOrder(orderId) {
+        console.log('🚀 WHATSAPP-INTEGRATION.JS: sendPurchaseOrder called for order:', orderId);
+        
         try {
             // Get purchase order details
             const order = await $.get(`/api/purchase-orders/${orderId}`);
@@ -100,49 +102,35 @@ class WhatsAppIntegration {
     }
 
     generatePOMessage(order, supplier) {
-        let message = `*${this.settings.companyName} - Purchase Order*\n\n`;
-        message += `Dear ${supplier.name},\n\n`;
-        message += `Please find below our purchase order details:\n\n`;
-        message += `*PO Number:* ${order.poNumber}\n`;
-        message += `*Date:* ${moment(order.createdAt).format('DD-MMM-YYYY')}\n`;
-        message += `*Expected Delivery:* ${order.expectedDeliveryDate ? moment(order.expectedDeliveryDate).format('DD-MMM-YYYY') : 'Not specified'}\n\n`;
+        // Format PO message according to new specification
+        let message = '';
+        message += `Hi *${supplier.name}* ,\n\n`;
+        message += `Please kindly process the following purchase order:\n`;
         
-        message += `*Items Ordered:*\n`;
-        order.items.forEach((item, index) => {
-            message += `${index + 1}. *${item.productName}*\n`;
-            message += `   📦 Barcode: ${item.barcode}\n`;
-            message += `   🔢 Quantity: ${item.quantity}\n`;
-            message += `   💰 Unit Price: ${utils.moneyFormat(item.unitPrice)}\n`;
-            message += `   💵 Total: ${utils.moneyFormat(item.totalPrice)}\n\n`;
+        // Add items in the specified format
+        order.items.forEach((item) => {
+            message += `${item.productName}: ${item.quantity} units\n`;
         });
         
-        message += `*Order Summary:*\n`;
-        message += `📊 Total Items: ${order.totalItems}\n`;
-        message += `💰 Subtotal: ${utils.moneyFormat(order.subtotal)}\n`;
-        if (order.tax > 0) {
-            message += `🧾 Tax: ${utils.moneyFormat(order.tax)}\n`;
-        }
-        if (order.discount > 0) {
-            message += `🎯 Discount: ${utils.moneyFormat(order.discount)}\n`;
-        }
-        message += `💵 *Total Amount: ${utils.moneyFormat(order.total)}*\n\n`;
+        message += `\nReference: *${order.poNumber}*\n`;
         
-        if (order.notes) {
-            message += `*Notes:*\n${order.notes}\n\n`;
+        // Add delivery information
+        if (order.expectedDeliveryDate) {
+            const deliveryDate = moment(order.expectedDeliveryDate).format('DD-MMM-YYYY');
+            message += `Delivery requested: ASAP, preferably by *${deliveryDate}* .\n\n`;
+        } else {
+            message += `Delivery requested: ASAP.\n\n`;
         }
         
-        message += `${this.settings.defaultMessage}\n\n`;
+        message += `Kindly confirm receipt of this order, product availability, and the total cost at your earliest convenience.\n\n`;
         
-        if (this.settings.includeTerms) {
-            message += `*Terms & Conditions:*\n`;
-            message += `• Please confirm receipt of this order\n`;
-            message += `• Delivery timeline to be confirmed\n`;
-            message += `• Payment terms as per agreement\n`;
-            message += `• Quality standards must be maintained\n\n`;
-        }
+        // Get pharmacy name from WhatsApp settings
+        const pharmacyName = this.settings.companyName || 'PharmaSpot';
+        message += `Thank you,\n*${pharmacyName}*\n\n`;
         
-        message += `Thank you for your business!\n`;
-        message += `Best regards,\n${this.settings.companyName} Team`;
+        // Add notes with generation info
+        const generatedDateTime = moment().format('DD-MMM-YYYY HH:mm');
+        message += `Note: _This order was auto-generated based on reorder points on_ ${generatedDateTime}.\nPowered by MukhtiYar Khan`;
         
         return message;
     }
@@ -168,10 +156,97 @@ class WhatsAppIntegration {
         // Open WhatsApp Web
         const whatsappUrl = `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodedMessage}`;
         
-        // Open in new tab
-        window.open(whatsappUrl, '_blank');
+        // Use Electron-compatible opening method
+        this.openWhatsAppInElectron(whatsappUrl);
         
         console.log(`Opening WhatsApp for ${cleanPhone} with message length: ${message.length}`);
+    }
+
+    openWhatsAppInElectron(whatsappUrl) {
+        // For Electron, use shell.openExternal for better compatibility
+        try {
+            console.log('🔄 Opening WhatsApp in Electron');
+            
+            // Use Electron's shell.openExternal for better compatibility
+            if (typeof require !== 'undefined') {
+                const { shell } = require('electron');
+                shell.openExternal(whatsappUrl);
+                console.log('✅ WhatsApp opened via Electron shell');
+                return;
+            }
+            
+            // Fallback to window.open if not in Electron
+            const newWindow = window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+            
+            if (newWindow && !newWindow.closed) {
+                console.log('✅ WhatsApp opened in new tab successfully');
+                return;
+            }
+        } catch (error) {
+            console.log('❌ Failed to open WhatsApp:', error);
+        }
+    }
+
+    openWhatsAppInDefaultBrowser(whatsappUrl) {
+        // Method 1: Try to open in new tab (most reliable for default browser)
+        try {
+            const newWindow = window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+            
+            // Check if the window opened successfully
+            if (newWindow && !newWindow.closed) {
+                console.log('✅ WhatsApp opened in new tab successfully');
+                return;
+            }
+        } catch (error) {
+            console.log('Method 1 failed:', error);
+        }
+        
+        // Method 2: Try using location.href (opens in current window)
+        try {
+            console.log('Trying Method 2: location.href');
+            window.location.href = whatsappUrl;
+            return;
+        } catch (error) {
+            console.log('Method 2 failed:', error);
+        }
+        
+        // Method 3: Create a temporary link and click it
+        try {
+            console.log('Trying Method 3: temporary link');
+            const link = document.createElement('a');
+            link.href = whatsappUrl;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            return;
+        } catch (error) {
+            console.log('Method 3 failed:', error);
+        }
+        
+        // Method 4: Fallback - show URL for manual copy
+        console.log('All methods failed, showing manual option');
+        if (typeof notiflix !== 'undefined' && notiflix.Report) {
+            notiflix.Report.info(
+                'WhatsApp Link',
+                `Please copy this link and open it in your default browser (Brave):\n\n${whatsappUrl}`,
+                'Copy Link',
+                () => {
+                    navigator.clipboard.writeText(whatsappUrl).then(() => {
+                        notiflix.Notify.success('Link copied to clipboard!');
+                    });
+                }
+            );
+        } else {
+            const copy = confirm(`Please copy this link and open it in Brave:\n\n${whatsappUrl}\n\nClick OK to copy to clipboard.`);
+            if (copy) {
+                navigator.clipboard.writeText(whatsappUrl).then(() => {
+                    alert('Link copied to clipboard!');
+                });
+            }
+        }
     }
 
     async bulkSendPurchaseOrders() {
@@ -384,6 +459,11 @@ Best regards,
         const cleanPhone = phoneNumber.replace(/\D/g, '');
         const encodedMessage = encodeURIComponent(message);
         return `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodedMessage}`;
+    }
+
+    // Open WhatsApp URL using robust browser opening method
+    openWhatsAppURL(whatsappUrl) {
+        this.openWhatsAppInDefaultBrowser(whatsappUrl);
     }
 
     // Check if WhatsApp Web is available

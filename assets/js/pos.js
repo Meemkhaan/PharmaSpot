@@ -317,13 +317,29 @@ function generateTransactionCards() {
 }
 
 // Auto-focus barcode search input when no modals are open
+// Only focus if user isn't interacting with other inputs
 function autoFocusBarcodeInput() {
   // Check if any modals are open
   const hasOpenModals = $('.modal.in, .modal.show').length > 0;
   const hasOpenPopups = $('.notiflix-report, .notiflix-notify').length > 0;
   
-  // Only focus if no modals or popups are open and we're in POS view
-  if (!hasOpenModals && !hasOpenPopups && $('#pos_view').is(':visible')) {
+  // Check if user is currently interacting with other input fields
+  const activeElement = document.activeElement;
+  const isOtherInputFocused = activeElement && 
+    activeElement !== document.body && 
+    (activeElement.tagName === 'INPUT' || 
+     activeElement.tagName === 'TEXTAREA' || 
+     activeElement.tagName === 'SELECT') &&
+    $(activeElement).attr('id') !== 'skuCode';
+  
+  // Check if search field or quantity inputs are focused
+  const isSearchFocused = $('#search').is(':focus');
+  const isQuantityInputFocused = $('.quantity-input').is(':focus');
+  
+  // Only focus if no modals/popups are open, we're in POS view, 
+  // and no other inputs are focused
+  if (!hasOpenModals && !hasOpenPopups && $('#pos_view').is(':visible') && 
+      !isOtherInputFocused && !isSearchFocused && !isQuantityInputFocused) {
     const barcodeInput = $('#skuCode');
     if (barcodeInput.length && !barcodeInput.is(':focus')) {
       barcodeInput.focus();
@@ -350,32 +366,81 @@ $(document).on('keydown', function(e) {
 });
 
 // Auto-focus barcode input when modals close
-$(document).on('hidden.bs.modal', function() {
+// But only if user isn't clicking on another input
+$(document).on('hidden.bs.modal', function(e) {
+  // Check if the modal close was triggered by clicking on an input
+  const clickedElement = $(document.activeElement);
+  const isInputField = clickedElement.is('input, textarea, select') && 
+                      clickedElement.attr('id') !== 'skuCode';
+  
+  if (!isInputField) {
   setTimeout(autoFocusBarcodeInput, 100); // Small delay to ensure modal is fully closed
+  }
 });
 
 // Auto-focus barcode input when popups close
-$(document).on('click', '.notiflix-report button, .notiflix-notify button', function() {
+// But only if user isn't clicking on another input
+$(document).on('click', '.notiflix-report button, .notiflix-notify button', function(e) {
+  // Check if the click was on an input field
+  const clickedElement = $(e.target);
+  const isInputField = clickedElement.is('input, textarea, select') && 
+                      clickedElement.attr('id') !== 'skuCode';
+  
+  if (!isInputField) {
   setTimeout(autoFocusBarcodeInput, 100);
+  }
 });
 
 // Auto-focus barcode input when clicking outside of modals
+// But NOT if clicking on other input fields
 $(document).on('click', function(e) {
-  // If click is not on a modal or its children, focus barcode input
+  // If click is not on a modal or its children
   if (!$(e.target).closest('.modal').length && !$(e.target).closest('.notiflix-report').length) {
+    // Don't auto-focus if user clicked on an input, textarea, select, or button
+    const clickedElement = $(e.target);
+    const isInputField = clickedElement.is('input, textarea, select') && 
+                        clickedElement.attr('id') !== 'skuCode';
+    const isQuantityInput = clickedElement.hasClass('quantity-input') || 
+                          clickedElement.closest('.quantity-input').length > 0;
+    const isSearchField = clickedElement.attr('id') === 'search' || 
+                         clickedElement.closest('#search').length > 0;
+    const isButton = clickedElement.is('button') || clickedElement.closest('button').length > 0;
+    
+    // Only auto-focus if user didn't click on another input field or button
+    if (!isInputField && !isQuantityInput && !isSearchField && !isButton) {
     setTimeout(autoFocusBarcodeInput, 50);
+    }
   }
 });
 
 // Prevent focus loss when typing in barcode input
-$('#skuCode').on('blur', function() {
+// But allow focus to move to other inputs
+$('#skuCode').on('blur', function(e) {
   // Only refocus if no modals are open
   const hasOpenModals = $('.modal.in, .modal.show').length > 0;
   const hasOpenPopups = $('.notiflix-report, .notiflix-notify').length > 0;
   
-  if (!hasOpenModals && !hasOpenPopups) {
+  // Check if blur was caused by clicking on another input field
+  const relatedTarget = e.relatedTarget || document.activeElement;
+  const isFocusingOtherInput = relatedTarget && 
+    (relatedTarget.tagName === 'INPUT' || 
+     relatedTarget.tagName === 'TEXTAREA' || 
+     relatedTarget.tagName === 'SELECT') &&
+    $(relatedTarget).attr('id') !== 'skuCode';
+  
+  // Don't refocus if user is moving to another input field
+  if (!hasOpenModals && !hasOpenPopups && !isFocusingOtherInput) {
     setTimeout(() => {
-      if (!$(this).is(':focus')) {
+      // Double-check that no other input has focus before refocusing
+      const activeElement = document.activeElement;
+      const hasOtherInputFocus = activeElement && 
+        activeElement !== document.body &&
+        (activeElement.tagName === 'INPUT' || 
+         activeElement.tagName === 'TEXTAREA' || 
+         activeElement.tagName === 'SELECT') &&
+        $(activeElement).attr('id') !== 'skuCode';
+      
+      if (!hasOtherInputFocus && !$(this).is(':focus')) {
         $(this).focus();
       }
     }, 10);
@@ -671,12 +736,7 @@ $(function () {
 
   cb(start, end);
 
-  $("#expirationDate").daterangepicker({
-    singleDatePicker: true,
-    locale: {
-      format: DATE_FORMAT,
-    },
-  });
+  // Removed daterangepicker for expirationDate - now using native date input
 });
 
 //Allow only numbers in input field
@@ -700,6 +760,20 @@ $('.number-input').allowOnlyNumbers();
 $.fn.serializeObject = function () {
   var o = {};
   var a = this.serializeArray();
+  
+  // First, collect all checkbox names to handle unchecked ones
+  var checkboxNames = [];
+  this.find('input[type="checkbox"]').each(function() {
+    checkboxNames.push($(this).attr('name'));
+  });
+  
+  // Initialize all checkboxes as false
+  checkboxNames.forEach(function(name) {
+    if (name) {
+      o[name] = false;
+    }
+  });
+  
   $.each(a, function () {
     if (o[this.name]) {
       if (!o[this.name].push) {
@@ -707,7 +781,12 @@ $.fn.serializeObject = function () {
       }
       o[this.name].push(this.value || "");
     } else {
+      // For checkboxes, use boolean true if checked
+      if (this.type === 'checkbox') {
+        o[this.name] = true;
+    } else {
       o[this.name] = this.value || "";
+      }
     }
   });
   return o;
@@ -779,6 +858,23 @@ if (auth == undefined) {
     }
     if (settings && settings.supplierCodeFormat) {
       $("#supplierCodeFormat").val(settings.supplierCodeFormat);
+    }
+    
+    // Populate supplier linking settings if they exist
+    if (settings && settings.productSupplierLinking !== undefined) {
+      $("#productSupplierLinking").prop('checked', settings.productSupplierLinking);
+    }
+    if (settings && settings.autoSplitMasterPOs !== undefined) {
+      $("#autoSplitMasterPOs").prop('checked', settings.autoSplitMasterPOs);
+    }
+    if (settings && settings.defaultSupplierAssignment) {
+      $("#defaultSupplierAssignment").val(settings.defaultSupplierAssignment);
+    }
+    if (settings && settings.requireSupplierConfirmation !== undefined) {
+      $("#requireSupplierConfirmation").prop('checked', settings.requireSupplierConfirmation);
+    }
+    if (settings && settings.enableBulkSupplierAssignment !== undefined) {
+      $("#enableBulkSupplierAssignment").prop('checked', settings.enableBulkSupplierAssignment);
     }
   });
 
@@ -1285,13 +1381,25 @@ if (auth == undefined) {
       $(".p_one").hide();
     }
 
-    function loadProducts() {
-      $.get(api + "inventory/products", function (data) {
-        data.forEach((item) => {
-          item.price = parseFloat(item.price).toFixed(2);
-        });
+    function loadProducts(retryCount = 0) {
+      $.ajax({
+        url: api + "inventory/products",
+        method: "GET",
+        timeout: 15000, // 15 seconds to allow for backend 8-second fallback + processing
+        success: function (data) {
+          // Handle empty array (might be timeout response)
+          if (!data || (Array.isArray(data) && data.length === 0 && retryCount === 0)) {
+            console.warn('Products endpoint returned empty array - might be timeout');
+            // Don't retry if it's likely a timeout - just continue with empty array
+            allProducts = [];
+            return;
+          }
+          
+          data.forEach((item) => {
+            item.price = parseFloat(item.price).toFixed(2);
+          });
 
-        allProducts = [...data];
+          allProducts = [...data];
 
         // Update loss tiles immediately after products load
         try {
@@ -1412,7 +1520,7 @@ if (auth == undefined) {
                                           item.barcode || item._id
                                         }</span>
                                         <span class="${item_stockStatus<1?'text-danger':''}"><span class="stock">STOCK </span><span class="count">${
-                                          item.stock == 1
+                                          (item.stock == 1 || (item.stock > 1 && item.quantity)) 
                                             ? item.quantity
                                             : "N/A"
                                         }</span></span></div>
@@ -1440,6 +1548,28 @@ if (auth == undefined) {
           setTimeout(() => {
             filterProducts();
           }, 100);
+        }
+        },
+        error: function (xhr, status, error) {
+          console.error('Failed to load products:', error, 'Status:', status);
+          
+          // Retry logic - retry up to 3 times with exponential backoff
+          if (retryCount < 3) {
+            const delay = Math.pow(2, retryCount) * 1000; // 1s, 2s, 4s
+            console.log(`Retrying products load in ${delay}ms (attempt ${retryCount + 1}/3)...`);
+            setTimeout(() => {
+              loadProducts(retryCount + 1);
+            }, delay);
+          } else {
+            // Max retries reached - show error to user
+            console.error('Failed to load products after 3 retries');
+            if (typeof notiflix !== 'undefined' && notiflix.Notify) {
+              notiflix.Notify.warning(
+                'Failed to load products. Please refresh the page or check server connection.',
+                4000
+              );
+            }
+          }
         }
       });
     }
@@ -1478,6 +1608,32 @@ if (auth == undefined) {
       });
     }
 
+    // Function to select best batch using FEFO (First-Expiry, First-Out)
+    function selectBestBatch(batches, quantity = 1) {
+      if (!batches || batches.length === 0) {
+        return null;
+      }
+      
+      // Filter batches with available quantity
+      const availableBatches = batches.filter(b => Number(b.quantity || 0) > 0);
+      
+      if (availableBatches.length === 0) {
+        return null;
+      }
+      
+      // Sort by expiry date (oldest first) - FEFO logic
+      availableBatches.sort((a, b) => {
+        const dateA = a.expiryDate ? new Date(a.expiryDate) : new Date('9999-12-31');
+        const dateB = b.expiryDate ? new Date(b.expiryDate) : new Date('9999-12-31');
+        return dateA - dateB;
+      });
+      
+      // Select the first batch (oldest expiry) that has enough quantity
+      // If quantity needed is more than available, we'll still select the first one
+      // (the decrement logic will handle multiple batches)
+      return availableBatches[0];
+    }
+
     $.fn.addToCart = function (id, count, stock) {
       $.get(api + "inventory/product/" + id, function (product) {
         if (isExpired(product.expirationDate)) {
@@ -1488,7 +1644,49 @@ if (auth == undefined) {
           );
         } else {
           if (count > 0) {
-            $(this).addProductToCart(product);
+            // Fetch batches for this product to select the best one using FEFO
+            $.ajax({
+              url: '/api/purchase-orders/batches/by-product/' + id,
+              method: 'GET',
+              timeout: 5000,
+              success: (response) => {
+                let selectedBatch = null;
+                
+                if (response.success && response.batches && response.batches.length > 0) {
+                  // Select best batch using FEFO
+                  selectedBatch = selectBestBatch(response.batches, 1);
+                  
+                  if (selectedBatch) {
+                    console.log(`✅ Selected batch for ${product.name}:`, {
+                      lotNumber: selectedBatch.lotNumber,
+                      barcode: selectedBatch.barcode,
+                      quantity: selectedBatch.quantity,
+                      expiryDate: selectedBatch.expiryDate
+                    });
+                  } else {
+                    console.log(`⚠️ No available batches found for ${product.name}, using product master data`);
+                  }
+                }
+                
+                // Add batch info to product before adding to cart
+                if (selectedBatch) {
+                  product.selectedBatch = selectedBatch;
+                  product.batchNumber = selectedBatch.lotNumber || selectedBatch.barcode || product.batchNumber || '';
+                  product.batchBarcode = selectedBatch.barcode || null;
+                  product.batchExpiryDate = selectedBatch.expiryDate || null;
+                  product.batchPurchasePrice = selectedBatch.purchasePrice || product.actualPrice || '';
+                  product.batchSellingPrice = selectedBatch.sellingPrice || product.price || '';
+                }
+                
+                // Use arrow function to maintain correct 'this' context
+                $('body').addProductToCart(product);
+              },
+              error: (xhr, status, error) => {
+                // If batch fetch fails, continue with product master data
+                console.warn('Failed to fetch batches, using product master data:', error);
+                $('body').addProductToCart(product);
+              }
+            });
           } else {
             if (stock == 1) {
               notiflix.Report.failure(
@@ -1610,6 +1808,12 @@ if (auth == undefined) {
         manufacturer: data.manufacturer || "",
         supplier: data.supplier || "",
         batchNumber: data.batchNumber || "",
+        // Add batch-specific information if available
+        batchBarcode: data.batchBarcode || null,
+        batchExpiryDate: data.batchExpiryDate || null,
+        batchPurchasePrice: data.batchPurchasePrice || data.actualPrice || "",
+        batchSellingPrice: data.batchSellingPrice || data.price || "",
+        selectedBatch: data.selectedBatch || null,
       };
 
       if ($(this).isExist(item)) {
@@ -1670,10 +1874,31 @@ if (auth == undefined) {
       $("#cartTable .card-body").empty();
       $(this).calculateCart();
       $.each(cartList, function (index, data) {
+        // Build product name with batch info if available
+        let productDisplay = data.product_name || '';
+        if (data.batchNumber) {
+          const batchInfo = [];
+          if (data.batchBarcode) batchInfo.push(`Barcode: ${data.batchBarcode}`);
+          if (data.batchExpiryDate) {
+            const expiryDate = new Date(data.batchExpiryDate);
+            const isExpired = expiryDate < new Date();
+            const isExpiringSoon = expiryDate < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+            const expiryStr = expiryDate.toLocaleDateString();
+            const expiryClass = isExpired ? 'text-danger' : (isExpiringSoon ? 'text-warning' : 'text-muted');
+            batchInfo.push(`Expires: <span class="${expiryClass}">${expiryStr}</span>`);
+          }
+          
+          if (batchInfo.length > 0) {
+            productDisplay += `<br><small class="text-info"><i class="fa fa-cubes"></i> Batch: ${data.batchNumber}${batchInfo.length > 0 ? ' • ' + batchInfo.join(' • ') : ''}</small>`;
+          } else {
+            productDisplay += `<br><small class="text-info"><i class="fa fa-cubes"></i> Batch: ${data.batchNumber}</small>`;
+          }
+        }
+        
         $("#cartTable .card-body").append(
           $("<div>", { class: "row m-t-10" }).append(
             $("<div>", { class: "col-md-1", text: index + 1 }),
-            $("<div>", { class: "col-md-3", text: data.product_name }),
+            $("<div>", { class: "col-md-3", html: productDisplay }),
             $("<div>", { class: "col-md-3" }).append(
               $("<div>", { class: "input-group" }).append(
                 $("<span>", { class: "input-group-btn" }).append(
@@ -2226,7 +2451,7 @@ if (auth == undefined) {
       receipt = `<div style="font-size: 10px">                            
         <p style="text-align: center;">
         ${
-          checkFileExists(logo)
+          false // Disable logo loading to prevent file:// protocol errors
             ? `<img style='max-width: 50px' src='${logo}' /><br>`
             : ``
         }
@@ -2745,6 +2970,47 @@ if (auth == undefined) {
         }
       });
       
+      // Prevent past dates for expiry and ensure date picker works
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const dd = String(today.getDate()).padStart(2, '0');
+      const minDate = `${yyyy}-${mm}-${dd}`;
+      
+      // Set minimum date and ensure field is properly configured
+      const expiryField = $("#expirationDate");
+      
+      // Remove any existing daterangepicker instances
+      if (expiryField.data('daterangepicker')) {
+        expiryField.data('daterangepicker').remove();
+      }
+      
+      // Configure as native date input
+      expiryField.attr('min', minDate);
+      expiryField.attr('type', 'date');
+      expiryField.removeAttr('readonly');
+      expiryField.removeAttr('parsley-trigger');
+      expiryField.removeAttr('placeholder');
+      expiryField.removeClass('daterangepicker-input');
+      
+      // Clear any existing value and ensure field is enabled
+      expiryField.val('');
+      expiryField.prop('disabled', false);
+      
+      // Force re-initialization of the field
+      setTimeout(() => {
+        expiryField.attr('type', 'date');
+        expiryField.attr('min', minDate);
+      }, 100);
+      
+      console.log('Expiry date field configured:', {
+        min: minDate,
+        type: expiryField.attr('type'),
+        readonly: expiryField.attr('readonly'),
+        disabled: expiryField.prop('disabled'),
+        hasDaterangepicker: !!expiryField.data('daterangepicker')
+      });
+      
       // Ensure dropdowns are populated
       if (!$("#manufacturer option").length || $("#manufacturer option").length <= 1) {
         console.log("Manufacturer dropdown empty, populating...");
@@ -3003,6 +3269,25 @@ if (auth == undefined) {
         // Set the current default if it exists in settings
         if (settings && settings.defaultSupplier) {
           $("#defaultSupplier").val(settings.defaultSupplier);
+        }
+      }
+      
+      // Populate supplier linking settings
+      if (settings) {
+        if (settings.productSupplierLinking !== undefined) {
+          $("#productSupplierLinking").prop('checked', settings.productSupplierLinking);
+        }
+        if (settings.autoSplitMasterPOs !== undefined) {
+          $("#autoSplitMasterPOs").prop('checked', settings.autoSplitMasterPOs);
+        }
+        if (settings.defaultSupplierAssignment) {
+          $("#defaultSupplierAssignment").val(settings.defaultSupplierAssignment);
+        }
+        if (settings.requireSupplierConfirmation !== undefined) {
+          $("#requireSupplierConfirmation").prop('checked', settings.requireSupplierConfirmation);
+        }
+        if (settings.enableBulkSupplierAssignment !== undefined) {
+          $("#enableBulkSupplierAssignment").prop('checked', settings.enableBulkSupplierAssignment);
         }
       }
     }
@@ -5073,6 +5358,85 @@ if (auth == undefined) {
       );
     };
 
+    $.fn.viewProductBatches = function (productId, productName) {
+        console.log('Viewing batches for product:', productId, productName);
+        
+        // Set product name in modal
+        $('#batchesProductName').text(productName || 'Product');
+        
+        // Show loading state
+        $('#batchesTableBody').html('<tr><td colspan="9" class="text-center"><i class="fa fa-spinner fa-spin"></i> Loading batches...</td></tr>');
+        $('#totalBatchesCount').text('0');
+        $('#totalBatchesQuantity').text('0');
+        $('#totalBatchesValue').text('$0.00');
+        
+        // Open modal
+        $('#productBatchesModal').modal('show');
+        
+        // Fetch batches from API
+        $.ajax({
+            url: '/api/purchase-orders/batches/by-product/' + productId,
+            method: 'GET',
+            timeout: 10000,
+            success: function (response) {
+                console.log('Batches response:', response);
+                
+                const tbody = $('#batchesTableBody');
+                tbody.empty();
+                
+                if (!response.success || !response.batches || response.batches.length === 0) {
+                    tbody.html('<tr><td colspan="9" class="text-center text-info"><i class="fa fa-info-circle"></i> No batches found for this product.</td></tr>');
+                    $('#totalBatchesCount').text('0');
+                    $('#totalBatchesQuantity').text('0');
+                    $('#totalBatchesValue').text('$0.00');
+                    return;
+                }
+                
+                const batches = response.batches;
+                let totalQuantity = 0;
+                let totalValue = 0;
+                
+                batches.forEach((batch, index) => {
+                    const quantity = Number(batch.quantity || 0);
+                    const purchasePrice = Number(batch.purchasePrice || 0);
+                    const value = quantity * purchasePrice;
+                    totalQuantity += quantity;
+                    totalValue += value;
+                    
+                    const expiryDate = batch.expiryDate ? new Date(batch.expiryDate) : null;
+                    const expiryStr = expiryDate ? expiryDate.toLocaleDateString() : 'N/A';
+                    const isExpired = expiryDate && expiryDate < new Date();
+                    const expiryClass = isExpired ? 'text-danger' : (expiryDate && expiryDate < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) ? 'text-warning' : '');
+                    
+                    const receivedDate = batch.updatedAt ? new Date(batch.updatedAt).toLocaleDateString() : 'N/A';
+                    
+                    tbody.append(`
+                        <tr>
+                            <td>${index + 1}</td>
+                            <td>${batch.lotNumber || '-'}</td>
+                            <td><code>${batch.barcode || '-'}</code></td>
+                            <td class="text-center"><span class="badge badge-${quantity > 0 ? 'success' : 'secondary'}">${quantity}</span></td>
+                            <td class="text-right">$${purchasePrice.toFixed(2)}</td>
+                            <td class="text-right">$${batch.sellingPrice ? Number(batch.sellingPrice).toFixed(2) : '-'}</td>
+                            <td class="${expiryClass}">${expiryStr}</td>
+                            <td>${batch.supplierName || batch.supplierId || '-'}</td>
+                            <td><small class="text-muted">${receivedDate}</small></td>
+                        </tr>
+                    `);
+                });
+                
+                // Update summary
+                $('#totalBatchesCount').text(batches.length);
+                $('#totalBatchesQuantity').text(totalQuantity);
+                $('#totalBatchesValue').text('$' + totalValue.toFixed(2));
+            },
+            error: function (xhr, status, error) {
+                console.error('Failed to load batches:', error);
+                $('#batchesTableBody').html('<tr><td colspan="9" class="text-center text-danger"><i class="fa fa-exclamation-triangle"></i> Failed to load batches. Please try again.</td></tr>');
+            }
+        });
+    };
+
     $.fn.deleteUser = function (id) {
       diagOptions = {
         title: "Are you sure?",
@@ -5390,7 +5754,7 @@ if (auth == undefined) {
            <td>${product.barcode || product._id}</td>
            <td>${product.name}</td>
            <td>${validator.unescape(settings.symbol)}${product.price}</td>
-           <td>${product.stock == 1 ? product.quantity : "N/A"}</td>
+           <td>${(product.stock == 1 || (product.stock > 1 && product.quantity)) ? product.quantity : "N/A"}</td>
            <td>${category.length > 0 ? category[0].name : ""}</td>
          </tr>`;
        });
@@ -5693,13 +6057,14 @@ if (auth == undefined) {
               ${product.actualPrice ? `<div><small>Purchase: ${validator.unescape(settings.symbol)}${product.actualPrice}</small></div>`: ""}
               <div><strong>Sell: ${validator.unescape(settings.symbol)}${product.price}</strong></div>
             </td>
-            <td>${product.stock == 1 ? product.quantity : "N/A"}
+            <td>${(product.stock == 1 || (product.stock > 1 && product.quantity)) ? product.quantity : "N/A"}
             ${product.stockAlert}
             </td>
             <td>${product.expirationDate}</td>
-            <td class="nobr"><span class="btn-group"><button onClick="$(this).editProduct(${index})" class="btn btn-warning btn-sm"><i class="fa fa-edit"></i></button><button onClick="$(this).deleteProduct(` +
+            <td class="nobr"><span class="btn-group"><button onClick="$(this).editProduct(${index})" class="btn btn-warning btn-sm" title="Edit Product"><i class="fa fa-edit"></i></button><button onClick="$(this).viewProductBatches(` +
+              product._id + `, '${(product.name || '').replace(/'/g, "\\'")}')" class="btn btn-info btn-sm" title="View Batches"><i class="fa fa-cubes"></i></button><button onClick="$(this).deleteProduct(` +
               product._id +
-            `)" class="btn btn-danger btn-sm"><i class="fa fa-trash"></i></button></span></td></tr>`;
+            `)" class="btn btn-danger btn-sm" title="Delete Product"><i class="fa fa-trash"></i></button></span></td></tr>`;
 
         if (counter == allProducts.length) {
           $("#product_list").html(product_list);
@@ -5790,6 +6155,9 @@ if (auth == undefined) {
       let formData = $(this).serializeObject();
       let mac_address;
 
+      // Debug: Log form data for troubleshooting
+      console.log('Settings form data:', formData);
+
       api = "http://" + host + ":" + port + "/api/";
 
       macaddress.one(function (err, mac) {
@@ -5828,6 +6196,12 @@ if (auth == undefined) {
         $(this).ajaxSubmit({
           contentType: "application/json",
           success: function () {
+            // Show success notification
+            if (typeof notiflix !== 'undefined' && notiflix.Notify) {
+              notiflix.Notify.success('Settings saved successfully!');
+            } else {
+              console.log('Settings saved successfully!');
+            }
             ipcRenderer.send("app-reload", "");
           },
           error: function (jqXHR) {
@@ -6001,6 +6375,23 @@ if (auth == undefined) {
             return $(this).text() == validator.unescape(settings.app);
           })
           .prop("selected", true);
+          
+        // Populate supplier linking settings
+        if (settings.productSupplierLinking !== undefined) {
+          $("#productSupplierLinking").prop('checked', settings.productSupplierLinking);
+        }
+        if (settings.autoSplitMasterPOs !== undefined) {
+          $("#autoSplitMasterPOs").prop('checked', settings.autoSplitMasterPOs);
+        }
+        if (settings.defaultSupplierAssignment) {
+          $("#defaultSupplierAssignment").val(settings.defaultSupplierAssignment);
+        }
+        if (settings.requireSupplierConfirmation !== undefined) {
+          $("#requireSupplierConfirmation").prop('checked', settings.requireSupplierConfirmation);
+        }
+        if (settings.enableBulkSupplierAssignment !== undefined) {
+          $("#enableBulkSupplierAssignment").prop('checked', settings.enableBulkSupplierAssignment);
+        }
       }
     });
  });
@@ -6392,7 +6783,7 @@ function loadSoldProducts() {
 
     const hasProduct = product.length > 0;
     const stockCell = hasProduct
-      ? (product[0].stock == 1 ? product[0].quantity : "N/A")
+      ? ((product[0].stock == 1 || (product[0].stock > 1 && product[0].quantity)) ? product[0].quantity : "N/A")
       : "";
 
     const salesVal = item.sales || (item.qty * parseFloat(item.price));
@@ -6564,7 +6955,7 @@ $.fn.viewTransaction = function (index) {
       receipt = `<div style="font-size: 10px">                            
         <p style="text-align: center;">
         ${
-          checkFileExists(logo)
+          false // Disable logo loading to prevent file:// protocol errors
             ? `<img style='max-width: 50px' src='${logo}' /><br>`
             : ``
         }

@@ -118,16 +118,36 @@ const setContentSecurityPolicy = () => {
   document.head.appendChild(metaTag);
 };
 
-module.exports = {
-  DATE_FORMAT,
-  moneyFormat,
-  isExpired,
-  getStockStatus,
-  getFileHash,
-  daysToExpire,
-  checkFileExists,
-  checkFileType,
-  filterFile,
-  validFileTypes,
-  setContentSecurityPolicy
-};
+// Make functions available globally for browser context
+if (typeof window !== 'undefined') {
+  window.utils = {
+    DATE_FORMAT,
+    moneyFormat,
+    isExpired,
+    getStockStatus,
+    getFileHash,
+    daysToExpire,
+    checkFileExists,
+    checkFileType,
+    filterFile,
+    validFileTypes,
+    setContentSecurityPolicy
+  };
+}
+
+// Node.js module exports
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    DATE_FORMAT,
+    moneyFormat,
+    isExpired,
+    getStockStatus,
+    getFileHash,
+    daysToExpire,
+    checkFileExists,
+    checkFileType,
+    filterFile,
+    validFileTypes,
+    setContentSecurityPolicy
+  };
+}
