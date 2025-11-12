@@ -175,34 +175,80 @@ $(document).on('keydown', function(e) {
 // Enhanced transaction view event handlers
 $(document).ready(function() {
   // Refresh transactions button
-  $(document).on('click', '#refresh_transactions', function() {
+  $(document).on('click', '#refresh_transactions', function(e) {
+    e.preventDefault();
+    const $btn = $(this);
+    const originalHtml = $btn.html();
+    
+    // Show loading state but keep button visible
+    $btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Refreshing...');
+    
     loadTransactions();
+    
+    // Reset button after a delay
+    setTimeout(() => {
+      $btn.prop('disabled', false).html(originalHtml);
+    }, 2000);
   });
   
   // Export transactions button
-  $(document).on('click', '#export_transactions', function() {
+  $(document).on('click', '#export_transactions', function(e) {
+    e.preventDefault();
+    const $btn = $(this);
+    const originalHtml = $btn.html();
+    
+    // Show loading state
+    $btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Exporting...');
+    
     if ($.fn.DataTable.isDataTable('#transactionList')) {
       $('#transactionList').DataTable().button('.buttons-csv').trigger();
     }
+    
+    // Reset button after a delay
+    setTimeout(() => {
+      $btn.prop('disabled', false).html(originalHtml);
+    }, 1000);
   });
   
   // Print summary button
-  $(document).on('click', '#print_summary', function() {
+  $(document).on('click', '#print_summary', function(e) {
+    e.preventDefault();
+    const $btn = $(this);
+    const originalHtml = $btn.html();
+    
+    // Show loading state
+    $btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Printing...');
+    
     if ($.fn.DataTable.isDataTable('#transactionList')) {
       $('#transactionList').DataTable().button('.buttons-print').trigger();
     }
+    
+    // Reset button after a delay
+    setTimeout(() => {
+      $btn.prop('disabled', false).html(originalHtml);
+    }, 1000);
   });
   
   // View toggle buttons
-  $(document).on('click', '#view_table', function() {
-    $(this).addClass('active');
+  $(document).on('click', '#view_table', function(e) {
+    e.preventDefault();
+    const $btn = $(this);
+    const originalHtml = $btn.html();
+    
+    // Don't disable toggle buttons, just update state
+    $btn.addClass('active');
     $('#view_cards').removeClass('active');
     $('#transaction_table_view').show();
     $('#transaction_cards_view').hide();
   });
   
-  $(document).on('click', '#view_cards', function() {
-    $(this).addClass('active');
+  $(document).on('click', '#view_cards', function(e) {
+    e.preventDefault();
+    const $btn = $(this);
+    const originalHtml = $btn.html();
+    
+    // Don't disable toggle buttons, just update state
+    $btn.addClass('active');
     $('#view_table').removeClass('active');
     $('#transaction_table_view').hide();
     $('#transaction_cards_view').show();
@@ -692,7 +738,503 @@ const {
 //set the content security policy of the app
 setContentSecurityPolicy();
 
+var productBatchManager;
+
+function normalizeDateForInput(value) {
+  if (!value) return "";
+  const trimmed = String(value).trim();
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  const shortMonthMatch = trimmed.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2})$/);
+  if (shortMonthMatch) {
+    const day = shortMonthMatch[1].padStart(2, "0");
+    const monthAbbrev = shortMonthMatch[2].toLowerCase();
+    const yearShort = shortMonthMatch[3];
+    const monthMap = {
+      jan: "01",
+      feb: "02",
+      mar: "03",
+      apr: "04",
+      may: "05",
+      jun: "06",
+      jul: "07",
+      aug: "08",
+      sep: "09",
+      oct: "10",
+      nov: "11",
+      dec: "12"
+    };
+    if (monthMap[monthAbbrev]) {
+      const year = parseInt(yearShort, 10);
+      const normalizedYear = year >= 70 ? 1900 + year : 2000 + year;
+      return `${normalizedYear}-${monthMap[monthAbbrev]}-${day}`;
+    }
+  }
+
+  const parsed = new Date(trimmed);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toISOString().slice(0, 10);
+  }
+
+  return "";
+}
+
+function getCanonicalExpiry(source) {
+  if (!source) return "";
+  if (source.batchSummary && source.batchSummary.earliestExpiry) {
+    return source.batchSummary.earliestExpiry;
+  }
+  if (source.expirationDate) {
+    return source.expirationDate;
+  }
+  if (source.expiryDate) {
+    return source.expiryDate;
+  }
+  return "";
+}
+
+function formatExpiryForDisplay(value) {
+  if (!value) return "";
+
+  if (moment.isMoment && moment.isMoment(value)) {
+    return value.clone().format(DATE_FORMAT);
+  }
+
+  if (value instanceof Date) {
+    return moment(value).format(DATE_FORMAT);
+  }
+
+  const trimmed = String(value).trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  const shortMonthMatch = trimmed.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2})$/);
+  if (shortMonthMatch) {
+    const day = shortMonthMatch[1].padStart(2, "0");
+    const monthAbbrev = shortMonthMatch[2].toLowerCase();
+    const yearShort = shortMonthMatch[3];
+    const monthMap = {
+      jan: "01",
+      feb: "02",
+      mar: "03",
+      apr: "04",
+      may: "05",
+      jun: "06",
+      jul: "07",
+      aug: "08",
+      sep: "09",
+      oct: "10",
+      nov: "11",
+      dec: "12"
+    };
+    if (monthMap[monthAbbrev]) {
+      const year = parseInt(yearShort, 10);
+      const normalizedYear = year >= 70 ? 1900 + year : 2000 + year;
+      const normalized = `${normalizedYear}-${monthMap[monthAbbrev]}-${day}`;
+      const parsed = moment(normalized, "YYYY-MM-DD", true);
+      if (parsed.isValid()) {
+        return parsed.format(DATE_FORMAT);
+      }
+    }
+  }
+
+  const knownFormats = [
+    "YYYY-MM-DD",
+    "YYYY/MM/DD",
+    "DD/MM/YYYY",
+    "MM/DD/YYYY",
+    "DD-MMM-YYYY",
+    "DD-MMM-YY",
+    "DD MMM YYYY",
+    "MMM DD, YYYY"
+  ];
+
+  let parsed = moment(trimmed, knownFormats, "en", true);
+
+  if (!parsed.isValid()) {
+    parsed = moment(trimmed, moment.ISO_8601, true);
+  }
+
+  if (parsed.isValid()) {
+    return parsed.format(DATE_FORMAT);
+  }
+
+  const jsDate = new Date(trimmed);
+  if (!Number.isNaN(jsDate.getTime())) {
+    return moment(jsDate).format(DATE_FORMAT);
+  }
+
+  return trimmed;
+}
+
 $(function () {
+  $("#quantityHelp, #batchNumberHelp, #barcodeHelp").hide();
+
+  productBatchManager = {
+    entries: [],
+    editingIndex: null,
+    setEntries(rawEntries) {
+      if (!Array.isArray(rawEntries)) {
+        this.entries = [];
+      } else {
+        this.entries = rawEntries
+          .map(this.normalizeEntry)
+          .filter(entry => entry && (entry.quantity > 0 || entry.lotNumber || entry.barcode));
+      }
+      this.editingIndex = null;
+      resetBatchEntryForm();
+      this.render();
+    },
+    reset() {
+      this.entries = [];
+      this.editingIndex = null;
+      resetBatchEntryForm();
+      this.render();
+    },
+    normalizeEntry(entry) {
+      if (!entry) return null;
+      const normalized = {
+        lotNumber: entry.lotNumber ? String(entry.lotNumber).trim() : "",
+        barcode: entry.barcode ? String(entry.barcode).trim() : "",
+        quantity: Number(entry.quantity || 0),
+        purchasePrice: entry.purchasePrice === "" || entry.purchasePrice === null || typeof entry.purchasePrice === "undefined"
+          ? ""
+          : Number(entry.purchasePrice),
+        sellingPrice: entry.sellingPrice === "" || entry.sellingPrice === null || typeof entry.sellingPrice === "undefined"
+          ? ""
+          : Number(entry.sellingPrice),
+        expiryDate: entry.expiryDate ? String(entry.expiryDate).substring(0, 10) : "",
+        supplierId: entry.supplierId || entry.supplierID || "",
+        supplierName: entry.supplierName || ""
+      };
+
+      if (Number.isNaN(normalized.quantity)) normalized.quantity = 0;
+      if (Number.isNaN(normalized.purchasePrice)) normalized.purchasePrice = "";
+      if (Number.isNaN(normalized.sellingPrice)) normalized.sellingPrice = "";
+
+      return normalized;
+    },
+    render() {
+      const tbody = $("#productBatchRows");
+      tbody.empty();
+
+      if (!this.entries.length) {
+        tbody.append(
+          $("<tr/>", { class: "batch-empty-state" }).append(
+            $("<td/>", {
+              colspan: 8,
+              class: "text-center text-muted",
+              html: '<i class="fa fa-cubes"></i> No batches added yet.'
+            })
+          )
+        );
+      } else {
+        this.entries.forEach((entry, index) => {
+          const $row = $("<tr/>").attr("data-index", index);
+          $row.append($("<td/>").text(index + 1));
+          $row.append($("<td/>").text(entry.lotNumber || "-"));
+          $row.append($("<td/>").text(entry.barcode || "-"));
+          $row.append($("<td/>", { class: "text-right" }).text(Number(entry.quantity || 0)));
+          $row.append(
+            $("<td/>", { class: "text-right" }).text(
+              entry.purchasePrice === "" ? "-" : Number(entry.purchasePrice).toFixed(2)
+            )
+          );
+          $row.append(
+            $("<td/>", { class: "text-right" }).text(
+              entry.sellingPrice === "" ? "-" : Number(entry.sellingPrice).toFixed(2)
+            )
+          );
+          $row.append(
+            $("<td/>").text(formatBatchDate(entry.expiryDate))
+          );
+
+          const actionGroup = $("<div/>", { class: "btn-group btn-group-xs" });
+          actionGroup.append(
+            $("<button/>", {
+              type: "button",
+              class: "btn btn-default edit-batch",
+              "data-index": index,
+              title: "Edit batch"
+            }).html('<i class="fa fa-edit"></i>')
+          );
+          actionGroup.append(
+            $("<button/>", {
+              type: "button",
+              class: "btn btn-danger remove-batch",
+              "data-index": index,
+              title: "Remove batch"
+            }).html('<i class="fa fa-trash"></i>')
+          );
+
+          $row.append($("<td/>", { class: "text-right" }).append(actionGroup));
+          tbody.append($row);
+        });
+      }
+
+      this.updateSummaries();
+      this.updateHiddenFields();
+    },
+    updateSummaries() {
+      const totals = this.entries.reduce(
+        (acc, entry) => {
+          const qty = Number(entry.quantity || 0);
+          const purchase = entry.purchasePrice === "" ? 0 : Number(entry.purchasePrice || 0);
+          acc.count += 1;
+          acc.quantity += qty;
+          acc.value += qty * purchase;
+          return acc;
+        },
+        { count: 0, quantity: 0, value: 0 }
+      );
+
+      $("#batchSummaryCount").text(totals.count);
+      $("#batchSummaryQuantity").text(totals.quantity);
+      $("#batchSummaryValue").text("$" + totals.value.toFixed(2));
+
+      if (totals.count === 0) {
+        $("#batchSummaryCount, #batchSummaryQuantity, #batchSummaryValue").addClass("text-muted");
+      } else {
+        $("#batchSummaryCount, #batchSummaryQuantity, #batchSummaryValue").removeClass("text-muted");
+      }
+
+      applyBatchDerivedFields();
+    },
+    updateHiddenFields() {
+      try {
+        $("#productBatchesPayload").val(JSON.stringify(this.entries));
+      } catch (error) {
+        console.error("Failed to serialize batch entries:", error);
+        $("#productBatchesPayload").val("[]");
+      }
+
+      const allBarcodes = this.entries
+        .map(entry => entry.barcode)
+        .filter(Boolean);
+      try {
+        $("#productAlternateBarcodes").val(JSON.stringify(allBarcodes.slice(1)));
+      } catch (error) {
+        console.error("Failed to serialize alternate barcodes:", error);
+        $("#productAlternateBarcodes").val("[]");
+      }
+    },
+    addEntry(entry) {
+      this.entries.push(this.normalizeEntry(entry));
+      this.editingIndex = null;
+      resetBatchEntryForm();
+      this.render();
+    },
+    updateEntry(index, entry) {
+      if (index == null || index < 0 || index >= this.entries.length) return;
+      this.entries[index] = this.normalizeEntry(entry);
+      this.editingIndex = null;
+      resetBatchEntryForm();
+      this.render();
+    },
+    removeEntry(index) {
+      if (index == null || index < 0 || index >= this.entries.length) return;
+      this.entries.splice(index, 1);
+      this.editingIndex = null;
+      resetBatchEntryForm();
+      this.render();
+    },
+    setEditing(index) {
+      this.editingIndex = index;
+    },
+    getEditingEntry() {
+      if (this.editingIndex == null) return null;
+      return this.entries[this.editingIndex] || null;
+    },
+    getPrimaryEntry() {
+      if (!this.entries.length) return null;
+      return this.entries[0];
+    },
+    getTotalQuantity() {
+      return this.entries.reduce((total, entry) => total + Number(entry.quantity || 0), 0);
+    },
+    getEarliestExpiry() {
+      const sorted = this.entries
+        .map(entry => {
+          if (!entry.expiryDate) return null;
+          const date = new Date(entry.expiryDate);
+          return Number.isNaN(date.getTime()) ? null : date;
+        })
+        .filter(Boolean)
+        .sort((a, b) => a - b);
+      if (!sorted.length) return "";
+      const date = sorted[0];
+      return date.toISOString().slice(0, 10);
+    }
+  };
+  window.productBatchManager = productBatchManager;
+
+  function resetBatchEntryForm() {
+    $("#batchLotInput").val("");
+    $("#batchBarcodeInput").val("");
+    $("#batchQuantityInput").val("");
+    $("#batchPurchaseInput").val("");
+    $("#batchSellingInput").val("");
+    $("#batchExpiryInput").val("");
+    $("#addBatchEntry").html('<i class="fa fa-plus"></i> Add Batch').removeClass("btn-primary").addClass("btn-success");
+    $("#cancelBatchEdit").hide();
+    $("#batchLotInput").focus();
+  }
+
+  function applyBatchDerivedFields() {
+    const entries = productBatchManager.entries;
+    const primary = productBatchManager.getPrimaryEntry();
+    const totalQuantity = productBatchManager.getTotalQuantity();
+    const earliestExpiry = productBatchManager.getEarliestExpiry();
+
+    if (entries.length > 0) {
+      if (primary) {
+        if (!$("#batchNumber").data("manual")) {
+          $("#batchNumber").val(primary.lotNumber || "");
+        }
+        if (primary.barcode && !$("#barcode").data("manual")) {
+          $("#barcode").val(primary.barcode);
+        }
+        if (
+          (primary.sellingPrice !== "" && !$("#product_price").data("manual")) ||
+          ($("#product_price").val() === "" && primary.sellingPrice !== "")
+        ) {
+          $("#product_price").val(Number(primary.sellingPrice).toFixed(2));
+        }
+        if (
+          (primary.purchasePrice !== "" && !$("#actual_price").data("manual")) ||
+          ($("#actual_price").val() === "" && primary.purchasePrice !== "")
+        ) {
+          $("#actual_price").val(Number(primary.purchasePrice).toFixed(2));
+        }
+      }
+
+      if (earliestExpiry && !$("#expirationDate").data("manual")) {
+        $("#expirationDate").val(earliestExpiry);
+      }
+
+      $("#quantity").val(totalQuantity).prop("readonly", true).addClass("readonly-field");
+      $("#quantityHelp").show();
+      $("#batchNumberHelp, #barcodeHelp").show();
+    } else {
+      $("#quantity").prop("readonly", false).removeClass("readonly-field");
+      $("#quantityHelp").hide();
+      $("#batchNumberHelp, #barcodeHelp").hide();
+    }
+  }
+
+  function formatBatchDate(value) {
+    if (!value) return "-";
+    const normalized = normalizeDateForInput(value);
+    return normalized || value;
+  }
+
+  $("#addBatchEntry").on("click", function () {
+    const lotNumber = $("#batchLotInput").val().trim();
+    const barcode = $("#batchBarcodeInput").val().trim();
+    const quantity = Number($("#batchQuantityInput").val());
+    const purchasePriceRaw = $("#batchPurchaseInput").val().trim();
+    const sellingPriceRaw = $("#batchSellingInput").val().trim();
+    const expiryDate = $("#batchExpiryInput").val();
+
+    if (!lotNumber && !barcode) {
+      notiflix.Notify.warning("Please provide at least a batch number or barcode.");
+      $("#batchLotInput").focus();
+      return;
+    }
+
+    if (Number.isNaN(quantity) || quantity < 0) {
+      notiflix.Notify.warning("Quantity must be zero or greater.");
+      $("#batchQuantityInput").focus();
+      return;
+    }
+
+    const entry = {
+      lotNumber,
+      barcode,
+      quantity,
+      purchasePrice: purchasePriceRaw === "" ? "" : Number(purchasePriceRaw),
+      sellingPrice: sellingPriceRaw === "" ? "" : Number(sellingPriceRaw),
+      expiryDate
+    };
+
+    if (Number.isNaN(entry.purchasePrice)) {
+      notiflix.Notify.warning("Purchase price must be numeric.");
+      $("#batchPurchaseInput").focus();
+      return;
+    }
+
+    if (Number.isNaN(entry.sellingPrice)) {
+      notiflix.Notify.warning("Selling price must be numeric.");
+      $("#batchSellingInput").focus();
+      return;
+    }
+
+    if (productBatchManager.editingIndex != null) {
+      productBatchManager.updateEntry(productBatchManager.editingIndex, entry);
+      notiflix.Notify.success("Batch updated.");
+    } else {
+      productBatchManager.addEntry(entry);
+      notiflix.Notify.success("Batch added.");
+    }
+  });
+
+  $("#cancelBatchEdit").on("click", function () {
+    productBatchManager.editingIndex = null;
+    resetBatchEntryForm();
+  });
+
+  $("#productBatchTable").on("click", ".edit-batch", function () {
+    const index = parseInt($(this).data("index"), 10);
+    if (Number.isNaN(index)) return;
+    const entry = productBatchManager.entries[index];
+    if (!entry) return;
+
+    productBatchManager.setEditing(index);
+    $("#batchLotInput").val(entry.lotNumber);
+    $("#batchBarcodeInput").val(entry.barcode);
+    $("#batchQuantityInput").val(entry.quantity);
+    $("#batchPurchaseInput").val(entry.purchasePrice !== "" ? entry.purchasePrice : "");
+    $("#batchSellingInput").val(entry.sellingPrice !== "" ? entry.sellingPrice : "");
+    $("#batchExpiryInput").val(entry.expiryDate);
+    $("#addBatchEntry")
+      .html('<i class="fa fa-save"></i> Update Batch')
+      .removeClass("btn-success")
+      .addClass("btn-primary");
+    $("#cancelBatchEdit").show();
+    $("#batchLotInput").focus();
+  });
+
+  $("#productBatchTable").on("click", ".remove-batch", function () {
+    const index = parseInt($(this).data("index"), 10);
+    if (Number.isNaN(index)) return;
+    productBatchManager.removeEntry(index);
+    notiflix.Notify.info("Batch removed.");
+  });
+
+  $("#batchLotInput, #batchBarcodeInput, #batchQuantityInput, #batchPurchaseInput, #batchSellingInput, #batchExpiryInput").on("keyup change", function (e) {
+    if (e.keyCode === 13) {
+      $("#addBatchEntry").click();
+    }
+  });
+
+  $("#batchNumber, #barcode, #product_price, #actual_price, #expirationDate").on("input", function () {
+    $(this).data("manual", true);
+  });
+
+  $("#newProduct").on("show.bs.modal", function () {
+    $("#batchNumber, #barcode, #product_price, #actual_price, #expirationDate").data("manual", false);
+    productBatchManager.reset();
+  });
+
+  $("#newProduct").on("hidden.bs.modal", function () {
+    productBatchManager.reset();
+    $("#batchNumber, #barcode, #product_price, #actual_price, #expirationDate").data("manual", false);
+  });
+
   function cb(start, end) {
     $("#reportrange span").html(
       start.format("MMMM D, YYYY") + "  -  " + end.format("MMMM D, YYYY"),
@@ -1395,11 +1937,11 @@ if (auth == undefined) {
             return;
           }
           
-          data.forEach((item) => {
-            item.price = parseFloat(item.price).toFixed(2);
-          });
+        data.forEach((item) => {
+          item.price = parseFloat(item.price).toFixed(2);
+        });
 
-          allProducts = [...data];
+        allProducts = [...data];
 
         // Update loss tiles immediately after products load
         try {
@@ -1413,7 +1955,8 @@ if (auth == undefined) {
             const qty = parseInt(p.quantity || 0);
             const cost = parseFloat(p.actualPrice || p.purchasePrice || p.buy_price || p.buyPrice || 0);
             const hasCost = !(isNaN(cost) || cost <= 0);
-            const isExp = isExpired(p.expirationDate);
+            const expiryRaw = getCanonicalExpiry(p);
+            const isExp = isExpired(expiryRaw);
             if (isExp) {
               if (qty > 0 && hasCost) {
                 lossTotalExpired += qty * cost;
@@ -1423,7 +1966,7 @@ if (auth == undefined) {
               }
               return;
             }
-            const days = daysToExpire(p.expirationDate);
+            const days = daysToExpire(expiryRaw);
             if (days > 0 && days <= 90) {
               if (qty > 0 && hasCost) {
                 lossPartialExpiry += 0.5 * qty * cost;
@@ -1454,11 +1997,10 @@ if (auth == undefined) {
         let delay = 0;
         let expiredCount = 0;
         allProducts.forEach((product) => {
-          let todayDate = moment();
-          let expiryDate = moment(product.expirationDate, DATE_FORMAT);
+          const productExpiryRaw = getCanonicalExpiry(product);
 
-          if (!isExpired(expiryDate)) {
-            const diffDays = daysToExpire(expiryDate);
+          if (!isExpired(productExpiryRaw)) {
+            const diffDays = daysToExpire(productExpiryRaw);
 
             if (diffDays > 0 && diffDays <= 30) {
               var days_noun = diffDays > 1 ? "days" : "day";
@@ -1488,7 +2030,8 @@ if (auth == undefined) {
           if (!categories.includes(item.category)) {
             categories.push(item.category);
           }
-          let item_isExpired = isExpired(item.expirationDate);
+          const itemExpiryRaw = getCanonicalExpiry(item);
+          let item_isExpired = isExpired(itemExpiryRaw);
           let item_stockStatus = getStockStatus(item.quantity,item.minStock);
           if(item.img==="")
           {
@@ -1634,9 +2177,197 @@ if (auth == undefined) {
       return availableBatches[0];
     }
 
+    // Function to update existing cart item with batch information
+    function updateCartItemWithBatch(productId, selectedBatch) {
+      // Find the cart item
+      const cartItem = cart.find(item => item.id == productId);
+      if (!cartItem) {
+        console.warn('Cart item not found for product ID:', productId);
+        return;
+      }
+      
+      // Update cart item with batch info
+      cartItem.selectedBatch = selectedBatch;
+      cartItem.batchNumber = selectedBatch.lotNumber || selectedBatch.barcode || cartItem.batchNumber || '';
+      cartItem.batchBarcode = selectedBatch.barcode || null;
+      cartItem.batchExpiryDate = selectedBatch.expiryDate || null;
+      cartItem.batchPurchasePrice = selectedBatch.purchasePrice || cartItem.purchasePrice || '';
+      // Update price if batch has selling price
+      if (selectedBatch.sellingPrice && Number(selectedBatch.sellingPrice) > 0) {
+        cartItem.price = Number(selectedBatch.sellingPrice);
+      }
+      cartItem.batchSellingPrice = selectedBatch.sellingPrice || cartItem.price || '';
+      
+      console.log(`✅ Updated cart item with batch info for ${cartItem.product_name}`);
+      
+      // Re-render cart to show updated batch info
+      $('body').renderTable(cart);
+    }
+
+    // Function to show batch selection dialog when multiple batches are available
+    function showBatchSelectionDialog(product, batches, updateExisting = false) {
+      // Set product name
+      $('#batchSelectionProductName').text(product.name || 'Product');
+      
+      // Update button text based on whether updating existing item or adding new
+      if (updateExisting) {
+        $('#confirmBatchSelection').html('<i class="fa fa-check"></i> Update Cart Item');
+      } else {
+        $('#confirmBatchSelection').html('<i class="fa fa-check"></i> Add to Cart');
+      }
+      
+      // Clear previous selection
+      window.pendingBatchSelection = null;
+      window.pendingProductForBatch = product;
+      
+      // Sort batches by expiry date (oldest first) - FEFO order
+      const sortedBatches = [...batches].sort((a, b) => {
+        const dateA = a.expiryDate ? new Date(a.expiryDate) : new Date('9999-12-31');
+        const dateB = b.expiryDate ? new Date(b.expiryDate) : new Date('9999-12-31');
+        return dateA - dateB;
+      });
+      
+      // Populate table
+      const tbody = $('#batchSelectionTableBody');
+      tbody.empty();
+      
+      const currencySymbol = (settings && settings.symbol) ? validator.unescape(settings.symbol) : '$';
+      sortedBatches.forEach((batch, index) => {
+        const quantity = Number(batch.quantity || 0);
+        const purchasePrice = Number(batch.purchasePrice || 0);
+        const sellingPrice = Number(batch.sellingPrice || 0);
+        
+        const expiryDate = batch.expiryDate ? new Date(batch.expiryDate) : null;
+        const expiryStr = expiryDate ? expiryDate.toLocaleDateString() : 'N/A';
+        const isExpired = expiryDate && expiryDate < new Date();
+        const isExpiringSoon = expiryDate && expiryDate < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        const expiryClass = isExpired ? 'text-danger' : (isExpiringSoon ? 'text-warning' : 'text-muted');
+        
+        // Highlight first batch (oldest expiry - FEFO recommended)
+        const isRecommended = index === 0;
+        const rowClass = isRecommended ? 'table-success' : '';
+        const recommendedBadge = isRecommended ? '<span class="badge badge-success"><i class="fa fa-star"></i> Recommended (FEFO)</span>' : '';
+        
+        tbody.append(`
+          <tr class="batch-selection-row ${rowClass}" data-batch-index="${index}" style="cursor: pointer;">
+            <td class="text-center">
+              <input type="radio" name="batchSelection" value="${index}" ${isRecommended ? 'checked' : ''}>
+              ${recommendedBadge}
+            </td>
+            <td>${batch.lotNumber || '-'}</td>
+            <td><code>${batch.barcode || '-'}</code></td>
+            <td class="text-center">
+              <span class="badge badge-${quantity > 0 ? 'success' : 'secondary'}">${quantity}</span>
+            </td>
+            <td class="text-right">${currencySymbol}${purchasePrice.toFixed(2)}</td>
+            <td class="text-right">${sellingPrice > 0 ? currencySymbol + sellingPrice.toFixed(2) : '-'}</td>
+            <td class="${expiryClass}">${expiryStr}</td>
+            <td>${batch.supplierName || batch.supplierId || '-'}</td>
+          </tr>
+        `);
+      });
+      
+      // Make rows clickable
+      $('.batch-selection-row').on('click', function(e) {
+        // Don't trigger if clicking on radio button
+        if ($(e.target).is('input[type="radio"]')) return;
+        
+        const row = $(this);
+        const radio = row.find('input[type="radio"]');
+        radio.prop('checked', true);
+        
+        // Update row highlighting
+        $('.batch-selection-row').removeClass('table-success');
+        row.addClass('table-success');
+        
+        // Enable confirm button
+        $('#confirmBatchSelection').prop('disabled', false);
+        
+        // Store selected batch
+        const batchIndex = parseInt(radio.val());
+        window.pendingBatchSelection = sortedBatches[batchIndex];
+      });
+      
+      // Radio button change handler
+      $('input[name="batchSelection"]').on('change', function() {
+        const row = $(this).closest('.batch-selection-row');
+        $('.batch-selection-row').removeClass('table-success');
+        row.addClass('table-success');
+        
+        // Enable confirm button
+        $('#confirmBatchSelection').prop('disabled', false);
+        
+        // Store selected batch
+        const batchIndex = parseInt($(this).val());
+        window.pendingBatchSelection = sortedBatches[batchIndex];
+      });
+      
+      // Set default selection (first batch - FEFO recommended)
+      if (sortedBatches.length > 0) {
+        window.pendingBatchSelection = sortedBatches[0];
+        $('#confirmBatchSelection').prop('disabled', false);
+      }
+      
+      // Confirm button handler
+      $('#confirmBatchSelection').off('click').on('click', function() {
+        if (!window.pendingBatchSelection || !window.pendingProductForBatch) {
+          return;
+        }
+        
+        const selectedBatch = window.pendingBatchSelection;
+        const product = window.pendingProductForBatch;
+        
+        // Close modal first
+        $('#batchSelectionModal').modal('hide');
+        
+        // Clear pending data
+        window.pendingBatchSelection = null;
+        const productId = product._id;
+        window.pendingProductForBatch = null;
+        
+        if (updateExisting) {
+          // Update existing cart item
+          updateCartItemWithBatch(productId, selectedBatch);
+        } else {
+          // Add batch info to product and add to cart (new item)
+          product.selectedBatch = selectedBatch;
+          product.batchNumber = selectedBatch.lotNumber || selectedBatch.barcode || product.batchNumber || '';
+          product.batchBarcode = selectedBatch.barcode || null;
+          product.batchExpiryDate = selectedBatch.expiryDate || null;
+          product.batchPurchasePrice = selectedBatch.purchasePrice || product.actualPrice || '';
+          // Update the main price field to use batch selling price if available
+          if (selectedBatch.sellingPrice && Number(selectedBatch.sellingPrice) > 0) {
+            product.price = String(selectedBatch.sellingPrice);
+          }
+          product.batchSellingPrice = selectedBatch.sellingPrice || product.price || '';
+          
+          console.log(`✅ User selected batch for ${product.name}:`, {
+            lotNumber: selectedBatch.lotNumber,
+            barcode: selectedBatch.barcode,
+            quantity: selectedBatch.quantity,
+            expiryDate: selectedBatch.expiryDate
+          });
+          
+          // Add to cart
+          $('body').addProductToCart(product);
+        }
+      });
+      
+      // Show modal with a small delay to ensure DOM is ready
+      setTimeout(() => {
+        try {
+          $('#batchSelectionModal').modal('show');
+          console.log('✅ Batch selection modal shown');
+        } catch (e) {
+          console.error('Error showing batch selection modal:', e);
+        }
+      }, 50);
+    }
+
     $.fn.addToCart = function (id, count, stock) {
       $.get(api + "inventory/product/" + id, function (product) {
-        if (isExpired(product.expirationDate)) {
+        const productExpiryRaw = getCanonicalExpiry(product);
+        if (isExpired(productExpiryRaw)) {
           notiflix.Report.failure(
             "Expired",
             `${product.name} is expired! Please restock.`,
@@ -1644,47 +2375,80 @@ if (auth == undefined) {
           );
         } else {
           if (count > 0) {
-            // Fetch batches for this product to select the best one using FEFO
+            // Add to cart immediately (non-blocking)
+            // Fetch batches in background and update if multiple batches found
+            $('body').addProductToCart(product);
+            
+            // Fetch batches in background (non-blocking)
             $.ajax({
               url: '/api/purchase-orders/batches/by-product/' + id,
               method: 'GET',
-              timeout: 5000,
+              timeout: 10000, // 10 second timeout (increased to match backend)
               success: (response) => {
-                let selectedBatch = null;
+                console.log(`✅ Batch fetch success for ${product.name}:`, {
+                  success: response.success,
+                  batchCount: response.batches ? response.batches.length : 0,
+                  hasBatches: !!response.batches,
+                  batchesType: Array.isArray(response.batches) ? 'array' : typeof response.batches,
+                  fullResponse: response
+                });
                 
                 if (response.success && response.batches && response.batches.length > 0) {
-                  // Select best batch using FEFO
-                  selectedBatch = selectBestBatch(response.batches, 1);
+                  // Deduplicate batches by lotNumber + barcode + productId
+                  const batchMap = new Map();
+                  response.batches.forEach(batch => {
+                    const key = `${batch.productId || ''}_${batch.lotNumber || ''}_${batch.barcode || ''}`;
+                    if (batchMap.has(key)) {
+                      // Merge duplicate: sum quantities, keep most recent updatedAt
+                      const existing = batchMap.get(key);
+                      existing.quantity = (Number(existing.quantity || 0) + Number(batch.quantity || 0));
+                      if (batch.updatedAt && (!existing.updatedAt || new Date(batch.updatedAt) > new Date(existing.updatedAt))) {
+                        existing.updatedAt = batch.updatedAt;
+                      }
+                    } else {
+                      batchMap.set(key, { ...batch });
+                    }
+                  });
                   
-                  if (selectedBatch) {
-                    console.log(`✅ Selected batch for ${product.name}:`, {
-                      lotNumber: selectedBatch.lotNumber,
-                      barcode: selectedBatch.barcode,
-                      quantity: selectedBatch.quantity,
-                      expiryDate: selectedBatch.expiryDate
-                    });
-                  } else {
-                    console.log(`⚠️ No available batches found for ${product.name}, using product master data`);
+                  // Filter available batches (with quantity > 0)
+                  const availableBatches = Array.from(batchMap.values()).filter(b => Number(b.quantity || 0) > 0);
+                  
+                  console.log(`📊 Available batches for ${product.name}:`, {
+                    total: response.batches.length,
+                    deduplicated: batchMap.size,
+                    available: availableBatches.length
+                  });
+                  
+                  if (availableBatches.length === 0) {
+                    console.log(`⚠️ No available batches found for ${product.name}`);
+                    return;
                   }
+                  
+                  // If multiple batches available, show selection dialog
+                  if (availableBatches.length > 1) {
+                    console.log(`📦 Multiple batches found for ${product.name} (${availableBatches.length} batches) - showing selection dialog`);
+                    // Use setTimeout to ensure modal can render
+                    setTimeout(() => {
+                      try {
+                        showBatchSelectionDialog(product, availableBatches, true); // true = update existing cart item
+                      } catch (e) {
+                        console.error('Error showing batch selection dialog:', e);
+                      }
+                    }, 100);
+                    return;
+                  } else if (availableBatches.length === 1) {
+                    // Only one batch available - auto-update cart item with batch info
+                    const selectedBatch = availableBatches[0];
+                    console.log(`✅ Auto-updating cart item with batch for ${product.name}`);
+                    updateCartItemWithBatch(product._id, selectedBatch);
+                  }
+                } else {
+                  console.log(`ℹ️ No batches returned for ${product.name}`);
                 }
-                
-                // Add batch info to product before adding to cart
-                if (selectedBatch) {
-                  product.selectedBatch = selectedBatch;
-                  product.batchNumber = selectedBatch.lotNumber || selectedBatch.barcode || product.batchNumber || '';
-                  product.batchBarcode = selectedBatch.barcode || null;
-                  product.batchExpiryDate = selectedBatch.expiryDate || null;
-                  product.batchPurchasePrice = selectedBatch.purchasePrice || product.actualPrice || '';
-                  product.batchSellingPrice = selectedBatch.sellingPrice || product.price || '';
-                }
-                
-                // Use arrow function to maintain correct 'this' context
-                $('body').addProductToCart(product);
               },
               error: (xhr, status, error) => {
-                // If batch fetch fails, continue with product master data
-                console.warn('Failed to fetch batches, using product master data:', error);
-                $('body').addProductToCart(product);
+                // Silently fail - product already in cart
+                console.warn('Background batch fetch failed for', product.name, error, 'Status:', status);
               }
             });
           } else {
@@ -1721,7 +2485,8 @@ if (auth == undefined) {
         processData: false,
         success: function (product) {
           $(".search-barcode-btn").html(searchBarCodeIcon);
-          const expired = isExpired(product.expirationDate);
+          const expiryRaw = getCanonicalExpiry(product);
+          const expired = isExpired(expiryRaw);
           if (product._id != undefined && product.quantity >= 1 && !expired) {
             $(this).addProductToCart(product);
             $("#searchBarCode").get(0).reset();
@@ -2321,17 +3086,22 @@ if (auth == undefined) {
             cart = [];
             $(this).renderTable(cart);
             holdOrder = 0;
-            notiflix.Report.success(
-              "Cleared!",
-              "All items have been removed.",
-              "Ok",
-            );
+            if (notiflix && notiflix.Notify) {
+              notiflix.Notify.success("Cart cleared");
+            }
           },
           "",
           diagOptions.options,
         );
       }
     };
+
+    // Focus on paymentText field when payment modal opens
+    $("#paymentModel").on('shown.bs.modal', function () {
+      setTimeout(function() {
+        $("#paymentText").focus();
+      }, 100);
+    });
 
     $("#payButton").on("click", function () {
       if (cart.length != 0) {
@@ -2446,35 +3216,44 @@ if (auth == undefined) {
         method = "POST";
       }
 
-      logo = path.join(img_path, validator.unescape(settings.img));
+      // Use web URL for logo in receipt
+      const logoUrl = validator.unescape(settings.img) ? `/uploads/${validator.unescape(settings.img)}` : '';
+      const logoHtml = logoUrl 
+        ? `<img style='max-width: 80px; max-height: 80px; object-fit: contain; display: block; margin: 0 auto;' src='${logoUrl}' alt='Store Logo' onerror='this.style.display=\"none\"' /><br>`
+        : '';
+
+      // Build address line
+      const addressLine = validator.unescape(settings.address_one) + 
+        (validator.unescape(settings.address_two) && validator.unescape(settings.address_two) != "" 
+          ? ', ' + validator.unescape(settings.address_two) 
+          : '');
+      
+      // Build contact/tax line
+      const contactParts = [];
+      if (validator.unescape(settings.contact) != "") {
+        contactParts.push("Tel: " + validator.unescape(settings.contact));
+      }
+      if (validator.unescape(settings.tax) != "") {
+        contactParts.push("Vat No: " + validator.unescape(settings.tax));
+      }
+      const contactLine = contactParts.length > 0 ? contactParts.join(", ") + "<br>" : "";
 
       receipt = `<div style="font-size: 10px">                            
         <p style="text-align: center;">
-        ${
-          false // Disable logo loading to prevent file:// protocol errors
-            ? `<img style='max-width: 50px' src='${logo}' /><br>`
-            : ``
-        }
+        ${logoHtml}
             <span style="font-size: 22px;">${validator.unescape(settings.store)}</span> <br>
-            ${validator.unescape(settings.address_one)} <br>
-            ${validator.unescape(settings.address_two)} <br>
-            ${
-              validator.unescape(settings.contact) != "" ? "Tel: " + validator.unescape(settings.contact) + "<br>" : ""
-            } 
-            ${validator.unescape(settings.tax) != "" ? "Vat No: " + validator.unescape(settings.tax) + "<br>" : ""} 
+            ${addressLine} <br>
+            ${contactLine}
         </p>
         <hr>
         <left>
-            <p>
-            Order No : ${orderNumber} <br>
-            Ref No : ${refNumber == "" ? orderNumber : _.escape(refNumber)} <br>
-            Customer : ${
-              customer == 0 ? "Walk in customer" : _.escape(customer.name)
-            } <br>
-            Cashier : ${user.fullname} <br>
-            Date : ${date}<br>
+            <p style="font-size: 9px; line-height: 1.2; margin: 5px 0;">
+            <strong>Order:</strong> ${orderNumber} | <strong>Ref:</strong> ${refNumber == "" ? orderNumber : _.escape(refNumber)}<br>
+            <strong>Customer:</strong> ${
+              customer == 0 ? "Walk-in" : _.escape(customer.name)
+            } | <strong>Cashier:</strong> ${user.fullname || 'N/A'}<br>
+            <strong>Date:</strong> ${date}
             </p>
-
         </left>
         <hr>
         <table width="90%">
@@ -2561,16 +3340,61 @@ if (auth == undefined) {
         user_id: user._id,
       };
 
+      const transactionUrl = api + "new";
+      console.log('🚀 Sending transaction to:', transactionUrl);
+      console.log('📦 Transaction data:', {
+        order: data.order,
+        items: data.items,
+        itemsCount: data.items?.length,
+        paid: data.paid,
+        total: data.total,
+        status: data.status
+      });
+      console.log('📋 Cart items structure:', data.items?.map(item => ({
+        id: item.id,
+        _id: item._id,
+        productId: item.productId,
+        product_name: item.product_name,
+        quantity: item.quantity,
+        qty: item.qty
+      })));
+
       $.ajax({
-        url: api + "new",
+        url: transactionUrl,
         type: method,
         data: JSON.stringify(data),
         contentType: "application/json; charset=utf-8",
         cache: false,
         processData: false,
-        success: function (data) {
+        success: function (response) {
+          console.log('✅ Transaction created successfully');
+          console.log('Response:', response);
+          
           cart = [];
-          receipt = DOMPurify.sanitize(receipt,{ ALLOW_UNKNOWN_PROTOCOLS: true });
+          // Check if receipt is valid before sanitizing
+          if (!receipt || typeof receipt !== 'string') {
+            console.error('❌ Receipt is not valid:', receipt);
+            notiflix.Report.failure(
+              "Receipt Error",
+              "Failed to generate receipt. Please try again.",
+              "Ok"
+            );
+            $(".loading").hide();
+            return;
+          }
+          
+          // Sanitize receipt but allow images
+          try {
+            receipt = DOMPurify.sanitize(receipt, { 
+              ALLOW_UNKNOWN_PROTOCOLS: true,
+              ALLOW_TAGS: ['div', 'p', 'span', 'br', 'hr', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'h5', 'h3', 'b', 'img'],
+              ALLOW_ATTR: ['style', 'src', 'alt', 'width', 'class', 'colspan', 'onerror']
+            });
+          } catch (sanitizeError) {
+            console.error('❌ Error sanitizing receipt:', sanitizeError);
+            // Continue with unsanitized receipt if sanitization fails
+          }
+          
           $("#viewTransaction").html("");
           $("#viewTransaction").html(receipt);
           
@@ -2601,7 +3425,13 @@ if (auth == undefined) {
           $("#confirmPayment").prop("disabled", false).html('<i class="fa fa-check"></i> Confirm Payment');
         },
 
-        error: function (data) {
+        error: function (xhr, status, error) {
+          console.error('❌ Transaction creation failed');
+          console.error('Status:', status);
+          console.error('Error:', error);
+          console.error('Response:', xhr.responseText);
+          console.error('Status code:', xhr.status);
+          
           $(".loading").hide();
           $("#dueModal").modal("toggle");
           
@@ -2993,8 +3823,10 @@ if (auth == undefined) {
       expiryField.removeAttr('placeholder');
       expiryField.removeClass('daterangepicker-input');
       
-      // Clear any existing value and ensure field is enabled
-      expiryField.val('');
+      // Clear any existing value only when adding a new product
+      if (!$("#product_id").val()) {
+        expiryField.val('');
+      }
       expiryField.prop('disabled', false);
       
       // Force re-initialization of the field
@@ -3073,6 +3905,8 @@ if (auth == undefined) {
       $(this).attr("action", api + "inventory/product");
       $(this).attr("method", "POST");
 
+      productBatchManager.updateHiddenFields();
+
       $(this).ajaxSubmit({
         contentType: "application/json",
         success: function (response) {
@@ -3089,11 +3923,16 @@ if (auth == undefined) {
 
           // Handle new detailed success messages
           if (resp && resp.success && resp.message) {
-            notiflix.Report.success("Success", resp.message, "Ok");
+      if (typeof notiflix !== 'undefined' && notiflix.Notify) {
+        notiflix.Notify.success(resp.message || "Product updated successfully.");
+      } else {
+        console.log('✅ Product updated successfully:', resp.message);
+      }
           }
 
           $("#saveProduct").get(0).reset();
           $("#current_img").text("");
+          productBatchManager.reset();
 
           loadProducts();
           diagOptions = {
@@ -3182,7 +4021,11 @@ if (auth == undefined) {
         success: function (data, textStatus, jqXHR) {
           // Handle new detailed success messages
           if (data && data.success && data.message) {
-            notiflix.Report.success("Success", data.message, "Ok");
+            if (typeof notiflix !== 'undefined' && notiflix.Notify) {
+              notiflix.Notify.success(data.message || "Product updated successfully.");
+            } else {
+              console.log('✅ Product updated successfully:', data.message);
+            }
           }
 
           $("#saveCategory").get(0).reset();
@@ -5172,7 +6015,7 @@ if (auth == undefined) {
         $("#product_price").val(product.price);
         $("#quantity").val(product.quantity);
         $("#barcode").val(product.barcode || product._id);
-        $("#expirationDate").val(product.expirationDate);
+        $("#expirationDate").val(normalizeDateForInput(product.expirationDate));
         $("#minStock").val(product.minStock || 1);
         $("#genericName").val(product.genericName || "");
         $("#batchNumber").val(product.batchNumber || "");
@@ -5276,6 +6119,9 @@ if (auth == undefined) {
           $("#stock").prop("checked", false);
       }
 
+        // Load batches for the product
+        loadProductBatchesForProduct(product);
+
         // Show the modal
       $("#newProduct").modal("show");
       };
@@ -5289,6 +6135,58 @@ if (auth == undefined) {
         // Still try to populate form with available data
         populateForm();
       });
+      function loadProductBatchesForProduct(productData) {
+        productBatchManager.reset();
+
+        if (!productData || !productData._id) {
+          return;
+        }
+
+        $("#productBatchRows")
+          .empty()
+          .append(
+            $("<tr/>").append(
+              $("<td/>", {
+                colspan: 8,
+                class: "text-center text-muted",
+                html: '<i class="fa fa-spinner fa-spin"></i> Loading batches...'
+              })
+            )
+          );
+
+        $.ajax({
+          url: api + "purchase-orders/batches/by-product/" + productData._id,
+          method: "GET",
+          timeout: 8000
+        })
+          .done(function (response) {
+            if (response && response.success && Array.isArray(response.batches) && response.batches.length) {
+              const normalized = response.batches.map(function (batch) {
+                return {
+                  lotNumber: batch.lotNumber || "",
+                  barcode: batch.barcode ? String(batch.barcode).trim() : "",
+                  quantity: Number(batch.quantity || 0),
+                  purchasePrice: typeof batch.purchasePrice !== "undefined" && batch.purchasePrice !== null
+                    ? Number(batch.purchasePrice)
+                    : "",
+                  sellingPrice: typeof batch.sellingPrice !== "undefined" && batch.sellingPrice !== null
+                    ? Number(batch.sellingPrice)
+                    : "",
+                  expiryDate: batch.expiryDate || "",
+                  supplierId: batch.supplierId || "",
+                  supplierName: batch.supplierName || ""
+                };
+              });
+              productBatchManager.setEntries(normalized);
+            } else {
+              productBatchManager.setEntries([]);
+            }
+          })
+          .fail(function (xhr, status) {
+            console.error("Failed to fetch product batches:", status, xhr && xhr.responseText);
+            productBatchManager.setEntries([]);
+          });
+      }
     };
 
     $("#userModal").on("hide.bs.modal", function () {
@@ -5377,7 +6275,7 @@ if (auth == undefined) {
         $.ajax({
             url: '/api/purchase-orders/batches/by-product/' + productId,
             method: 'GET',
-            timeout: 10000,
+            timeout: 10000, // 10 second timeout (increased from 5s to match backend)
             success: function (response) {
                 console.log('Batches response:', response);
                 
@@ -5392,7 +6290,32 @@ if (auth == undefined) {
                     return;
                 }
                 
-                const batches = response.batches;
+                let batches = response.batches;
+                
+                // Deduplicate batches by lotNumber + barcode + productId
+                // Group by lot number and sum quantities to avoid duplicates
+                const batchMap = new Map();
+                batches.forEach(batch => {
+                    const key = `${batch.productId || ''}_${batch.lotNumber || ''}_${batch.barcode || ''}`;
+                    if (batchMap.has(key)) {
+                        // Merge duplicate: sum quantities, keep most recent updatedAt
+                        const existing = batchMap.get(key);
+                        existing.quantity = (Number(existing.quantity || 0) + Number(batch.quantity || 0));
+                        if (batch.updatedAt && (!existing.updatedAt || new Date(batch.updatedAt) > new Date(existing.updatedAt))) {
+                            existing.updatedAt = batch.updatedAt;
+                        }
+                    } else {
+                        batchMap.set(key, { ...batch });
+                    }
+                });
+                
+                // Convert back to array and sort by expiry date
+                batches = Array.from(batchMap.values()).sort((a, b) => {
+                    const dateA = a.expiryDate ? new Date(a.expiryDate) : new Date('9999-12-31');
+                    const dateB = b.expiryDate ? new Date(b.expiryDate) : new Date('9999-12-31');
+                    return dateA - dateB;
+                });
+                
                 let totalQuantity = 0;
                 let totalValue = 0;
                 
@@ -5990,8 +6913,7 @@ if (auth == undefined) {
         });
 
         product.stockAlert = "";
-        const todayDate = moment();
-        const expiryDate = moment(product.expirationDate, DATE_FORMAT);
+        const expiryRawValue = getCanonicalExpiry(product);
 
         //show stock status indicator
         const stockStatus = getStockStatus(product.quantity,product.minStock);
@@ -6010,8 +6932,8 @@ if (auth == undefined) {
         }
         //calculate days to expiry
         product.expiryAlert = "";
-        if (!isExpired(expiryDate)) {
-          const diffDays = daysToExpire(expiryDate);
+        if (!isExpired(expiryRawValue)) {
+          const diffDays = daysToExpire(expiryRawValue);
 
           if (diffDays > 0 && diffDays <= 30) {
             var days_noun = diffDays > 1 ? "days" : "day";
@@ -6024,6 +6946,8 @@ if (auth == undefined) {
           product.expiryStatus = "Expired";
           product.expiryAlert = `<p class="text-danger"><small><i class="${icon}"></i> ${product.expiryStatus}</small></p>`;
         }
+
+        const expiryDisplay = formatExpiryForDisplay(expiryRawValue);
 
         if(product.img==="")
         {
@@ -6060,7 +6984,7 @@ if (auth == undefined) {
             <td>${(product.stock == 1 || (product.stock > 1 && product.quantity)) ? product.quantity : "N/A"}
             ${product.stockAlert}
             </td>
-            <td>${product.expirationDate}</td>
+            <td>${expiryDisplay}</td>
             <td class="nobr"><span class="btn-group"><button onClick="$(this).editProduct(${index})" class="btn btn-warning btn-sm" title="Edit Product"><i class="fa fa-edit"></i></button><button onClick="$(this).viewProductBatches(` +
               product._id + `, '${(product.name || '').replace(/'/g, "\\'")}')" class="btn btn-info btn-sm" title="View Batches"><i class="fa fa-cubes"></i></button><button onClick="$(this).deleteProduct(` +
               product._id +
@@ -6364,8 +7288,10 @@ if (auth == undefined) {
         }
         if (validator.unescape(settings.img) != "") {
           $("#logoname").hide();
+          // Use web URL for logo display
+          const logoUrl = `/uploads/${validator.unescape(settings.img)}`;
           $("#current_logo").html(
-            `<img src="${img_path + validator.unescape(settings.img)}" alt="">`,
+            `<img src="${logoUrl}" alt="Store Logo" style="max-width: 200px; max-height: 100px; object-fit: contain;">`,
           );
           $("#rmv_logo").show();
         }
@@ -6476,6 +7402,13 @@ function loadTransactions() {
     
     function processTransactions(transactions) {
     if (transactions.length > 0) {
+      // Sort transactions by date descending (newest first)
+      transactions.sort((a, b) => {
+        const dateA = a.date instanceof Date ? a.date : new Date(a.date);
+        const dateB = b.date instanceof Date ? b.date : new Date(b.date);
+        return dateB - dateA; // Descending order (newest first)
+      });
+
       $("#transaction_list").empty();
       if ($.fn.DataTable.isDataTable('#transactionList')) {
       $("#transactionList").DataTable().destroy();
@@ -6514,12 +7447,15 @@ function loadTransactions() {
           ? '<button class="btn btn-sm btn-outline-secondary" title="View Details"><i class="fa fa-eye"></i></button>'
           : '<button onClick="$(this).viewTransaction(' + index + ')" class="btn btn-sm btn-info" title="View Receipt"><i class="fa fa-eye"></i></button>';
 
+        const transDate = trans.date instanceof Date ? trans.date : new Date(trans.date);
+        const dateTimestamp = transDate.getTime();
+        
         transaction_list += `<tr class="transaction-row" data-status="${isPaid ? 'paid' : 'unpaid'}">
                                 <td><strong>${trans.order}</strong></td>
-                                <td class="nobr">
+                                <td class="nobr" data-order="${dateTimestamp}">
                                   <i class="fa fa-calendar text-muted"></i> 
-                                  ${moment(new Date(trans.date)).format("DD-MMM-YYYY")}<br>
-                                  <small class="text-muted">${moment(new Date(trans.date)).format("HH:mm:ss")}</small>
+                                  ${moment(transDate).format("DD-MMM-YYYY")}<br>
+                                  <small class="text-muted">${moment(transDate).format("HH:mm:ss")}</small>
                                 </td>
                                 <td class="text-right">
                                   <strong>${validator.unescape(settings.symbol)}${moneyFormat(trans.total)}</strong>
@@ -6630,7 +7566,8 @@ function loadTransactions() {
             columnDefs: [
               { targets: [2, 3, 4], className: 'text-right' },
               { targets: [5, 6, 8], className: 'text-center' },
-              { targets: [0], className: 'font-weight-bold' }
+              { targets: [0], className: 'font-weight-bold' },
+              { targets: [1], type: 'num' } // Use numeric type for date sorting via data-order attribute
             ]
           });
         }
@@ -6652,11 +7589,12 @@ function loadTransactions() {
             if (match) buy = parseFloat(match.purchasePrice);
           }
           if (isNaN(qty) || qty <= 0 || isNaN(buy) || buy <= 0) return;
-          if (isExpired(p.expirationDate)) {
+          const expiryRaw = getCanonicalExpiry(p);
+          if (isExpired(expiryRaw)) {
             lossTotalExpired += qty * buy;
             return;
           }
-          const days = daysToExpire(p.expirationDate);
+          const days = daysToExpire(expiryRaw);
           if (days > 0 && days <= 90) {
             lossPartialExpiry += 0.5 * qty * buy;
           }
@@ -6723,7 +7661,8 @@ function loadTransactions() {
         columnDefs: [
           { targets: [2, 3, 4], className: 'text-right' },
           { targets: [5, 6, 8], className: 'text-center' },
-          { targets: [0], className: 'font-weight-bold' }
+          { targets: [0], className: 'font-weight-bold' },
+          { targets: [1], type: 'num' } // Use numeric type for date sorting via data-order attribute
         ]
       });
       
@@ -6823,20 +7762,20 @@ function loadSoldProducts() {
           }
           if (isNaN(qty) || qty <= 0 || isNaN(buy) || buy <= 0) return;
 
-          let expired = isExpired(p.expirationDate);
-          if (!expired) {
-            const m = moment(p.expirationDate);
-            if (m.isValid() && m.isSameOrBefore(moment(), 'day')) expired = true;
+          const productExpiryRaw = getCanonicalExpiry(p);
+          const expiryMoment = productExpiryRaw ? moment(productExpiryRaw) : null;
+          let expired = isExpired(productExpiryRaw);
+          if (!expired && expiryMoment && expiryMoment.isValid() && expiryMoment.isSameOrBefore(moment(), 'day')) {
+            expired = true;
           }
           if (expired) {
             lossTotalExpired += qty * buy;
             return;
           }
 
-          let days = daysToExpire(p.expirationDate);
-          if (days === 0) {
-            const m = moment(p.expirationDate);
-            if (m.isValid() && m.isAfter(moment(), 'day')) days = m.diff(moment(), 'days');
+          let days = daysToExpire(productExpiryRaw);
+          if (days === 0 && expiryMoment && expiryMoment.isValid() && expiryMoment.isAfter(moment(), 'day')) {
+            days = expiryMoment.diff(moment(), 'days');
           }
           if (days > 0 && days <= 90) {
             // Partial expiry window (<= 3 months): provision 50% cost
@@ -6950,39 +7889,48 @@ $.fn.viewTransaction = function (index) {
             </tr>`;
   }
 
-    logo = path.join(img_path, validator.unescape(settings.img));
+    // Use web URL for logo in receipt
+    const logoUrl = validator.unescape(settings.img) ? `/uploads/${validator.unescape(settings.img)}` : '';
+    const logoHtml = logoUrl 
+      ? `<img style='max-width: 80px; max-height: 80px; object-fit: contain; display: block; margin: 0 auto;' src='${logoUrl}' alt='Store Logo' onerror='this.style.display=\"none\"' /><br>`
+      : '';
       
+      // Build address line
+      const addressLine2 = validator.unescape(settings.address_one) + 
+        (validator.unescape(settings.address_two) && validator.unescape(settings.address_two) != "" 
+          ? ', ' + validator.unescape(settings.address_two) 
+          : '');
+      
+      // Build contact/tax line
+      const contactParts2 = [];
+      if (validator.unescape(settings.contact) != "") {
+        contactParts2.push("Tel: " + validator.unescape(settings.contact));
+      }
+      if (validator.unescape(settings.tax) != "") {
+        contactParts2.push("Vat No: " + validator.unescape(settings.tax));
+      }
+      const contactLine2 = contactParts2.length > 0 ? contactParts2.join(", ") + "<br>" : "";
+
       receipt = `<div style="font-size: 10px">                            
         <p style="text-align: center;">
-        ${
-          false // Disable logo loading to prevent file:// protocol errors
-            ? `<img style='max-width: 50px' src='${logo}' /><br>`
-            : ``
-        }
+        ${logoHtml}
             <span style="font-size: 22px;">${validator.unescape(settings.store)}</span> <br>
-            ${validator.unescape(settings.address_one)} <br>
-            ${validator.unescape(settings.address_two)} <br>
-            ${
-              validator.unescape(settings.contact) != "" ? "Tel: " + validator.unescape(settings.contact) + "<br>" : ""
-            } 
-            ${validator.unescape(settings.tax) != "" ? "Vat No: " + validator.unescape(settings.tax) + "<br>" : ""} 
+            ${addressLine2} <br>
+            ${contactLine2}
     </p>
     <hr>
     <left>
-        <p>
-        Order No : ${orderNumber} <br>
-        Ref No : ${refNumber == "" ? orderNumber : _.escape(refNumber)} <br>
-        Customer : ${
+        <p style="font-size: 9px; line-height: 1.2; margin: 5px 0;">
+        <strong>Order:</strong> ${orderNumber} | <strong>Ref:</strong> ${refNumber == "" ? orderNumber : _.escape(refNumber)}<br>
+        <strong>Customer:</strong> ${
           allTransactions[index].customer == 0
-            ? "Walk in customer"
+            ? "Walk-in"
             : _.escape(allTransactions[index].customer.name)
-        } <br>
-        Cashier : ${allTransactions[index].user} <br>
-        Date : ${moment(allTransactions[index].date).format(
+        } | <strong>Cashier:</strong> ${allTransactions[index].user || 'N/A'}<br>
+        <strong>Date:</strong> ${moment(allTransactions[index].date).format(
           "DD MMM YYYY HH:mm:ss",
-        )}<br>
+        )}
         </p>
-
     </left>
     <hr>
     <table width="90%">
@@ -7039,7 +7987,17 @@ $.fn.viewTransaction = function (index) {
         </div>`;
 
         //prevent DOM XSS; allow windows paths in img src
-        receipt = DOMPurify.sanitize(receipt,{ ALLOW_UNKNOWN_PROTOCOLS: true });
+        // Sanitize receipt but allow images
+        try {
+          receipt = DOMPurify.sanitize(receipt, { 
+            ALLOW_UNKNOWN_PROTOCOLS: true,
+            ALLOW_TAGS: ['div', 'p', 'span', 'br', 'hr', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'h5', 'h3', 'b', 'img'],
+            ALLOW_ATTR: ['style', 'src', 'alt', 'width', 'class', 'colspan', 'onerror']
+          });
+        } catch (sanitizeError) {
+          console.error('❌ Error sanitizing receipt:', sanitizeError);
+          // Continue with unsanitized receipt if sanitization fails
+        }
 
   $("#viewTransaction").html("");
   $("#viewTransaction").html(receipt);

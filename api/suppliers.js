@@ -50,12 +50,12 @@ suppliersDB.ensureIndex({ fieldName: "code", unique: true });
  * @returns {void}
  */
 app.get("/", function (req, res) {
-    console.log("Suppliers API root route called - searching database...");
+    // Suppliers API root route called (log removed for cleaner output)
     
     // Force database reload to ensure fresh data
     try {
         suppliersDB.loadDatabase();
-        console.log("Database reloaded successfully");
+        // Database reloaded (log removed for cleaner output)
     } catch (reloadError) {
         console.log(`Database reload warning: ${reloadError.message}`);
     }
@@ -68,7 +68,7 @@ app.get("/", function (req, res) {
                 message: "An unexpected error occurred.",
             });
         } else {
-            console.log(`Found ${docs.length} suppliers:`, docs);
+            // Found suppliers (log removed for cleaner output)
             res.send(docs);
         }
     });
@@ -82,7 +82,7 @@ app.get("/", function (req, res) {
  * @returns {void}
  */
 app.get("/suppliers", function (req, res) {
-    console.log("Suppliers API called - searching database...");
+    // Suppliers API called (log removed for cleaner output)
     suppliersDB.find({}, function (err, docs) {
         if (err) {
             console.error("Database error:", err);
@@ -91,7 +91,7 @@ app.get("/suppliers", function (req, res) {
                 message: "An unexpected error occurred.",
             });
         } else {
-            console.log(`Found ${docs.length} suppliers:`, docs);
+            // Found suppliers (log removed for cleaner output)
             res.send(docs);
         }
     });
@@ -105,7 +105,7 @@ app.get("/suppliers", function (req, res) {
  * @returns {void}
  */
 app.get("/all", function (req, res) {
-    console.log("Suppliers /all API called - searching database...");
+    // Suppliers /all API called (log removed for cleaner output)
     suppliersDB.find({}, function (err, docs) {
         if (err) {
             console.error("Database error:", err);
@@ -114,7 +114,7 @@ app.get("/all", function (req, res) {
                 message: "An unexpected error occurred.",
             });
         } else {
-            console.log(`Found ${docs.length} suppliers:`, docs);
+            // Found suppliers (log removed for cleaner output)
             res.send(docs);
         }
     });

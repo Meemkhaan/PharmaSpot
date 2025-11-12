@@ -1,0 +1,782 @@
+/* Barcode input styling for better visibility */
+.barcode-input {
+    font-size: 16px !important;
+    padding: 12px 15px !important;
+    border: 2px solid #007bff !important;
+    box-shadow: 0 0 10px rgba(0, 123, 255, 0.3) !important;
+    transition: all 0.3s ease !important;
+}
+
+.barcode-input:focus {
+    border-color: #0056b3 !important;
+    box-shadow: 0 0 15px rgba(0, 123, 255, 0.5) !important;
+    outline: none !important;
+}
+
+.barcode-input::placeholder {
+    color: #6c757d !important;
+    font-style: italic !important;
+}
+
+/* Add a subtle animation to indicate it's always ready */
+.barcode-input:not(:focus) {
+    animation: barcode-pulse 2s infinite;
+}
+
+@keyframes barcode-pulse {
+    0% { box-shadow: 0 0 10px rgba(0, 123, 255, 0.3); }
+    50% { box-shadow: 0 0 15px rgba(0, 123, 255, 0.5); }
+    100% { box-shadow: 0 0 10px rgba(0, 123, 255, 0.3); }
+}
+
+/* Compact stats tiles in Transactions view */
+#totals > div, #extra_totals > div {
+    padding: 6px 8px !important;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 55px;
+    box-sizing: border-box;
+}
+#totals h5, #extra_totals h5 {
+    font-size: 12px;
+    margin: 0 0 4px 0;
+    line-height: 1.1;
+    white-space: nowrap;
+}
+#totals span[id$="_counter"], #extra_totals span[id$="_counter"] {
+    display: inline-block;
+    font-size: 16px;
+    line-height: 1.2;
+}
+
+/* Enhanced Transactions View Styles */
+.transaction-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border: 1px solid #e3e6f0;
+}
+
+.transaction-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.transaction-card .card-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-bottom: none;
+}
+
+.transaction-card .badge {
+    font-size: 0.75em;
+}
+
+.transaction-card .card-body {
+    padding: 1rem;
+}
+
+.transaction-card .card-footer {
+    background-color: #f8f9fa;
+    border-top: 1px solid #e3e6f0;
+    padding: 0.75rem;
+}
+
+.transaction-card .btn-group .btn {
+    font-size: 0.875rem;
+}
+
+/* Enhanced table styling */
+#transactionList thead th {
+    background: #1a1a1a !important;
+    color: #ffffff !important;
+    border: none !important;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.9rem;
+    letter-spacing: 1px;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    padding: 15px 12px !important;
+    border-bottom: 2px solid #333333 !important;
+}
+
+#transactionList thead th:hover {
+    background: #2d2d2d !important;
+    color: #ffffff !important;
+    transform: translateY(-1px);
+    transition: all 0.2s ease;
+}
+
+#transactionList thead th i {
+    color: #ffffff !important;
+    margin-right: 8px;
+}
+
+#transactionList tbody tr:hover {
+    background-color: #f8f9fa;
+    transform: scale(1.01);
+    transition: all 0.2s ease;
+}
+
+#transactionList tbody td {
+    vertical-align: middle;
+    border-color: #e3e6f0;
+}
+
+/* Enhanced filter section */
+.form-group label {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 0.5rem;
+}
+
+/* Compact filter styling */
+.form-group.mb-2 {
+    margin-bottom: 0.5rem !important;
+}
+
+.control-label.small {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+    color: #6c757d;
+}
+
+.input-sm, .form-control.input-sm {
+    height: 32px;
+    padding: 6px 10px;
+    font-size: 1rem;
+    line-height: 1.4;
+}
+
+.btn-group-sm > .btn, .btn-sm {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    line-height: 1.25;
+}
+
+.input-group-sm > .form-control {
+    height: 32px;
+    padding: 6px 10px;
+    font-size: 1rem;
+}
+
+.input-group-sm > .input-group-btn > .btn {
+    height: 32px;
+    padding: 6px 10px;
+}
+
+/* Button grouping improvements */
+.btn-group .btn-group {
+    margin-left: 5px;
+}
+
+.form-group.mb-1 {
+    margin-bottom: 0.25rem !important;
+}
+
+.form-group.mb-0 {
+    margin-bottom: 0 !important;
+}
+
+.btn-group .btn.active {
+    background-color: #007bff;
+    border-color: #007bff;
+    color: white;
+}
+#newProduct .modal-body {
+    padding: 15px 20px;
+}
+#newProduct .modal-dialog {
+    max-width: 900px;
+}
+.form-compact .form-group {
+    margin-bottom: 10px;
+}
+.form-compact label {
+    font-size: 1rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    color: #4a4a4a;
+}
+.form-compact .form-control {
+    height: 34px;
+    padding: 6px 10px;
+    font-size: 1rem;
+}
+.form-compact .input-group .form-control {
+    height: 34px;
+}
+.form-compact .input-group .input-group-btn > .btn {
+    height: 34px;
+    padding: 6px 10px;
+    font-size: 0.8rem;
+}
+.form-compact .form-text {
+    margin-top: 2px;
+    font-size: 0.75rem;
+}
+.form-compact .row.form-row {
+    margin-left: -10px;
+    margin-right: -10px;
+}
+.form-compact .row.form-row > [class*="col-"] {
+    padding-left: 10px;
+    padding-right: 10px;
+}
+.form-compact .compact-checkbox {
+    padding-top: 8px;
+}
+.form-compact .compact-checkbox label {
+    font-weight: 500;
+    font-size: 0.85rem;
+    text-transform: none;
+}
+.form-compact input[type="file"] {
+    height: auto;
+}
+
+/* Enhanced statistics cards */
+#totals .col-md-2, #extra_totals .col-md-2 {
+    transition: transform 0.2s ease;
+}
+
+#totals .col-md-2:hover, #extra_totals .col-md-2:hover {
+    transform: translateY(-2px);
+}
+
+/* Loading states */
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Search input styling */
+#transaction_search {
+    border-radius: 0.375rem;
+    border: 1px solid #ced4da;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+#transaction_search:focus {
+    border-color: #80bdff;
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+    .transaction-card {
+        margin-bottom: 1rem;
+    }
+    
+    #totals .col-md-2, #extra_totals .col-md-2 {
+        margin-bottom: 1rem;
+    }
+    
+    .btn-group {
+        width: 100%;
+    }
+    
+    .btn-group .btn {
+        flex: 1;
+    }
+}
+
+/* Enhanced form validation styles */
+.is-invalid {
+    border-color: #dc3545 !important;
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25) !important;
+}
+
+.is-valid {
+    border-color: #28a745 !important;
+    box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25) !important;
+}
+
+/* Enhanced button states */
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn-loading {
+    position: relative;
+    pointer-events: none;
+}
+
+.btn-loading::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    top: 50%;
+    left: 50%;
+    margin-left: -8px;
+    margin-top: -8px;
+    border: 2px solid transparent;
+    border-top-color: #ffffff;
+    border-radius: 50%;
+    animation: button-loading-spinner 1s ease infinite;
+}
+
+@keyframes button-loading-spinner {
+    from { transform: rotate(0turn); }
+    to { transform: rotate(1turn); }
+}
+
+/* Enhanced table interactions */
+.table tbody tr:hover {
+    background-color: #f8f9fa;
+    cursor: pointer;
+}
+
+.table tbody tr.selected {
+    background-color: #e3f2fd;
+}
+
+/* Enhanced modal animations */
+.modal.fade .modal-dialog {
+    transition: transform 0.3s ease-out;
+    transform: translate(0, -50px);
+}
+
+.modal.show .modal-dialog {
+    transform: none;
+}
+
+/* Enhanced form field focus */
+.form-control:focus {
+    border-color: #80bdff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+/* Enhanced notification styles */
+.notification-badge {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+/* Enhanced loading states */
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+/* Enhanced status badges */
+.badge-draft { background-color: #6c757d; }
+.badge-sent { background-color: #17a2b8; }
+.badge-partial { background-color: #ffc107; color: #212529; }
+.badge-completed { background-color: #28a745; }
+.badge-cancelled { background-color: #dc3545; }
+
+/* PO Notification Badge Styling */
+.po-btn-with-badge {
+    position: relative;
+    overflow: visible !important;
+}
+
+.po-notification-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    min-width: 20px;
+    height: 20px;
+    border-radius: 9px;
+    font-size: 11px;
+    font-weight: bold;
+    line-height: 18px;
+    text-align: center;
+    padding: 0 4px;
+    background-color: #dc3545 !important;
+    color: white !important;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    z-index: 1000;
+    animation: badgePulse 2s infinite;
+}
+
+@keyframes badgePulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+/* Ensure button group doesn't clip the badge */
+.btn-group.p_purchase_orders {
+    overflow: visible;
+}
+
+/* Make sure the badge is always visible */
+.po-notification-badge.show {
+    display: inline-block !important;
+}
+
+/* Enhanced Create PO Modal Styling */
+#createPOModal .modal-header {
+    border-bottom: 2px solid #007bff;
+}
+
+#createPOModal .form-control:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+#createPOModal .form-control-focus {
+    border-color: #007bff !important;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25) !important;
+}
+
+#createPOModal .progress-bar {
+    background-color: #007bff;
+}
+
+#createPOModal .table th {
+    background-color: #f8f9fa;
+    border-top: none;
+    font-weight: 600;
+}
+
+#createPOModal .table td {
+    vertical-align: middle;
+}
+
+#createPOModal .btn-success {
+    background-color: #28a745;
+    border-color: #28a745;
+    transition: all 0.3s ease;
+}
+
+#createPOModal .btn-success:hover {
+    background-color: #218838;
+    border-color: #1e7e34;
+    transform: translateY(-1px);
+}
+
+#createPOModal .alert-info {
+    background-color: #d1ecf1;
+    border-color: #bee5eb;
+    color: #0c5460;
+}
+
+/* Enhanced form field styling */
+#createPOModal .form-group label {
+    font-weight: 600;
+    color: #495057;
+}
+
+#createPOModal .form-text {
+    font-size: 0.875rem;
+}
+
+/* Loading states */
+#createPOModal .btn.loading {
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+#createPOModal .btn.loading i {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Enhanced Success/Error Banners */
+#poSuccessBanner, #poErrorBanner {
+    animation: slideInRight 0.5s ease-out;
+    border-left: 4px solid;
+}
+
+#poSuccessBanner {
+    border-left-color: #28a745;
+}
+
+#poErrorBanner {
+    border-left-color: #dc3545;
+}
+
+@keyframes slideInRight {
+    0% {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    100% {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Enhanced Card Styles for Steps */
+#createPOModal .card {
+    border: 1px solid #e9ecef;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+    margin-bottom: 1rem;
+}
+
+#createPOModal .card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+#createPOModal .card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+    font-weight: 600;
+    padding: 0.75rem 1rem;
+}
+
+#createPOModal .card-header h6 {
+    margin: 0;
+    color: #495057;
+    font-size: 0.95rem;
+}
+
+#createPOModal .card-body {
+    padding: 1rem;
+}
+
+/* Enhanced Totals Cards */
+#createPOModal .card.bg-light {
+    background-color: #f8f9fa !important;
+    border: 1px solid #dee2e6;
+}
+
+#createPOModal .card.bg-success {
+    background: linear-gradient(135deg, #28a745, #20c997) !important;
+    border: none;
+    color: white;
+}
+
+#createPOModal .card-body.text-center h4 {
+    margin: 0;
+    font-weight: 700;
+}
+
+#createPOModal .card-body.text-center h6 {
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+/* Form Progress Text */
+#formProgressText {
+    font-weight: 600;
+    color: #007bff;
+}
+
+/* Clear Form Button */
+#clearPOForm {
+    transition: all 0.3s ease;
+}
+
+#clearPOForm:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Elegant Modal Header */
+#createPOModal .modal-header {
+    background: #ffffff;
+    border-bottom: 2px solid #e9ecef;
+    padding: 1.5rem 2rem;
+    position: relative;
+}
+
+#createPOModal .modal-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #007bff, #28a745, #ffc107, #dc3545);
+}
+
+#createPOModal .modal-title-container {
+    flex: 1;
+}
+
+#createPOModal .modal-title {
+    font-weight: 700;
+    font-size: 1.5rem;
+    color: #2c3e50;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+#createPOModal .modal-title i {
+    color: #007bff;
+    font-size: 1.3rem;
+}
+
+#createPOModal .modal-title .title-text {
+    background: linear-gradient(135deg, #007bff, #28a745);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+#createPOModal .modal-subtitle {
+    color: #6c757d;
+    font-size: 0.95rem;
+    margin: 0.5rem 0 0 0;
+    font-weight: 400;
+    line-height: 1.4;
+}
+
+#createPOModal .modal-header .close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 50%;
+    width: 2.5rem;
+    height: 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6c757d;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    opacity: 1;
+}
+
+#createPOModal .modal-header .close:hover {
+    background: #e9ecef;
+    color: #495057;
+    transform: scale(1.1);
+}
+
+/* Enhanced Progress Bar */
+#createPOModal .progress-bar {
+    background: linear-gradient(90deg, #28a745, #20c997);
+}
+
+/* Enhanced Button Styles */
+#createPOModal .btn-success {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    border: none;
+    transition: all 0.3s ease;
+}
+
+#createPOModal .btn-success:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
+}
+
+/* Enhanced Alert Styles */
+#createPOModal .alert-info {
+    background-color: #e3f2fd;
+    border-color: #bbdefb;
+    color: #1565c0;
+}
+
+/* Minimal Quick Tips */
+.quick-tips-minimal {
+    padding: 0.5rem 0.75rem;
+    background-color: #f8f9fa;
+    border-left: 3px solid #007bff;
+    border-radius: 0 4px 4px 0;
+    font-size: 0.85rem;
+    line-height: 1.3;
+}
+
+.quick-tips-minimal i {
+    color: #007bff;
+    margin-right: 0.25rem;
+}
+
+.quick-tips-minimal strong {
+    color: #495057;
+}
+
+/* Enhanced Footer */
+#createPOModal .modal-footer {
+    background-color: #f8f9fa;
+    border-top: 1px solid #e9ecef;
+}
+
+#createPOModal .modal-footer .alert {
+    margin-bottom: 0;
+}
+
+/* Inline Button Layout - Force Single Line */
+#createPOModal .modal-footer .d-flex {
+    flex-wrap: nowrap !important;
+}
+
+#createPOModal .modal-footer .btn {
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    min-width: auto !important;
+    font-size: 0.875rem;
+    padding: 0.375rem 0.75rem;
+}
+
+#createPOModal .modal-footer .btn-sm {
+    font-size: 1.5rem;
+    padding: 0.25rem 0.5rem;
+}
+
+#createPOModal .modal-footer .btn-secondary {
+    margin-right: 0.5rem;
+}
+
+#createPOModal .modal-footer .btn-outline-primary {
+    margin-right: 0.5rem;
+}
+
+#createPOModal .modal-footer .btn-success {
+    font-weight: 600;
+}
+
+/* Force single line layout */
+#createPOModal .modal-footer > .d-flex {
+    min-height: 40px;
+    overflow: hidden;
+}
+
+#createPOModal .modal-footer .d-flex > div {
+    display: flex;
+    align-items: center;
+}
+
+#createPOModal .modal-footer .d-flex > div:first-child {
+    flex: 1;
+    justify-content: flex-start;
+}
+
+#createPOModal .modal-footer .d-flex > div:last-child {
+    flex: 0 0 auto;
+    justify-content: flex-end;
+}
+
+/* Enhanced notification styling */
+.alert-heading {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.alert .badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}

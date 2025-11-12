@@ -29,11 +29,7 @@ const validator = require("validator");
 const appName = process.env.APPNAME;
 const appData = process.env.APPDATA;
 
-console.log("Environment variables:");
-console.log("- APPNAME:", appName);
-console.log("- APPDATA:", appData);
-console.log("- Current working directory:", process.cwd());
-console.log("- __dirname:", __dirname);
+// Environment variables (log removed for cleaner output)
 const dbPath = path.join(
     appData,
     appName,
@@ -67,10 +63,7 @@ const csvUpload = multer({
   }
 });
 
-console.log("CSV upload configuration created:", csvUpload);
-console.log("CSV upload type:", typeof csvUpload);
-console.log("CSV upload single method:", typeof csvUpload.single);
-console.log("CSV upload single function:", csvUpload.single('csvFile'));
+// CSV upload configuration (log removed for cleaner output)
 
 
 app.use(bodyParser.json());
@@ -82,29 +75,61 @@ let inventoryDB = new Datastore({
     filename: dbPath,
     autoload: true,
     onload: function(err) {
-        if (err) {
+                if (err) {
             console.error('Inventory database load error:', err);
-            // If ENOENT error (missing temp file), database will create a new file on first write
-            // Mark as ready anyway to allow operations to proceed
             if (err.code === 'ENOENT') {
                 console.log('Database file missing - will be created on first write');
+                inventoryDBReady = true;
+            } else {
+                // Other error (like rename error) - try to reload manually
+                console.warn('⚠️ Inventory DB autoload failed, attempting manual reload...');
+                const fs = require('fs');
+                if (fs.existsSync(dbPath)) {
+                    console.log('   Database file exists, forcing reload...');
+                    inventoryDB.loadDatabase(function(reloadErr) {
+                        if (reloadErr) {
+                            console.error('   Manual reload failed:', reloadErr);
+                            // Mark as ready anyway - queries will work or fail gracefully
+                            inventoryDBReady = true;
+                        } else {
+                            console.log('   ✅ Manual reload successful');
+                            inventoryDBReady = true;
+                        }
+                    });
+                } else {
+                    console.log('   Database file does not exist - will be created on first write');
+                    inventoryDBReady = true;
+                }
             }
-            inventoryDBReady = true;
-        } else {
-            console.log('Inventory database loaded successfully');
+                } else {
+            if (process.env.NODE_ENV === 'dev') {
+                console.log('Inventory database loaded successfully');
+            }
             inventoryDBReady = true;
         }
     }
 });
 
-console.log("Inventory database path:", dbPath);
-console.log("Inventory database loaded:", inventoryDB ? "Yes" : "No");
-console.log("NeDB version check - typeof inventoryDB:", typeof inventoryDB);
-console.log("NeDB constructor name:", inventoryDB.constructor.name);
-console.log("Available NeDB methods:", Object.getOwnPropertyNames(Object.getPrototypeOf(inventoryDB)).filter(name => typeof inventoryDB[name] === 'function'));
-console.log("Direct properties:", Object.keys(inventoryDB));
-console.log("remove method exists:", typeof inventoryDB.remove === 'function');
-console.log("deleteOne method exists:", typeof inventoryDB.deleteOne === 'function');
+// Verify database is actually loaded after a delay
+setTimeout(() => {
+    const fs = require('fs');
+    if (fs.existsSync(dbPath) && !inventoryDBReady) {
+        console.warn('⚠️ Inventory DB file exists but not marked ready - forcing load...');
+        inventoryDB.loadDatabase(function(loadErr) {
+            if (!loadErr) {
+                if (process.env.NODE_ENV === 'dev') {
+                    console.log('✅ Inventory database manually loaded successfully');
+                }
+                inventoryDBReady = true;
+            } else {
+                console.error('❌ Manual inventory DB load failed:', loadErr);
+                inventoryDBReady = true; // Mark as ready anyway to allow queries
+            }
+        });
+    }
+}, 500);
+
+// Database initialization (log removed for cleaner output)
 
 // Ensure database is ready after a short delay (for autoload completion)
 setTimeout(() => {
@@ -112,7 +137,7 @@ setTimeout(() => {
         console.log('Database autoload taking longer than expected - marking as ready');
         inventoryDBReady = true;
     }
-    inventoryDB.ensureIndex({ fieldName: "_id", unique: true });
+inventoryDB.ensureIndex({ fieldName: "_id", unique: true });
 }, 1000);
 
 // Batches database for lot-level inventory tracking
@@ -120,6 +145,265 @@ const inventoryBatchesDB = new Datastore({
     filename: path.join(appData, appName, "server", "databases", "inventory-batches.db"),
     autoload: true,
 });
+
+function parseBatchesPayload(rawBatches) {
+    let batchesArray = [];
+
+    if (Array.isArray(rawBatches)) {
+        batchesArray = rawBatches;
+    } else if (typeof rawBatches === 'string' && rawBatches.trim()) {
+        try {
+            batchesArray = JSON.parse(rawBatches);
+        } catch (e) {
+            console.warn('Failed to parse batches payload JSON:', e.message);
+        }
+    }
+
+    const normalized = [];
+    batchesArray.forEach((entry) => {
+        if (!entry) {
+            return;
+        }
+
+        const lotNumber = entry.lotNumber ? validator.escape(String(entry.lotNumber).trim()) : "";
+        const barcodeRaw = entry.barcode !== null && entry.barcode !== undefined
+            ? String(entry.barcode).trim()
+            : "";
+        let barcodeNumeric = null;
+        if (barcodeRaw) {
+            const parsedBarcode = Number(barcodeRaw);
+            if (!Number.isNaN(parsedBarcode)) {
+                barcodeNumeric = parsedBarcode;
+            }
+        }
+
+        let quantity = Number(entry.quantity || 0);
+        if (Number.isNaN(quantity) || quantity < 0) {
+            quantity = 0;
+        }
+
+        let purchasePrice = null;
+        if (entry.purchasePrice !== "" && entry.purchasePrice !== null && entry.purchasePrice !== undefined) {
+            const parsedPurchase = Number(entry.purchasePrice);
+            if (!Number.isNaN(parsedPurchase) && parsedPurchase >= 0) {
+                purchasePrice = parsedPurchase;
+            }
+        }
+
+        let sellingPrice = null;
+        if (entry.sellingPrice !== "" && entry.sellingPrice !== null && entry.sellingPrice !== undefined) {
+            const parsedSelling = Number(entry.sellingPrice);
+            if (!Number.isNaN(parsedSelling) && parsedSelling >= 0) {
+                sellingPrice = parsedSelling;
+            }
+        }
+
+        let expiryDate = "";
+        if (entry.expiryDate) {
+            const parsedDate = new Date(entry.expiryDate);
+            if (!Number.isNaN(parsedDate.getTime())) {
+                expiryDate = parsedDate.toISOString().slice(0, 10);
+            }
+        }
+
+        normalized.push({
+            lotNumber,
+            barcodeRaw,
+            barcodeNumeric,
+            quantity,
+            purchasePrice,
+            sellingPrice,
+            expiryDate,
+            supplierId: entry.supplierId || entry.supplierID || null,
+            supplierName: entry.supplierName || ""
+        });
+    });
+
+    const totalQuantity = normalized.reduce((sum, batch) => sum + Number(batch.quantity || 0), 0);
+
+    const earliestExpiryDate = normalized
+        .map((batch) => batch.expiryDate)
+        .filter(Boolean)
+        .map((value) => new Date(value))
+        .filter((date) => !Number.isNaN(date.getTime()))
+        .sort((a, b) => a - b)[0];
+
+    const earliestExpiry = earliestExpiryDate ? earliestExpiryDate.toISOString().slice(0, 10) : "";
+
+    const primaryEntry = normalized.length ? normalized[0] : null;
+
+    const barcodeRawList = normalized
+        .map((batch) => batch.barcodeRaw)
+        .filter((value) => !!value);
+
+    const barcodeNumericList = normalized
+        .map((batch) => batch.barcodeNumeric)
+        .filter((value) => value !== null && !Number.isNaN(value));
+
+    return {
+        entries: normalized,
+        totalQuantity,
+        earliestExpiry,
+        primaryEntry,
+        barcodes: {
+            raw: barcodeRawList,
+            numeric: barcodeNumericList
+        }
+    };
+}
+
+function syncProductBatches(productId, productName, supplierName, batches, callback) {
+    if (!Array.isArray(batches)) {
+        if (typeof callback === 'function') {
+            callback();
+        }
+        return;
+    }
+
+    inventoryBatchesDB.remove({ productId: productId }, { multi: true }, function (removeErr) {
+        if (removeErr) {
+            console.error('Failed to clear existing batches for product:', productId, removeErr);
+            if (typeof callback === 'function') {
+                callback(removeErr);
+            }
+            return;
+        }
+
+        if (batches.length === 0) {
+            if (typeof callback === 'function') {
+                callback();
+            }
+            return;
+        }
+
+        async.eachSeries(
+            batches,
+            function (entry, next) {
+                if (!entry) {
+                    next();
+                    return;
+                }
+
+                const barcodeValue = entry.barcodeNumeric !== null ? entry.barcodeNumeric : (entry.barcodeRaw || null);
+
+                const batchQuery = {
+                    productId: productId,
+                    lotNumber: entry.lotNumber || "",
+                    barcode: barcodeValue
+                };
+
+                const payload = {
+                    productId: productId,
+                    productName: productName || "",
+                    lotNumber: entry.lotNumber || "",
+                    barcode: barcodeValue,
+                    barcodeRaw: entry.barcodeRaw || "",
+                    quantity: Number(entry.quantity || 0),
+                    purchasePrice: entry.purchasePrice !== null ? Number(entry.purchasePrice) : null,
+                    sellingPrice: entry.sellingPrice !== null ? Number(entry.sellingPrice) : null,
+                    expiryDate: entry.expiryDate || "",
+                    supplierId: entry.supplierId || null,
+                    supplierName: entry.supplierName || supplierName || "",
+                    updatedAt: new Date()
+                };
+
+                inventoryBatchesDB.update(
+                    batchQuery,
+                    { $set: payload },
+                    { upsert: true },
+                    function (err) {
+                        if (err) {
+                            console.error('Failed to upsert batch for product:', productId, payload, err);
+                        }
+                        next(err);
+                    }
+                );
+            },
+            function (err) {
+                if (typeof callback === 'function') {
+                    callback(err);
+                }
+            }
+        );
+    });
+}
+
+function validateBarcodesUnique(barcodes, skipProductId, callback) {
+    if (!Array.isArray(barcodes) || barcodes.length === 0) {
+        callback();
+        return;
+    }
+
+    const uniqueBarcodes = [...new Set(
+        barcodes
+            .map((value) => Number(value))
+            .filter((value) => !Number.isNaN(value))
+    )];
+
+    if (!uniqueBarcodes.length) {
+        callback();
+        return;
+    }
+
+    async.eachSeries(
+        uniqueBarcodes,
+        function (barcodeValue, next) {
+            inventoryDB.findOne({ barcode: barcodeValue }, function (err, existing) {
+                if (err) {
+                    next(err);
+                    return;
+                }
+
+                if (existing && (!skipProductId || existing._id !== skipProductId)) {
+                    const duplicateError = new Error("duplicate_barcode");
+                    duplicateError.duplicateId = existing._id;
+                    duplicateError.barcode = barcodeValue;
+                    return next(duplicateError);
+                }
+
+                next();
+            });
+        },
+        callback
+    );
+}
+
+function applyBatchPayloadToProduct(product, batchPayload) {
+    if (!batchPayload || !Array.isArray(batchPayload.entries) || batchPayload.entries.length === 0) {
+        product.batchSummary = {
+            totalQuantity: Number(product.quantity || 0),
+            batchCount: 0,
+            earliestExpiry: null
+        };
+        product.additionalBarcodes = [];
+        return;
+    }
+
+    const primaryEntry = batchPayload.primaryEntry;
+
+    product.quantity = batchPayload.totalQuantity;
+    product.batchSummary = {
+        totalQuantity: batchPayload.totalQuantity,
+        batchCount: batchPayload.entries.length,
+        earliestExpiry: batchPayload.earliestExpiry || null
+    };
+
+    if (primaryEntry && primaryEntry.lotNumber) {
+        product.batchNumber = primaryEntry.lotNumber;
+    }
+
+    if (primaryEntry && primaryEntry.barcodeNumeric !== null) {
+        product.barcode = primaryEntry.barcodeNumeric;
+    } else if (primaryEntry && primaryEntry.barcodeRaw) {
+        product.barcode = primaryEntry.barcodeRaw;
+    }
+
+    if (batchPayload.earliestExpiry) {
+        product.expirationDate = batchPayload.earliestExpiry;
+    }
+
+    product.additionalBarcodes = batchPayload.barcodes.raw.slice(1);
+}
 
 /**
  * GET endpoint: Get the welcome message for the Inventory API.
@@ -140,7 +424,7 @@ app.get("/", function (req, res) {
  * @returns {void}
  */
 app.get("/products", function (req, res) {
-    console.log("Products endpoint called - fetching all products...");
+    // Products endpoint called (log removed for cleaner output)
     
     // Response guard to prevent duplicate responses
     let responseSent = false;
@@ -164,39 +448,63 @@ app.get("/products", function (req, res) {
             console.warn('⏱️ Products endpoint timeout - returning empty array');
             sendResponse([], 200);
         }
-    }, 8000); // 8 second timeout
+    }, 5000); // Reduced to 5 second timeout
     
-    // Wait for database to be ready (max 3 seconds)
+    // Check if database file exists
+    const fs = require('fs');
+    const dbExists = fs.existsSync(dbPath);
+    
+    // Don't wait too long - proceed quickly
     const waitForDB = (attempts = 0) => {
-        if (inventoryDBReady || attempts >= 30) {
+        // If DB is ready OR we've waited enough (500ms max), proceed
+        if (inventoryDBReady || attempts >= 5) {
             const queryStartTime = Date.now();
-            console.log(`Executing products query (DB ready: ${inventoryDBReady}, attempts: ${attempts})`);
+            // Executing products query (log removed for cleaner output)
             
-            inventoryDB.find({}, function (err, products) {
-                const queryDuration = Date.now() - queryStartTime;
-                console.log(`Products query completed in ${queryDuration}ms`);
-                
-                clearTimeout(fallbackTimer);
-                
-                if (responseSent) {
-                    console.warn('⚠️ Response already sent via timeout, ignoring query result');
-                    return;
-                }
-                
-                if (err) {
-                    console.error("Error fetching products:", err);
-                    sendResponse({
-                        error: "Internal Server Error",
-                        message: "Failed to fetch products."
-                    }, 500);
-                    return;
-                }
-                
-                console.log(`Found ${products.length} products`);
-                sendResponse(products);
-            });
+            // If DB file exists but not ready, try to load it
+            if (dbExists && !inventoryDBReady && attempts >= 5) {
+                console.warn('⚠️ DB file exists but not ready - attempting quick load...');
+                inventoryDB.loadDatabase(function(quickLoadErr) {
+                    if (!quickLoadErr) {
+                        console.log('✅ Quick load successful');
+                        inventoryDBReady = true;
+                    }
+                    // Proceed with query anyway
+                    executeQuery();
+                });
+            } else {
+                executeQuery();
+            }
+            
+            function executeQuery() {
+                inventoryDB.find({})
+                    .limit(10000) // Add limit to prevent huge queries
+                    .exec(function (err, products) {
+                        const queryDuration = Date.now() - queryStartTime;
+                        // Products query completed (log removed for cleaner output)
+                        
+                        clearTimeout(fallbackTimer);
+                        
+                        if (responseSent) {
+                            console.warn('⚠️ Response already sent via timeout, ignoring query result');
+                            return;
+                        }
+                        
+                        if (err) {
+                            console.error("Error fetching products:", err);
+                            sendResponse({
+                                error: "Internal Server Error",
+                                message: "Failed to fetch products."
+                            }, 500);
+                            return;
+                        }
+                        
+                        // Found products (log removed for cleaner output)
+                        sendResponse(products || []);
+                    });
+            }
         } else {
-            // Wait 100ms before retrying
+            // Wait 100ms before retrying (max 500ms total)
             setTimeout(() => waitForDB(attempts + 1), 100);
         }
     };
@@ -209,84 +517,161 @@ app.get("/products", function (req, res) {
  * Accepts multipart/form-data (for optional image upload) and standard fields.
  */
 app.post("/product", function (req, res) {
-    // Use multer to handle multipart form (image + fields)
     upload(req, res, function (err) {
+        if (err) {
+            console.error("Upload error:", err);
+            return res.status(400).json({
+                error: "Upload Error",
+                message: err.message || "Failed to upload file",
+            });
+        }
+
         try {
-            if (err) {
-                console.error("Upload error:", err);
-                return res.status(400).json({
-                    error: "Upload Error",
-                    message: err.message || "Failed to upload file",
-                });
-            }
-
-            // req.body contains the text fields, req.file contains the uploaded file
             const data = req.body || {};
+            const isUpdate = data.id && String(data.id).trim() !== "";
+            const parsedBatches = parseBatchesPayload(data.batches);
+            const primaryBatch = parsedBatches.primaryEntry;
 
-            // Basic validation
-            if (!data.name || !data.barcode || !data.price) {
+            const rawName = data.name ? data.name.toString().trim() : "";
+            if (!rawName) {
                 return res.status(400).json({
                     error: "Validation Error",
-                    message: "Name, Barcode and Selling Price are required.",
+                    message: "Product name is required.",
                 });
             }
 
+            const resolvedBarcode = data.barcode && String(data.barcode).trim()
+                ? String(data.barcode).trim()
+                : (primaryBatch && primaryBatch.barcodeRaw ? primaryBatch.barcodeRaw : "");
+
+            if (!resolvedBarcode) {
+                return res.status(400).json({
+                    error: "Validation Error",
+                    message: "A primary barcode is required. Provide one or add a batch with a barcode.",
+                });
+            }
+
+            let sellingPriceInput = typeof data.price !== "undefined" && data.price !== ""
+                ? data.price
+                : (primaryBatch && primaryBatch.sellingPrice !== null ? primaryBatch.sellingPrice : "");
+
+            if (sellingPriceInput === "" || sellingPriceInput === null || Number.isNaN(Number(sellingPriceInput))) {
+                return res.status(400).json({
+                    error: "Validation Error",
+                    message: "Selling Price is required.",
+                });
+            }
+
+            let purchasePriceInput = typeof data.actualPrice !== "undefined" && data.actualPrice !== ""
+                ? data.actualPrice
+                : (primaryBatch && primaryBatch.purchasePrice !== null ? primaryBatch.purchasePrice : "");
+
+            let imageName = "";
+            if (data.img && validator.escape(data.img) !== "") {
+                imageName = sanitizeFilename(data.img);
+            }
+            if (req.file && req.file.filename) {
+                imageName = sanitizeFilename(req.file.filename);
+            }
+
+            if (validator.escape(data.remove || "") === "1") {
+                try {
+                    if (!req.file && imageName) {
+                        const imgPath = path.join(appData, appName, "uploads", imageName);
+                        if (fs.existsSync(imgPath)) {
+                            fs.unlinkSync(imgPath);
+                        }
+                    }
+                    imageName = "";
+                } catch (removeErr) {
+                    console.error("Failed to remove existing image:", removeErr);
+                }
+            }
+
+            const productId = isUpdate
+                ? parseInt(validator.escape(data.id), 10)
+                : Math.floor(Date.now() / 1000) + Math.floor(Math.random() * 1000);
+
             const product = {
-                _id: Math.floor(Date.now() / 1000) + Math.floor(Math.random() * 1000),
-                barcode: parseInt(data.barcode),
-                name: validator.escape(data.name.toString()),
-                price: validator.escape((data.price || "").toString()),
-                actualPrice: validator.escape((data.actualPrice || "").toString()),
+                _id: productId,
+                barcode: Number(resolvedBarcode),
+                name: validator.escape(rawName),
+                price: validator.escape(String(sellingPriceInput)),
+                actualPrice: purchasePriceInput === "" ? "" : validator.escape(String(purchasePriceInput)),
                 genericName: validator.escape((data.genericName || "").toString()),
                 manufacturer: validator.escape((data.manufacturer || "").toString()),
                 supplier: validator.escape((data.supplier || "").toString()),
                 batchNumber: validator.escape((data.batchNumber || "").toString()),
-                category: data.category ? parseInt(data.category) || data.category : "",
-                quantity: parseInt(data.quantity) || 0,
-                minStock: parseInt(data.minStock) || 1,
-                stock: data.stock ? 0 : 1, // checkbox named 'stock' to disable stock check; invert to match existing schema
-                img: req.file ? req.file.filename : (data.img || ""),
+                category: data.category ? (parseInt(data.category, 10) || data.category) : "",
+                quantity: data.quantity ? parseInt(data.quantity, 10) || 0 : 0,
+                minStock: data.minStock ? parseInt(data.minStock, 10) || 1 : 1,
+                stock: data.stock ? 0 : 1,
+                img: imageName,
                 expirationDate: data.expirationDate || "",
-                // Supplier linking fields
-                designatedSupplierId: data.designatedSupplierId ? parseInt(data.designatedSupplierId) : null,
+                designatedSupplierId: data.designatedSupplierId ? parseInt(data.designatedSupplierId, 10) : null,
                 supplierAssignmentDate: data.designatedSupplierId ? new Date() : null,
                 supplierAssignmentMethod: data.supplierAssignmentMethod || 'manual',
-                createdAt: new Date(),
-                updatedAt: new Date(),
+                reorderPoint: data.reorderPoint ? parseInt(data.reorderPoint, 10) || parseInt(data.minStock || 5, 10) : parseInt(data.minStock || 5, 10),
+                reorderQuantity: data.reorderQuantity ? parseInt(data.reorderQuantity, 10) || 10 : 10,
+                supplier_id: validator.escape((data.supplier_id || "").toString()),
+                expiryAlertDays: data.expiryAlertDays ? parseInt(data.expiryAlertDays, 10) || 30 : 30,
+                createdAt: isUpdate ? undefined : new Date(),
+                updatedAt: new Date()
             };
 
-            // Duplicate checks: by barcode and by (name + batchNumber + manufacturer)
-            inventoryDB.findOne({ barcode: product.barcode }, function (errFind, existingByBarcode) {
-                if (errFind) {
-                    console.error("Database error on duplicate check:", errFind);
+            applyBatchPayloadToProduct(product, parsedBatches);
+
+            if (Number.isNaN(Number(product.barcode))) {
+                product.barcode = resolvedBarcode;
+            }
+
+            const barcodesToValidate = [];
+            const numericPrimary = Number(product.barcode);
+            if (!Number.isNaN(numericPrimary)) {
+                barcodesToValidate.push(numericPrimary);
+            }
+            barcodesToValidate.push(...parsedBatches.barcodes.numeric);
+
+            const duplicateCompositeQuery = {
+                name: product.name,
+                batchNumber: product.batchNumber,
+                manufacturer: product.manufacturer
+            };
+
+            inventoryDB.findOne(duplicateCompositeQuery, function (errDup, existingByCombo) {
+                if (errDup) {
+                    console.error("Database error on combo duplicate check:", errDup);
                     return res.status(500).json({
                         error: "Internal Server Error",
-                        message: "Failed to save product (duplicate check).",
+                        message: "Failed to save product (duplicate combo check).",
                     });
                 }
 
-                if (existingByBarcode) {
-                    return res.json({ status: 'duplicate_barcode', message: 'Product with this barcode already exists.' });
+                if (existingByCombo && (!isUpdate || existingByCombo._id !== product._id)) {
+                    return res.json({
+                        status: 'duplicate_product',
+                        id: existingByCombo._id,
+                        message: 'A product with the same Name, Batch Number and Manufacturer already exists.'
+                    });
                 }
 
-                inventoryDB.findOne({
-                    name: product.name,
-                    batchNumber: product.batchNumber,
-                    manufacturer: product.manufacturer,
-                }, function (errDup, existingByCombo) {
-                    if (errDup) {
-                        console.error("Database error on combo duplicate check:", errDup);
+                validateBarcodesUnique(barcodesToValidate, isUpdate ? product._id : null, function (duplicateErr) {
+                    if (duplicateErr) {
+                        if (duplicateErr.message === "duplicate_barcode") {
+                            return res.json({
+                                status: "duplicate_barcode",
+                                id: duplicateErr.duplicateId,
+                                barcode: duplicateErr.barcode
+                            });
+                        }
+                        console.error("Barcode validation error:", duplicateErr);
                         return res.status(500).json({
                             error: "Internal Server Error",
-                            message: "Failed to save product (duplicate combo check).",
+                            message: "Failed to validate product barcodes."
                         });
                     }
 
-                    if (existingByCombo) {
-                        return res.json({ status: 'duplicate_product', message: 'A product with the same Name, Batch Number and Manufacturer already exists.' });
-                    }
-
-                    // Insert the product
+                if (!isUpdate) {
                     inventoryDB.insert(product, function (errInsert, saved) {
                         if (errInsert) {
                             console.error("Insert error:", errInsert);
@@ -296,8 +681,71 @@ app.post("/product", function (req, res) {
                             });
                         }
 
-                        return res.json({ success: true, message: 'Product saved successfully.', data: saved });
+                        syncProductBatches(saved._id, saved.name, saved.supplier, parsedBatches.entries, function (batchErr) {
+                            if (batchErr) {
+                                console.error("Batch sync error (create):", batchErr);
+                            }
+
+                            return res.json({
+                                success: true,
+                                message: 'Product saved successfully.',
+                                data: saved,
+                                batchWarning: batchErr ? batchErr.message : null
+                            });
+                        });
                     });
+                } else {
+                    inventoryDB.findOne({ _id: product._id }, function (findErr, existingProduct) {
+                        if (findErr) {
+                            console.error("Product lookup error:", findErr);
+                            return res.status(500).json({
+                                error: "Internal Server Error",
+                                message: "Failed to update product.",
+                            });
+                        }
+
+                        if (!existingProduct) {
+                            return res.status(404).json({
+                                error: "Not Found",
+                                message: "Product not found."
+                            });
+                        }
+
+                        if (existingProduct.createdAt) {
+                            product.createdAt = existingProduct.createdAt;
+                        } else if (!product.createdAt) {
+                            product.createdAt = new Date();
+                        }
+
+                        inventoryDB.update(
+                            { _id: product._id },
+                            product,
+                            {},
+                            function (errUpdate) {
+                                if (errUpdate) {
+                                    console.error("Update error:", errUpdate);
+                                    return res.status(500).json({
+                                        error: "Internal Server Error",
+                                        message: "Failed to update product.",
+                                    });
+                                }
+
+                                syncProductBatches(product._id, product.name, product.supplier, parsedBatches.entries, function (batchErr) {
+                                    if (batchErr) {
+                                        console.error("Batch sync error (update):", batchErr);
+                                    }
+
+                                    return res.json({
+                                        success: true,
+                                        message: `Product "${product.name}" updated successfully!`,
+                                        product: product,
+                                        batchWarning: batchErr ? batchErr.message : null
+                                    });
+                                });
+                            }
+                        );
+                    });
+                }
                 });
             });
         } catch (e) {
@@ -1720,158 +2168,368 @@ app.post("/product/sku", function (req, res) {
  * @returns {void}
  */
 app.decrementInventory = function (products) {
-    console.log('=== DECREMENT INVENTORY CALLED ===');
-    console.log('Products to decrement:', products);
-    
-    if (!products || products.length === 0) {
-        console.log('No products to decrement');
-        return;
-    }
-    
-    async.eachSeries(products, function (transactionProduct, callback) {
-        const productId = parseInt(transactionProduct.id || transactionProduct._id || transactionProduct.productId);
-        const quantityToDeduct = parseInt(transactionProduct.quantity || transactionProduct.qty || 0);
+    return new Promise((resolve, reject) => {
+        console.log('=== DECREMENT INVENTORY CALLED ===');
+        console.log('Products to decrement:', products);
         
-        console.log(`Processing product ID: ${productId}, quantity: ${quantityToDeduct}`);
+        const summary = {
+            totalRequested: Array.isArray(products) ? products.length : 0,
+            processed: 0,
+            skipped: 0,
+            totalDeducted: 0,
+            batchAdjustments: [],
+            errors: []
+        };
         
-        if (!productId || isNaN(productId) || quantityToDeduct <= 0 || isNaN(quantityToDeduct)) {
-            console.log(`Skipping invalid product: id=${productId}, quantity=${quantityToDeduct}`);
-            callback();
+        if (!Array.isArray(products) || products.length === 0) {
+            console.log('No products to decrement');
+            console.log('=== DECREMENT INVENTORY COMPLETED ===');
+            resolve(summary);
             return;
         }
         
+    async.eachSeries(products, function (transactionProduct, callback) {
+            const productId = parseInt(transactionProduct.id || transactionProduct._id || transactionProduct.productId);
+            const quantityToDeduct = parseInt(transactionProduct.quantity || transactionProduct.qty || 0);
+            
+            console.log(`Processing product ID: ${productId}, quantity: ${quantityToDeduct}`);
+            
+            if (!productId || isNaN(productId) || quantityToDeduct <= 0 || isNaN(quantityToDeduct)) {
+                console.log(`Skipping invalid product: id=${productId}, quantity=${quantityToDeduct}`);
+                summary.skipped += 1;
+                callback();
+                return;
+            }
+            
         inventoryDB.findOne(
             {
-                _id: productId,
+                    _id: productId,
             },
             function (err, product) {
-                if (err) {
-                    console.error(`Error finding product ${productId}:`, err);
+                    if (err) {
+                        const errorMsg = `Error finding product ${productId}: ${err.message || err}`;
+                        console.error(errorMsg);
+                        summary.errors.push(errorMsg);
                     callback();
-                    return;
-                }
-                
-                if (!product) {
-                    console.log(`Product ${productId} not found in inventory`);
-                    callback();
-                    return;
-                }
-                
-                if (!product.quantity || product.quantity <= 0) {
-                    console.log(`Product ${productId} has no quantity`);
-                    callback();
-                    return;
-                }
-                
-                console.log(`Found product: ${product.name || productId}, current quantity: ${product.quantity}`);
-                
-                // First, try to decrement from batches using FEFO (First-Expiry, First-Out)
-                inventoryBatchesDB.find(
-                    { productId: productId, quantity: { $gt: 0 } },
-                    { sort: { expiryDate: 1 } }, // Sort by expiry date (oldest first)
-                    function (batchErr, batches) {
-                        let remainingQty = quantityToDeduct;
+                        return;
+                    }
+                    
+                    if (!product) {
+                        console.log(`Product ${productId} not found in inventory`);
+                        summary.skipped += 1;
+                        callback();
+                        return;
+                    }
+                    
+                    const currentQuantity = Number(product.quantity || 0);
+                    if (currentQuantity <= 0) {
+                        console.log(`Product ${productId} has no quantity`);
+                        summary.skipped += 1;
+                        callback();
+                        return;
+                    }
+                    
+                    console.log(`Found product: ${product.name || productId}, current quantity: ${currentQuantity}`);
+                    
+                    // First, try to decrement from batches using FEFO (First-Expiry, First-Out)
+                    // Use file reading fallback since queries are hanging
+                    const batchesDBPath = inventoryBatchesDB.filename;
+                    const fs = require('fs');
+                    let batches = [];
+                    
+                    const selectedBatchInfo = (function resolveSelectedBatch(infoSource) {
+                        if (!infoSource) return null;
+                        const selected = infoSource.selectedBatch || infoSource.batchSelection || null;
+                        const fallbackLot = infoSource.batchNumber || infoSource.lotNumber || (selected && selected.lotNumber) || null;
+                        const fallbackBarcode = infoSource.batchBarcode || infoSource.barcode || (selected && selected.barcode) || null;
+                        const fallbackId = infoSource.batchId || infoSource.batch_id || infoSource.batchID || (selected && (selected._id || selected.id || selected.batchId));
                         
-                        if (!batchErr && batches && batches.length > 0) {
-                            console.log(`Found ${batches.length} batches for product ${productId}`);
-                            
-                            // Deduct from batches using FEFO
+                        if (selected || fallbackLot || fallbackBarcode || fallbackId) {
+                            return {
+                                _id: selected && (selected._id || selected.id || selected.batchId) || fallbackId || null,
+                                lotNumber: selected && selected.lotNumber || fallbackLot || null,
+                                barcode: selected && selected.barcode || fallbackBarcode || null
+                            };
+                        }
+                        
+                        return null;
+                    })(transactionProduct);
+                    
+                    function doesBatchMatchSelection(batch, selection) {
+                        if (!batch || !selection) return false;
+                        if (selection._id && (String(batch._id) === String(selection._id))) {
+                            return true;
+                        }
+                        const lotMatches = selection.lotNumber && batch.lotNumber &&
+                            String(batch.lotNumber).toLowerCase() === String(selection.lotNumber).toLowerCase();
+                        const barcodeMatches = selection.barcode && batch.barcode &&
+                            String(batch.barcode) === String(selection.barcode);
+                        
+                        if (lotMatches) {
+                            if (!selection.barcode) {
+                                return true;
+                            }
+                            return barcodeMatches;
+                        }
+                        
+                        if (barcodeMatches && !selection.lotNumber) {
+                            return true;
+                        }
+                        
+                        return false;
+                    }
+                    
+                    function sortAndPrioritizeBatches() {
+                        // Sort by expiry date (oldest first) for FEFO
+                        batches.sort((a, b) => {
+                            const dateA = a.expiryDate ? new Date(a.expiryDate) : new Date('9999-12-31');
+                            const dateB = b.expiryDate ? new Date(b.expiryDate) : new Date('9999-12-31');
+                            return dateA - dateB;
+                        });
+                        
+                        if (selectedBatchInfo) {
+                            const preferredIndex = batches.findIndex(batch => doesBatchMatchSelection(batch, selectedBatchInfo));
+                            if (preferredIndex > 0) {
+                                const [preferredBatch] = batches.splice(preferredIndex, 1);
+                                batches.unshift(preferredBatch);
+                                console.log(`Prioritized user-selected batch ${preferredBatch._id || preferredBatch.lotNumber || preferredBatch.barcode || 'N/A'} for product ${productId}`);
+                            } else if (preferredIndex === -1) {
+                                console.warn(`Selected batch not found for product ${productId}. Falling back to FEFO. Selection:`, selectedBatchInfo);
+                            }
+                        }
+                    }
+                    
+                    function loadBatchesAndProcess() {
+                        sortAndPrioritizeBatches();
+                        processBatches();
+                    }
+                    
+                    // Try to get batches from file directly (since queries hang)
+                    if (fs.existsSync(batchesDBPath)) {
+                        try {
+                            const fileContent = fs.readFileSync(batchesDBPath, 'utf8');
+                            const lines = fileContent.split('\n').filter(l => l.trim());
+                            const latestById = new Map();
+                            lines.forEach(line => {
+                                try {
+                                    const batch = JSON.parse(line);
+                                    if (batch && batch._id) {
+                                        latestById.set(batch._id, batch);
+                                    }
+                                } catch (e) {
+                                    // Skip invalid JSON lines
+                                }
+                            });
+                            batches = Array.from(latestById.values()).filter(batch => {
+                                const bId = batch.productId;
+                                return (bId === productId || 
+                                        String(bId) === String(productId) ||
+                                        Number(bId) === productId) &&
+                                       Number(batch.quantity || 0) > 0;
+                            });
+                            console.log(`Found ${batches.length} batches for product ${productId} (from file)`);
+                            loadBatchesAndProcess();
+                        } catch (fileErr) {
+                            console.warn('File read failed, trying DB query:', fileErr);
+                            // Fallback to DB query
+                            inventoryBatchesDB.find(
+                                { productId: productId, quantity: { $gt: 0 } },
+                                { sort: { expiryDate: 1 } },
+                                function (batchErr, dbBatches) {
+                                    if (!batchErr && dbBatches && dbBatches.length > 0) {
+                                        batches = dbBatches;
+                                        console.log(`Found ${batches.length} batches for product ${productId} (from DB)`);
+                                    }
+                                    loadBatchesAndProcess();
+                                }
+                            );
+                        }
+                } else {
+                        // No file, try DB query
+                        inventoryBatchesDB.find(
+                            { productId: productId, quantity: { $gt: 0 } },
+                            { sort: { expiryDate: 1 } },
+                            function (batchErr, dbBatches) {
+                                if (!batchErr && dbBatches && dbBatches.length > 0) {
+                                    batches = dbBatches;
+                                    console.log(`Found ${batches.length} batches for product ${productId} (from DB)`);
+                                }
+                                loadBatchesAndProcess();
+                            }
+                        );
+                    }
+                    
+                    function processBatches() {
+                        let remainingQty = quantityToDeduct;
+                        let totalDeductedForProduct = 0;
+                        const batchLogs = [];
+
+                        if (batches && batches.length > 0) {
                             async.eachSeries(batches, function (batch, batchCallback) {
                                 if (remainingQty <= 0) {
                                     batchCallback();
                                     return;
                                 }
-                                
+
                                 const batchQty = parseInt(batch.quantity || 0);
                                 const deductFromBatch = Math.min(remainingQty, batchQty);
-                                
-                                if (deductFromBatch > 0) {
-                                    const newBatchQty = batchQty - deductFromBatch;
-                                    remainingQty -= deductFromBatch;
-                                    
-                                    console.log(`Deducting ${deductFromBatch} from batch ${batch._id}, new quantity: ${newBatchQty}`);
-                                    
-                                    if (newBatchQty > 0) {
-                                        // Update batch quantity
-                                        inventoryBatchesDB.update(
-                                            { _id: batch._id },
-                                            { $set: { quantity: newBatchQty } },
-                                            {},
-                                            batchCallback
-                                        );
-                                    } else {
-                                        // Remove batch if quantity is 0
-                                        inventoryBatchesDB.remove(
-                                            { _id: batch._id },
-                                            {},
-                                            batchCallback
-                                        );
-                                    }
-                                } else {
+
+                                if (deductFromBatch <= 0) {
                                     batchCallback();
+                                    return;
+                                }
+
+                                const newBatchQty = batchQty - deductFromBatch;
+                                remainingQty -= deductFromBatch;
+                                totalDeductedForProduct += deductFromBatch;
+                                batchLogs.push({
+                                    batchId: batch._id || null,
+                                    lotNumber: batch.lotNumber || null,
+                                    barcode: batch.barcode || null,
+                                    deducted: deductFromBatch,
+                                    newQuantity: newBatchQty
+                                });
+
+                                console.log(`Deducting ${deductFromBatch} from batch ${batch._id} (lot: ${batch.lotNumber || 'N/A'}), new quantity: ${newBatchQty}`);
+
+                                const batchQuery = { _id: batch._id };
+                                const backupQuery = {
+                                    productId: productId,
+                                    lotNumber: batch.lotNumber || '',
+                                    barcode: batch.barcode || null
+                                };
+
+                                const finalizeBatchUpdate = (updateErr, numAffected) => {
+                                    if (updateErr) {
+                                        console.error(`Error updating batch ${batch._id}:`, updateErr);
+                                    } else if (typeof numAffected === 'number' && numAffected === 0) {
+                                        console.warn(`⚠️ No batch updated with _id ${batch._id}`);
+                                    } else {
+                                        console.log(`✅ Updated batch ${batch._id || '[backup-match]'} (lot: ${batch.lotNumber || 'N/A'}): ${batchQty} → ${newBatchQty}`);
+                                    }
+                                    batchCallback();
+                                };
+
+                                if (newBatchQty > 0) {
+                                    inventoryBatchesDB.update(
+                                        batchQuery,
+                                        { $set: { quantity: newBatchQty, updatedAt: new Date() } },
+                                        {},
+                                        function(updateErr, numAffected) {
+                                            if (updateErr || numAffected === 0) {
+                                                if (updateErr) {
+                                                    console.error(`Primary batch update failed:`, updateErr);
+                                                } else {
+                                                    console.warn(`⚠️ Primary batch update affected 0 records, trying backup query...`);
+                                                }
+                                                inventoryBatchesDB.update(
+                                                    backupQuery,
+                                                    { $set: { quantity: newBatchQty, updatedAt: new Date() } },
+                                                    {},
+                                                    finalizeBatchUpdate
+                                                );
+                                            } else {
+                                                finalizeBatchUpdate(null, numAffected);
+                                            }
+                                        }
+                                    );
+                                } else {
+                                    console.log(`Removing batch ${batch._id} (lot: ${batch.lotNumber || 'N/A'}) - quantity reached 0`);
+                                    inventoryBatchesDB.remove(
+                                        { _id: batch._id },
+                                        {},
+                                        function(removeErr) {
+                                            if (removeErr) {
+                                                console.error(`Error removing batch ${batch._id}:`, removeErr);
+                                                summary.errors.push(`Failed to remove empty batch ${batch._id}: ${removeErr.message || removeErr}`);
+                                            } else {
+                                                console.log(`✅ Removed batch ${batch._id} (lot: ${batch.lotNumber || 'N/A'})`);
+                                            }
+                                            batchCallback();
+                                        }
+                                    );
                                 }
                             }, function () {
-                                // After processing batches, update product quantity
-                                const finalQuantity = Math.max(0, parseInt(product.quantity) - quantityToDeduct);
-                                
-                                console.log(`Updating product ${productId} quantity from ${product.quantity} to ${finalQuantity}`);
-                                
-                                inventoryDB.update(
-                                    {
-                                        _id: productId,
-                                    },
-                                    {
-                                        $set: {
-                                            quantity: finalQuantity,
-                                        },
-                                    },
+                                const actualDeducted = Math.min(quantityToDeduct, totalDeductedForProduct);
+                                const finalQuantity = Math.max(0, currentQuantity - actualDeducted);
+
+                                if (remainingQty > 0) {
+                                    const warnMsg = `Requested ${quantityToDeduct} but only ${actualDeducted} deducted for product ${productId} (insufficient batch stock).`;
+                                    console.warn(warnMsg);
+                                    summary.errors.push(warnMsg);
+                                }
+
+                                console.log(`Updating product ${productId} quantity from ${currentQuantity} to ${finalQuantity}`);
+
+                    inventoryDB.update(
+                                    { _id: productId },
+                                    { $set: { quantity: finalQuantity } },
                                     {},
                                     function (updateErr) {
                                         if (updateErr) {
-                                            console.error(`Error updating product ${productId}:`, updateErr);
+                                            const errorMsg = `Error updating product ${productId}: ${updateErr.message || updateErr}`;
+                                            console.error(errorMsg);
+                                            summary.errors.push(errorMsg);
                                         } else {
                                             console.log(`Successfully decremented product ${productId}`);
                                         }
+                                        summary.processed += 1;
+                                        summary.totalDeducted += actualDeducted;
+                                        summary.batchAdjustments.push({
+                                            productId,
+                                            requested: quantityToDeduct,
+                                            deducted: actualDeducted,
+                                            batches: batchLogs
+                                        });
                                         callback();
-                                    },
+                                    }
                                 );
                             });
-                        } else {
-                            // No batches found, just update product quantity directly
-                            console.log(`No batches found for product ${productId}, updating quantity directly`);
-                            const finalQuantity = Math.max(0, parseInt(product.quantity) - quantityToDeduct);
-                            
-                            inventoryDB.update(
-                                {
-                                    _id: productId,
-                                },
-                                {
-                                    $set: {
-                                        quantity: finalQuantity,
-                                    },
-                                },
-                                {},
-                                function (updateErr) {
-                                    if (updateErr) {
-                                        console.error(`Error updating product ${productId}:`, updateErr);
-                                    } else {
-                                        console.log(`Successfully decremented product ${productId} to ${finalQuantity}`);
-                                    }
-                                    callback();
-                                },
-                            );
+                            return;
                         }
-                    }
-                );
+
+                        console.log(`No batches found for product ${productId}, updating quantity directly`);
+                        const actualDeducted = Math.min(quantityToDeduct, currentQuantity);
+                        const finalQuantity = Math.max(0, currentQuantity - actualDeducted);
+
+                        inventoryDB.update(
+                            { _id: productId },
+                            { $set: { quantity: finalQuantity } },
+                            {},
+                            function (updateErr) {
+                                if (updateErr) {
+                                    const errorMsg = `Error updating product ${productId}: ${updateErr.message || updateErr}`;
+                                    console.error(errorMsg);
+                                    summary.errors.push(errorMsg);
+                                } else {
+                                    console.log(`Successfully decremented product ${productId} to ${finalQuantity}`);
+                                }
+                                summary.processed += 1;
+                                summary.totalDeducted += actualDeducted;
+                                summary.batchAdjustments.push({
+                                    productId,
+                                    requested: quantityToDeduct,
+                                    deducted: actualDeducted,
+                                    batches: []
+                                });
+                                callback();
+                            }
+                    );
+                }
             },
         );
-    }, function () {
-        console.log('=== DECREMENT INVENTORY COMPLETED ===');
+        }, function (err) {
+            if (err) {
+                console.error('Error while decrementing inventory:', err);
+                summary.errors.push(err.message || err);
+                return reject(err);
+            }
+            console.log('=== DECREMENT INVENTORY COMPLETED ===');
+            resolve(summary);
+        });
     });
 };
 
-console.log("Multer imported:", multer);
-console.log("Multer type:", typeof multer);
-console.log("Multer methods:", Object.getOwnPropertyNames(Object.getPrototypeOf(multer)).filter(name => typeof multer[name] === 'function'));
+// Multer initialized (log removed for cleaner output)
 
 module.exports = app;

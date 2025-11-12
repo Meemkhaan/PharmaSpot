@@ -16,6 +16,7 @@ class PurchaseOrderManager {
         this.isAutoDraftRunning = false; // Flag to prevent concurrent auto-draft calls
         this.isLoadingAutoDraftProducts = false; // Flag to prevent multiple concurrent loads
         this.settings = null; // Store settings for store name
+        this.currencySymbol = '$'; // Default currency symbol
         
         // Initialize global flag if not already set
         if (typeof window.isAutoDraftRunning === 'undefined') {
@@ -29,8 +30,18 @@ class PurchaseOrderManager {
         this.setupEventListeners();
         // Load data directly since we're now served through the server
         this.loadSettings();
-        this.loadSuppliers();
-        this.loadProducts();
+        // Check if data is already loaded from pos.js to avoid duplicate API calls
+        if (typeof allSuppliers !== 'undefined' && allSuppliers && allSuppliers.length > 0) {
+            this.suppliers = allSuppliers;
+            this.populateSupplierDropdowns();
+        } else {
+            this.loadSuppliers();
+        }
+        if (typeof allProducts !== 'undefined' && allProducts && allProducts.length > 0) {
+            this.products = allProducts;
+        } else {
+            this.loadProducts();
+        }
         this.loadPurchaseOrders();
     }
 
@@ -85,11 +96,25 @@ class PurchaseOrderManager {
         });
         
         // Auto-draft modal buttons
-        $(document).on('click', '#refreshAutoDraft', () => {
+        $(document).on('click', '#refreshAutoDraft', (e) => {
+            e.preventDefault();
+            const $btn = $(e.currentTarget);
+            const originalHtml = $btn.html();
+            
+            // Show loading state but keep button visible
+            $btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Refreshing...');
+            
             // Force allow a new load and clear table state
             this.isLoadingAutoDraftProducts = false;
             $('#autoDraftTable tbody').html('');
+            
+            // Load products
             this.loadAutoDraftProducts();
+            
+            // Reset button after a delay
+            setTimeout(() => {
+                $btn.prop('disabled', false).html(originalHtml);
+            }, 2000);
         });
         
         $(document).on('click', '#createPOsFromAssignments', () => {
@@ -136,13 +161,22 @@ class PurchaseOrderManager {
                 $btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i>');
                 
                 if (window.purchaseOrderManager) {
-                    window.purchaseOrderManager.sendPOToSupplier(orderId);
+                    window.purchaseOrderManager.sendPOToSupplier(orderId, () => {
+                        // Reset button using selector in case DOM changed
+                        const $resetBtn = $(`.send-po-btn[data-order-id="${orderId}"]`);
+                        if ($resetBtn.length) {
+                            $resetBtn.prop('disabled', false).html(originalHtml);
+                        }
+                    });
+                } else {
+                    // Fallback reset if manager not available
+                    setTimeout(() => {
+                        const $resetBtn = $(`.send-po-btn[data-order-id="${orderId}"]`);
+                        if ($resetBtn.length) {
+                            $resetBtn.prop('disabled', false).html(originalHtml);
+                        }
+                    }, 3000);
                 }
-                
-                // Reset button after delay
-                setTimeout(() => {
-                    $btn.prop('disabled', false).html(originalHtml);
-                }, 3000);
             }
         });
 
@@ -173,15 +207,23 @@ class PurchaseOrderManager {
             
             // Call edit function with proper context
             if (window.purchaseOrderManager) {
-                window.purchaseOrderManager.editPurchaseOrder(orderId);
+                window.purchaseOrderManager.editPurchaseOrder(orderId, () => {
+                    // Reset button using selector in case DOM changed
+                    const $resetBtn = $(`.edit-po-btn[data-order-id="${orderId}"]`);
+                    if ($resetBtn.length) {
+                        $resetBtn.prop('disabled', false).html(originalHtml);
+                    }
+                });
             } else {
                 console.error('PurchaseOrderManager not found');
+                // Fallback reset if manager not available
+                setTimeout(() => {
+                    const $resetBtn = $(`.edit-po-btn[data-order-id="${orderId}"]`);
+                    if ($resetBtn.length) {
+                        $resetBtn.prop('disabled', false).html(originalHtml);
+                    }
+                }, 500);
             }
-            
-            // Reset button after modal is shown
-            setTimeout(() => {
-                $btn.prop('disabled', false).html(originalHtml);
-            }, 500);
         });
 
         // Delete PO button
@@ -197,10 +239,22 @@ class PurchaseOrderManager {
         });
 
         // Refresh PO list
-        $(document).on('click', '#refreshPOList', () => {
+        $(document).on('click', '#refreshPOList', (e) => {
+            e.preventDefault();
+            const $btn = $(e.currentTarget);
+            const originalHtml = $btn.html();
+            
+            // Show loading state but keep button visible
+            $btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Refreshing...');
+            
             if (window.purchaseOrderManager) {
                 window.purchaseOrderManager.loadPurchaseOrders();
             }
+            
+            // Reset button after a delay
+            setTimeout(() => {
+                $btn.prop('disabled', false).html(originalHtml);
+            }, 2000);
         });
 
 
@@ -295,6 +349,7 @@ class PurchaseOrderManager {
                 // Update supplier field behavior based on linking setting
                 this.updateSupplierFieldBehavior();
             }
+            this.currencySymbol = this.getCurrencySymbol();
         }).fail((xhr, status, error) => {
             console.error('Failed to load settings:', error);
             this.settings = {
@@ -304,7 +359,20 @@ class PurchaseOrderManager {
                 store: 'PharmaSpot'
             };
             this.updateSupplierFieldBehavior();
+            this.currencySymbol = this.getCurrencySymbol();
         });
+    }
+
+    getCurrencySymbol() {
+        const settings = this.settings || {};
+        return settings.symbol ||
+               settings.currencySymbol ||
+               settings.currency_symbol ||
+               settings.currency ||
+               (settings.storeSettings && settings.storeSettings.currencySymbol) ||
+               (settings.store && settings.store.currencySymbol) ||
+               this.currencySymbol ||
+               '$';
     }
     
     updateSupplierFieldBehavior() {
@@ -563,8 +631,21 @@ class PurchaseOrderManager {
             this.displayPurchaseOrders();
             this.updateStatistics();
             this.updateNotificationBadge();
+            
+            // Reset refresh button state
+            const $refreshBtn = $('#refreshPOList');
+            if ($refreshBtn.length) {
+                $refreshBtn.prop('disabled', false).html('<i class="fa fa-refresh"></i> Refresh');
+            }
         }).fail((xhr, status, error) => {
             console.error('Failed to load purchase orders:', error);
+            
+            // Reset refresh button state even on error
+            const $refreshBtn = $('#refreshPOList');
+            if ($refreshBtn.length) {
+                $refreshBtn.prop('disabled', false).html('<i class="fa fa-refresh"></i> Refresh');
+            }
+            
             if (typeof notiflix !== 'undefined') {
                 notiflix.Notify.failure('Failed to load purchase orders. Please check server connection.');
             } else {
@@ -915,10 +996,15 @@ class PurchaseOrderManager {
                 clearTimeout(watchdogId);
                 this.isLoadingAutoDraftProducts = false;
                 
+                // Reset refresh button state
+                const $refreshBtn = $('#refreshAutoDraft');
+                if ($refreshBtn.length) {
+                    $refreshBtn.prop('disabled', false).html('<i class="fa fa-refresh"></i> Refresh');
+                }
+                
             if (response.success) {
                     if (response.products && response.products.length > 0) {
                         this.populateAutoDraftTable(response.products, response.suppliers);
-                        this.updateAutoDraftSummary(response.products);
                     } else {
                         $('#autoDraftTable tbody').html('<tr><td colspan="9" class="text-center text-info">No products need reordering at this time.</td></tr>');
                         this.updateAutoDraftSummary([]);
@@ -931,6 +1017,15 @@ class PurchaseOrderManager {
             },
             error: (xhr, status, error) => {
                 console.error('❌ Auto-draft products API call failed:', error);
+                clearTimeout(watchdogId);
+                this.isLoadingAutoDraftProducts = false;
+                
+                // Reset refresh button state even on error
+                const $refreshBtn = $('#refreshAutoDraft');
+                if ($refreshBtn.length) {
+                    $refreshBtn.prop('disabled', false).html('<i class="fa fa-refresh"></i> Refresh');
+                }
+                
                 $('#autoDraftTable tbody').html('<tr><td colspan="9" class="text-center text-danger">Failed to load products. Please try again.</td></tr>');
             },
             complete: () => {
@@ -952,10 +1047,15 @@ class PurchaseOrderManager {
         
         if (products.length === 0) {
             tbody.html('<tr><td colspan="9" class="text-center text-info">No products need reordering at this time.</td></tr>');
+            this.updateAutoDraftSummary([]);
             return;
         }
         
+        const currencySymbol = this.getCurrencySymbol();
         products.forEach((product, index) => {
+            const preferredSupplierIdRaw = product.supplierId || product.designatedSupplierId || product.designatedSupplierID || product.supplier_id || product.supplierID || product.designatedSupplier || product.defaultSupplierId || null;
+            const preferredSupplierId = preferredSupplierIdRaw ? String(preferredSupplierIdRaw) : '';
+            const unitPrice = Number(product.unitPrice) || 0;
             const row = $(`
                 <tr data-product-id="${product.productId}">
                     <td>
@@ -976,16 +1076,16 @@ class PurchaseOrderManager {
                         <select class="form-control supplier-select" data-product-id="${product.productId}">
                             <option value="">Select Supplier</option>
                             ${suppliers.map(supplier => 
-                                `<option value="${supplier._id}" ${product.supplierId == supplier._id ? 'selected' : ''}>${supplier.name}</option>`
+                                `<option value="${supplier._id}" ${preferredSupplierId && String(supplier._id) === preferredSupplierId ? 'selected' : ''}>${supplier.name}</option>`
                             ).join('')}
                         </select>
                     </td>
                     <td>
                         <input type="number" class="form-control quantity-input" data-product-id="${product.productId}" 
-                               value="${product.suggestedQuantity}" min="1" step="1">
+                               value="" min="1" step="1" ${product.suggestedQuantity ? `placeholder="${product.suggestedQuantity}"` : ''}>
                     </td>
-                    <td>$${product.unitPrice.toFixed(2)}</td>
-                    <td class="total-price" data-product-id="${product.productId}">$${(product.suggestedQuantity * product.unitPrice).toFixed(2)}</td>
+                    <td class="unit-price" data-unit-price="${unitPrice}">${currencySymbol}${unitPrice.toFixed(2)}</td>
+                    <td class="total-price" data-product-id="${product.productId}" data-unit-price="${unitPrice}">${currencySymbol}0.00</td>
                     <td>
                         ${product.expiryDate ? 
                             `<small class="text-muted">${new Date(product.expiryDate).toLocaleDateString()}</small>` : 
@@ -1000,18 +1100,23 @@ class PurchaseOrderManager {
         
         // Add event listeners
         this.attachAutoDraftEventListeners();
+        
+        // Refresh summary based on rendered table
+        this.updateAutoDraftSummary();
     }
     
     // Attach event listeners for auto-draft table
     attachAutoDraftEventListeners() {
         // Quantity input change
         $(document).off('input', '.quantity-input').on('input', '.quantity-input', (e) => {
-            const productId = $(e.target).data('product-id');
+            const $row = $(e.target).closest('tr');
             const quantity = parseFloat($(e.target).val()) || 0;
-            const unitPrice = parseFloat($(e.target).closest('tr').find('td:nth-child(7)').text().replace('$', '')) || 0;
+            const unitPrice = parseFloat($row.find('.unit-price').data('unit-price')) || 0;
             const total = quantity * unitPrice;
             
-            $(e.target).closest('tr').find('.total-price').text('$' + total.toFixed(2));
+            $row.find('.total-price')
+                .text(this.getCurrencySymbol() + total.toFixed(2))
+                .data('calculated-total', total);
             this.updateAutoDraftSummary();
         });
         
@@ -1027,11 +1132,12 @@ class PurchaseOrderManager {
             // Get data from table
             const rows = $('#autoDraftTable tbody tr[data-product-id]');
             products = [];
-            rows.each(function() {
-                const productId = $(this).data('product-id');
-                const supplierId = $(this).find('.supplier-select').val();
-                const quantity = parseFloat($(this).find('.quantity-input').val()) || 0;
-                const unitPrice = parseFloat($(this).find('td:nth-child(7)').text().replace('$', '')) || 0;
+            rows.each((_, rowEl) => {
+                const $row = $(rowEl);
+                const productId = $row.data('product-id');
+                const supplierId = $row.find('.supplier-select').val();
+                const quantity = parseFloat($row.find('.quantity-input').val()) || 0;
+                const unitPrice = parseFloat($row.find('.unit-price').data('unit-price')) || 0;
                 
                 if (supplierId && quantity > 0) {
                     products.push({
@@ -1050,7 +1156,7 @@ class PurchaseOrderManager {
         
         $('#totalProducts').text(totalProducts);
         $('#assignedProducts').text(assignedProducts);
-        $('#estimatedTotal').text('$' + estimatedTotal.toFixed(2));
+        $('#estimatedTotal').text(this.getCurrencySymbol() + estimatedTotal.toFixed(2));
         
         // Update supplier summary
         this.updateSupplierSummary(products);
@@ -1070,10 +1176,11 @@ class PurchaseOrderManager {
             supplierSummary[product.supplierId].total += product.quantity * product.unitPrice;
         });
         
+        const currencySymbol = this.getCurrencySymbol();
         const summaryHtml = Object.keys(supplierSummary).map(supplierId => {
             const supplier = this.suppliers.find(s => s._id == supplierId);
             const supplierName = supplier ? supplier.name : 'Unknown Supplier';
-            return `<div class="mb-1"><strong>${supplierName}:</strong> ${supplierSummary[supplierId].count} products, $${supplierSummary[supplierId].total.toFixed(2)}</div>`;
+            return `<div class="mb-1"><strong>${supplierName}:</strong> ${supplierSummary[supplierId].count} products, ${currencySymbol}${supplierSummary[supplierId].total.toFixed(2)}</div>`;
         }).join('');
         
         $('#supplierSummary').html(summaryHtml || '<div class="text-muted">No suppliers assigned yet</div>');
@@ -1129,9 +1236,23 @@ class PurchaseOrderManager {
                 console.log('=== CREATE POS RESPONSE ===');
                 console.log('Response:', response);
                 
-                if (response.success) {
-                    const message = `Successfully created ${response.orders.length} purchase orders!`;
+                // Use backend message if available, otherwise construct one
+                let message = response.message || '';
+                if (!message) {
+                    if (response.orders && response.orders.length > 0) {
+                        message = `Successfully created ${response.orders.length} purchase order${response.orders.length === 1 ? '' : 's'}!`;
+                    } else if (response.existingOrders && response.existingOrders.length > 0) {
+                        message = `Skipped ${response.existingOrders.length} existing purchase order${response.existingOrders.length === 1 ? '' : 's'} (already exists for same products on same date)`;
+                    } else {
+                        message = 'No purchase orders were created.';
+                    }
+                }
+                
+                if (response.success || (response.orders && response.orders.length > 0)) {
                     console.log('✅ ' + message);
+                    if (response.existingOrders && response.existingOrders.length > 0) {
+                        console.log(`ℹ️ Skipped ${response.existingOrders.length} existing order(s)`);
+                    }
                     
                     if (typeof notiflix !== 'undefined' && notiflix.Notify) {
                         notiflix.Notify.success(message);
@@ -1139,20 +1260,29 @@ class PurchaseOrderManager {
                         console.log('✅ ' + message);
                     }
                     
+                    // Reset button before closing modal
+                    $('#createPOsFromAssignments').prop('disabled', false).html('<i class="fa fa-save"></i> Create POs');
+                    
                     // Close modal and refresh purchase orders
                     $('#autoDraftModal').modal('hide');
-                this.loadPurchaseOrders();
-            } else {
-                    console.error('Failed to create POs:', response.message);
+                    this.loadPurchaseOrders();
+                } else {
+                    console.error('Failed to create POs:', message);
+                    // Reset button on failure
+                    $('#createPOsFromAssignments').prop('disabled', false).html('<i class="fa fa-save"></i> Create POs');
+                    
                     if (typeof notiflix !== 'undefined' && notiflix.Notify) {
-                        notiflix.Notify.failure('Failed to create purchase orders: ' + response.message);
+                        notiflix.Notify.failure(message);
                     } else {
-                        console.error('❌ Failed to create purchase orders: ' + response.message);
-            }
+                        console.error('❌ ' + message);
+                    }
                 }
             },
             error: (xhr, status, error) => {
                 console.error('❌ Create POs API call failed:', error);
+                // Reset button on error
+                $('#createPOsFromAssignments').prop('disabled', false).html('<i class="fa fa-save"></i> Create POs');
+                
                 if (typeof notiflix !== 'undefined' && notiflix.Notify) {
                     notiflix.Notify.failure('Failed to create purchase orders. Please try again.');
                 } else {
@@ -1272,6 +1402,9 @@ class PurchaseOrderManager {
             </tr>
         `);
 
+        // Reset add button
+        addBtn.prop('disabled', false).html(originalText);
+
         // Show success feedback
         if (typeof notiflix !== 'undefined') {
             notiflix.Notify.success(`${product.name} added to order`);
@@ -1281,9 +1414,6 @@ class PurchaseOrderManager {
         $('#poProductSelect').val('');
         $('#poQuantity').val('1');
         $('#poUnitPrice').val('');
-
-        // Reset button state
-        addBtn.prop('disabled', false).html(originalText);
 
         this.calculatePOTotals();
     }
@@ -1554,7 +1684,8 @@ class PurchaseOrderManager {
         }
         
         // Show loading state
-        const originalText = submitBtn.text();
+        const originalHtml = submitBtn.html();
+        submitBtn.data('original-html', originalHtml); // Store original HTML
         const loadingText = isEdit ? '<i class="fa fa-spinner fa-spin"></i> Updating...' : '<i class="fa fa-spinner fa-spin"></i> Creating...';
         submitBtn.prop('disabled', true).html(loadingText);
 
@@ -1634,8 +1765,9 @@ class PurchaseOrderManager {
                     }
                 }
                 
-                // Reset button state
-                submitBtn.prop('disabled', false).text(originalText);
+                // Reset button state (use html to preserve icon)
+                const originalHtml = submitBtn.data('original-html') || originalText;
+                submitBtn.prop('disabled', false).html(originalHtml || '<i class="fa fa-plus"></i> Create Purchase Order');
             },
             error: (xhr, status, error) => {
                 console.error('Purchase order request failed:', {
@@ -1664,19 +1796,21 @@ class PurchaseOrderManager {
                 // Show error banner for better visibility
                 this.showErrorFeedback(errorMessage);
                 
-                // Reset button state
-                submitBtn.prop('disabled', false).text(originalText);
+                // Reset button state (use html to preserve icon)
+                const originalHtml = submitBtn.data('original-html') || originalText;
+                submitBtn.prop('disabled', false).html(originalHtml || '<i class="fa fa-plus"></i> Create Purchase Order');
             }
         });
     }
 
-    sendPOToSupplier(orderId) {
+    sendPOToSupplier(orderId, callback) {
         console.log('🚀 PURCHASE-ORDERS.JS: sendPOToSupplier called for order:', orderId);
         
         const order = this.orders.find(o => o._id == orderId);
         if (!order) {
             console.error('❌ Order not found:', orderId);
             (typeof notiflix !== 'undefined' ? notiflix.Notify : { success: console.log, failure: console.error, warning: console.warn, info: console.info }).failure('Purchase order not found');
+            if (callback) callback();
             return;
         }
         console.log('✅ Order found:', order);
@@ -1685,16 +1819,23 @@ class PurchaseOrderManager {
         const supplier = this.suppliers.find(s => s._id == order.supplierId);
         if (!supplier) {
             (typeof notiflix !== 'undefined' ? notiflix.Notify : { success: console.log, failure: console.error, warning: console.warn, info: console.info }).failure('Supplier not found');
+            if (callback) callback();
             return;
         }
         
         if (!supplier.phone) {
             (typeof notiflix !== 'undefined' ? notiflix.Notify : { success: console.log, failure: console.error, warning: console.warn, info: console.info }).warning(`Phone number is not available for supplier "${supplier.name}". Please add a phone number to the supplier profile to send WhatsApp messages.`);
+            if (callback) callback();
             return;
         }
                     
         // If phone number exists, proceed with sending
-                    this.openWhatsAppWithPO(order);
+        this.openWhatsAppWithPO(order);
+        
+        // Call callback after a short delay to allow WhatsApp to open
+        if (callback) {
+            setTimeout(callback, 1000);
+        }
     }
 
     openWhatsAppWithPO(order) {
@@ -2395,6 +2536,14 @@ class PurchaseOrderManager {
                     this.showSaveSuccess(receivedItems.length);
                 $('#receiveItemsModal').modal('hide');
                 this.loadPurchaseOrders();
+                // Refresh product list to show updated quantities and expiry dates
+                // loadProducts() will automatically call loadProductList() after loading
+                if (typeof loadProducts === 'function') {
+                    // Small delay to ensure backend has finished processing
+                    setTimeout(() => {
+                        loadProducts();
+                    }, 300);
+                }
             } else {
                     this.showSaveError(response.message || 'Failed to receive items');
                 }
@@ -2942,7 +3091,7 @@ class PurchaseOrderManager {
             
             // Set default delivery date to 7 days from now
             const defaultDate = new Date();
-            defaultDate.setDate(defaultDate.getDate() + 7);
+            defaultDate.setDate(defaultDate.getDate() + 1);
             $('#poExpectedDelivery').val(defaultDate.toISOString().split('T')[0]);
         });
         

@@ -139,33 +139,66 @@ app.get("/by-date", function (req, res) {
  * @param {Object} res response object.
  * @returns {void}
  */
-app.post("/new", function (req, res) {
-  let newTransaction = req.body;
+app.post("/new", async function (req, res) {
+  const newTransaction = req.body;
   
   console.log('=== NEW TRANSACTION RECEIVED ===');
   console.log('Transaction data:', JSON.stringify(newTransaction, null, 2));
-  console.log('Paid:', newTransaction.paid, 'Total:', newTransaction.total);
+  const paidAmount = parseFloat(newTransaction.paid) || 0;
+  const totalAmount = parseFloat(newTransaction.total) || 0;
+
+  console.log('Paid:', paidAmount, 'Total:', totalAmount);
   console.log('Items:', newTransaction.items);
 
-  transactionsDB.insert(newTransaction, function (err, transaction) {
-    if (err) {
-      console.error('Transaction insert error:', err);
-      res.status(500).json({
-        error: "Internal Server Error",
-        message: "An unexpected error occurred.",
+  try {
+    const transaction = await new Promise((resolve, reject) => {
+      transactionsDB.insert(newTransaction, function (err, doc) {
+        if (err) {
+          return reject(err);
+        }
+        return resolve(doc);
       });
-    } else {
-      console.log('Transaction saved successfully:', transaction._id);
-      res.sendStatus(200);
+    });
 
-      if (newTransaction.paid >= newTransaction.total) {
-        console.log('Transaction fully paid - decrementing inventory...');
-        Inventory.decrementInventory(newTransaction.items);
+    console.log('Transaction saved successfully:', transaction._id);
+
+    let inventorySummary = null;
+    if (paidAmount >= totalAmount) {
+      console.log('Transaction fully paid - decrementing inventory...');
+      console.log('Inventory module type:', typeof Inventory);
+      console.log('Inventory.decrementInventory type:', typeof Inventory.decrementInventory);
+      
+      if (typeof Inventory.decrementInventory === 'function') {
+        try {
+          inventorySummary = await Inventory.decrementInventory(newTransaction.items);
+          console.log('✅ Inventory decrement completed successfully');
+        } catch (error) {
+          console.error('❌ Error during inventory decrement:', error);
+          inventorySummary = { error: error.message || String(error) };
+        }
       } else {
-        console.log(`Transaction NOT fully paid (paid: ${newTransaction.paid}, total: ${newTransaction.total}) - skipping inventory decrement`);
+        const typeError = 'Inventory.decrementInventory is not a function!';
+        console.error(`❌ ${typeError}`);
+        console.error('Inventory object keys:', Object.keys(Inventory || {}));
+        inventorySummary = { error: typeError };
       }
+    } else {
+      console.log(`Transaction NOT fully paid (paid: ${paidAmount}, total: ${totalAmount}) - skipping inventory decrement`);
     }
-  });
+
+    res.status(200).json({
+      success: true,
+      transactionId: transaction._id,
+      inventory: inventorySummary
+    });
+  } catch (err) {
+    console.error('Transaction insert error:', err);
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: "Failed to save transaction.",
+      details: err && err.message ? err.message : err
+    });
+  }
 });
 
 /**

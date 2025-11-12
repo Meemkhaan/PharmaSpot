@@ -57,6 +57,10 @@ app.all("/*", function (req, res, next) {
 // Serve static files (CSS, JS, images, etc.)
 app.use(express.static(__dirname));
 
+// Serve uploaded files (logos, product images, etc.)
+const uploadsPath = path.join(process.env.APPDATA || require('os').homedir(), process.env.APPNAME || pkg.name, "uploads");
+app.use("/uploads", express.static(uploadsPath));
+
 app.get("/", function (req, res) {
     // Serve the main HTML file
     res.sendFile(path.join(__dirname, "index.html"));
