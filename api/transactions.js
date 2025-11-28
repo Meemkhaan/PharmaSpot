@@ -141,7 +141,7 @@ app.get("/by-date", function (req, res) {
  */
 app.post("/new", async function (req, res) {
   const newTransaction = req.body;
-  
+
   console.log('=== NEW TRANSACTION RECEIVED ===');
   console.log('Transaction data:', JSON.stringify(newTransaction, null, 2));
   const paidAmount = parseFloat(newTransaction.paid) || 0;
@@ -153,7 +153,7 @@ app.post("/new", async function (req, res) {
   try {
     const transaction = await new Promise((resolve, reject) => {
       transactionsDB.insert(newTransaction, function (err, doc) {
-        if (err) {
+    if (err) {
           return reject(err);
         }
         return resolve(doc);
@@ -176,7 +176,7 @@ app.post("/new", async function (req, res) {
           console.error('❌ Error during inventory decrement:', error);
           inventorySummary = { error: error.message || String(error) };
         }
-      } else {
+    } else {
         const typeError = 'Inventory.decrementInventory is not a function!';
         console.error(`❌ ${typeError}`);
         console.error('Inventory object keys:', Object.keys(Inventory || {}));

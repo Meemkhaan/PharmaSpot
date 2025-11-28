@@ -35,12 +35,12 @@ class PurchaseOrderManager {
             this.suppliers = allSuppliers;
             this.populateSupplierDropdowns();
         } else {
-            this.loadSuppliers();
+        this.loadSuppliers();
         }
         if (typeof allProducts !== 'undefined' && allProducts && allProducts.length > 0) {
             this.products = allProducts;
         } else {
-            this.loadProducts();
+        this.loadProducts();
         }
         this.loadPurchaseOrders();
     }
@@ -409,9 +409,12 @@ class PurchaseOrderManager {
         });
     }
 
-    loadProducts() {
+    loadProducts(forceRefresh = false) {
+        // Add refresh parameter to force database reload after receive
+        const refreshParam = forceRefresh ? '?refresh=true' : '';
         $.ajax({
-            url: '/api/inventory/products',
+            url: '/api/inventory/products' + refreshParam,
+            cache: false, // Prevent browser caching
             timeout: 15000, // 15 seconds to match backend fallback timeout
             success: (products) => {
                 // Handle empty array (might be timeout response)
@@ -1051,16 +1054,129 @@ class PurchaseOrderManager {
             return;
         }
         
+        // Check linking mode
+        const linkingEnabled = this.settings?.productSupplierLinking !== false;
+        const defaultSupplierId = this.settings?.defaultSupplier ? String(this.settings.defaultSupplier) : null;
+        
+        // Update UI to show linking mode
+        this.updateAutoDraftLinkingMode(linkingEnabled);
+        
         const currencySymbol = this.getCurrencySymbol();
         products.forEach((product, index) => {
-            const preferredSupplierIdRaw = product.supplierId || product.designatedSupplierId || product.designatedSupplierID || product.supplier_id || product.supplierID || product.designatedSupplier || product.defaultSupplierId || null;
-            const preferredSupplierId = preferredSupplierIdRaw ? String(preferredSupplierIdRaw) : '';
+            // Check for linked supplier - prioritize designatedSupplierId (the field used for product-supplier linking)
+            const preferredSupplierIdRaw = product.designatedSupplierId || product.designatedSupplierID || product.supplierId || product.supplier_id || product.supplierID || product.designatedSupplier || product.defaultSupplierId || null;
+            const preferredSupplierId = preferredSupplierIdRaw ? String(preferredSupplierIdRaw) : (defaultSupplierId || '');
+            
+            // Filter suppliers based on linking mode
+            let availableSuppliers = suppliers;
+            let isSupplierLocked = false;
+            let selectedSupplierId = '';
+            
+            if (linkingEnabled) {
+                // Linking enabled: Only show linked supplier (or default if none)
+                if (preferredSupplierId) {
+                    // Try to find supplier by matching ID (handle both string and number comparisons)
+                    availableSuppliers = suppliers.filter(s => {
+                        const supplierIdStr = String(s._id);
+                        const supplierIdNum = Number(s._id);
+                        const preferredIdStr = String(preferredSupplierId);
+                        const preferredIdNum = Number(preferredSupplierId);
+                        return supplierIdStr === preferredIdStr || 
+                               supplierIdNum === preferredIdNum ||
+                               supplierIdStr === preferredIdNum.toString() ||
+                               supplierIdNum.toString() === preferredIdStr;
+                    });
+                    
+                    if (availableSuppliers.length > 0) {
+                        isSupplierLocked = true;
+                        selectedSupplierId = String(availableSuppliers[0]._id);
+                    } else {
+                        // Supplier not found - log for debugging
+                        console.warn(`[Auto-Draft] Linked supplier ID ${preferredSupplierId} not found in suppliers list for product ${product.productName}`, {
+                            productId: product.productId,
+                            preferredSupplierId,
+                            availableSupplierIds: suppliers.map(s => ({ id: s._id, name: s.name, idType: typeof s._id }))
+                        });
+                    }
+                } else if (defaultSupplierId) {
+                    availableSuppliers = suppliers.filter(s => {
+                        const supplierIdStr = String(s._id);
+                        const supplierIdNum = Number(s._id);
+                        const defaultIdStr = String(defaultSupplierId);
+                        const defaultIdNum = Number(defaultSupplierId);
+                        return supplierIdStr === defaultIdStr || 
+                               supplierIdNum === defaultIdNum ||
+                               supplierIdStr === defaultIdNum.toString() ||
+                               supplierIdNum.toString() === defaultIdStr;
+                    });
+                    if (availableSuppliers.length > 0) {
+                        isSupplierLocked = true;
+                        selectedSupplierId = String(availableSuppliers[0]._id);
+                    }
+                } else {
+                    // No supplier linked and no default - show warning
+                    availableSuppliers = [];
+                }
+            } else {
+                // Linking disabled - allow any supplier, but pre-select linked supplier if available
+                if (preferredSupplierId) {
+                    const matchingSupplier = suppliers.find(s => {
+                        const supplierIdStr = String(s._id);
+                        const supplierIdNum = Number(s._id);
+                        const preferredIdStr = String(preferredSupplierId);
+                        const preferredIdNum = Number(preferredSupplierId);
+                        return supplierIdStr === preferredIdStr || 
+                               supplierIdNum === preferredIdNum ||
+                               supplierIdStr === preferredIdNum.toString() ||
+                               supplierIdNum.toString() === preferredIdStr;
+                    });
+                    if (matchingSupplier) {
+                        selectedSupplierId = String(matchingSupplier._id);
+                    }
+                }
+            }
+            
+            // Debug logging for supplier linking - always log for debugging
+            console.log(`[Auto-Draft] Product: ${product.productName} (ID: ${product.productId})`);
+            console.log('  - product.supplierId:', product.supplierId, typeof product.supplierId);
+            console.log('  - product.designatedSupplierId:', product.designatedSupplierId, typeof product.designatedSupplierId);
+            console.log('  - product.designatedSupplierID:', product.designatedSupplierID, typeof product.designatedSupplierID);
+            console.log('  - product.supplier_id:', product.supplier_id, typeof product.supplier_id);
+            console.log('  - preferredSupplierIdRaw:', preferredSupplierIdRaw, typeof preferredSupplierIdRaw);
+            console.log('  - preferredSupplierId:', preferredSupplierId, typeof preferredSupplierId);
+            console.log('  - selectedSupplierId:', selectedSupplierId, typeof selectedSupplierId);
+            console.log('  - linkingEnabled:', linkingEnabled);
+            console.log('  - isSupplierLocked:', isSupplierLocked);
+            console.log('  - availableSuppliers:', availableSuppliers.map(s => ({ id: s._id, name: s.name, idType: typeof s._id })));
+            console.log('  - All product fields:', Object.keys(product));
+            
             const unitPrice = Number(product.unitPrice) || 0;
+            const supplierSelectDisabled = linkingEnabled && isSupplierLocked ? 'disabled' : '';
+            const supplierSelectClass = linkingEnabled && isSupplierLocked ? 'form-control supplier-select supplier-locked' : 'form-control supplier-select';
+            const supplierSelectTitle = linkingEnabled && isSupplierLocked ? 'Supplier is locked based on Product-Supplier Linking settings' : '';
+            
+            // Build supplier options
+            let supplierOptions = '';
+            if (availableSuppliers.length === 0) {
+                supplierOptions = `<option value="">No supplier available</option>`;
+            } else {
+                supplierOptions = `<option value="">Select Supplier</option>` +
+                    availableSuppliers.map(supplier => {
+                        const supplierIdStr = String(supplier._id);
+                        const isSelected = selectedSupplierId && supplierIdStr === selectedSupplierId;
+                        return `<option value="${supplier._id}" ${isSelected ? 'selected' : ''}>${supplier.name}</option>`;
+                    }).join('');
+            }
+            
             const row = $(`
-                <tr data-product-id="${product.productId}">
+                <tr data-product-id="${product.productId}" data-linked-supplier-id="${selectedSupplierId || preferredSupplierId || ''}">
                     <td>
                         <strong>${product.productName}</strong>
                         ${product.barcode ? `<br><small class="text-muted">${product.barcode}</small>` : ''}
+                        ${linkingEnabled && !preferredSupplierId && !defaultSupplierId ? 
+                            `<br><small class="text-danger"><i class="fa fa-exclamation-triangle"></i> No supplier linked</small>` : 
+                            ''
+                        }
                     </td>
                     <td>${product.barcode || '-'}</td>
                     <td>
@@ -1073,12 +1189,14 @@ class PurchaseOrderManager {
                         </span>
                     </td>
                     <td>
-                        <select class="form-control supplier-select" data-product-id="${product.productId}">
-                            <option value="">Select Supplier</option>
-                            ${suppliers.map(supplier => 
-                                `<option value="${supplier._id}" ${preferredSupplierId && String(supplier._id) === preferredSupplierId ? 'selected' : ''}>${supplier.name}</option>`
-                            ).join('')}
+                        <select class="${supplierSelectClass}" data-product-id="${product.productId}" 
+                                ${supplierSelectDisabled} title="${supplierSelectTitle}">
+                            ${supplierOptions}
                         </select>
+                        ${linkingEnabled && isSupplierLocked ? 
+                            `<small class="text-info d-block mt-1"><i class="fa fa-lock"></i> Linked supplier</small>` : 
+                            ''
+                        }
                     </td>
                     <td>
                         <input type="number" class="form-control quantity-input" data-product-id="${product.productId}" 
@@ -1103,6 +1221,31 @@ class PurchaseOrderManager {
         
         // Refresh summary based on rendered table
         this.updateAutoDraftSummary();
+    }
+    
+    updateAutoDraftLinkingMode(linkingEnabled) {
+        const infoText = $('#autoDraftLinkingInfo');
+        if (infoText.length === 0) {
+            // Add info text if it doesn't exist
+            const modalHeader = $('#autoDraftModal .modal-header');
+            if (modalHeader.length) {
+                modalHeader.append(`
+                    <div class="alert alert-info alert-sm mb-0 mt-2" id="autoDraftLinkingInfo" style="padding: 8px 12px; font-size: 12px;">
+                        <i class="fa fa-info-circle"></i> 
+                        <span id="autoDraftLinkingText"></span>
+                    </div>
+                `);
+            }
+        }
+        
+        const linkingText = $('#autoDraftLinkingText');
+        if (linkingText.length) {
+            if (linkingEnabled) {
+                linkingText.html('Product-Supplier Linking is <strong>enabled</strong>. Products can only be assigned to their linked suppliers.');
+            } else {
+                linkingText.html('Product-Supplier Linking is <strong>disabled</strong>. Products can be assigned to any supplier.');
+            }
+        }
     }
     
     // Attach event listeners for auto-draft table
@@ -1190,14 +1333,28 @@ class PurchaseOrderManager {
     createPOsFromAssignments() {
         console.log('=== CREATING POS FROM ASSIGNMENTS ===');
         
+        const linkingEnabled = this.settings?.productSupplierLinking !== false;
+        const validationErrors = [];
+        
         // Collect assignments
         const assignments = [];
-        $('#autoDraftTable tbody tr[data-product-id]').each(function() {
-            const productId = $(this).data('product-id');
-            const supplierId = $(this).find('.supplier-select').val();
-            const quantity = parseFloat($(this).find('.quantity-input').val()) || 0;
+        $('#autoDraftTable tbody tr[data-product-id]').each((_, rowEl) => {
+            const $row = $(rowEl);
+            const productId = $row.data('product-id');
+            const linkedSupplierId = $row.data('linked-supplier-id');
+            const supplierId = $row.find('.supplier-select').val();
+            const quantity = parseFloat($row.find('.quantity-input').val()) || 0;
             
             console.log(`Assignment row - productId: ${productId} (type: ${typeof productId}), supplierId: ${supplierId}, quantity: ${quantity}`);
+            
+            // Validate supplier assignment if linking is enabled
+            if (linkingEnabled && supplierId && linkedSupplierId) {
+                if (String(supplierId) !== String(linkedSupplierId)) {
+                    const productName = $row.find('td:first strong').text();
+                    validationErrors.push(`${productName}: Cannot assign to different supplier when Product-Supplier Linking is enabled.`);
+                    return; // Skip this assignment
+                }
+            }
             
             if (supplierId && quantity > 0) {
                 // Ensure productId is properly formatted (NeDB uses numbers for _id)
@@ -1211,6 +1368,18 @@ class PurchaseOrderManager {
                 console.warn(`Skipping assignment - missing supplierId or quantity. supplierId: ${supplierId}, quantity: ${quantity}`);
             }
         });
+        
+        // Show validation errors if any
+        if (validationErrors.length > 0) {
+            const errorMessage = 'Validation failed:\n' + validationErrors.join('\n');
+            if (typeof notiflix !== 'undefined' && notiflix.Notify) {
+                notiflix.Notify.failure(errorMessage);
+            } else {
+                console.error('Validation errors:', validationErrors);
+                alert(errorMessage);
+            }
+            return;
+        }
         
         if (assignments.length === 0) {
             if (typeof notiflix !== 'undefined' && notiflix.Notify) {
@@ -1265,8 +1434,8 @@ class PurchaseOrderManager {
                     
                     // Close modal and refresh purchase orders
                     $('#autoDraftModal').modal('hide');
-                    this.loadPurchaseOrders();
-                } else {
+                this.loadPurchaseOrders();
+            } else {
                     console.error('Failed to create POs:', message);
                     // Reset button on failure
                     $('#createPOsFromAssignments').prop('disabled', false).html('<i class="fa fa-save"></i> Create POs');
@@ -1830,7 +1999,7 @@ class PurchaseOrderManager {
         }
                     
         // If phone number exists, proceed with sending
-        this.openWhatsAppWithPO(order);
+                    this.openWhatsAppWithPO(order);
         
         // Call callback after a short delay to allow WhatsApp to open
         if (callback) {
@@ -2536,14 +2705,236 @@ class PurchaseOrderManager {
                     this.showSaveSuccess(receivedItems.length);
                 $('#receiveItemsModal').modal('hide');
                 this.loadPurchaseOrders();
+                
                 // Refresh product list to show updated quantities and expiry dates
-                // loadProducts() will automatically call loadProductList() after loading
-                if (typeof loadProducts === 'function') {
-                    // Small delay to ensure backend has finished processing
-                    setTimeout(() => {
-                        loadProducts();
-                    }, 300);
+                console.log('Refreshing product list after receiving items...');
+                
+                // First refresh PurchaseOrderManager's product cache with force refresh
+                if (this.loadProducts && typeof this.loadProducts === 'function') {
+                    this.loadProducts(true); // Force database reload for fresh quantities
                 }
+                
+                // Refresh the UI product list after backend update completes and flushes
+                // Backend now has 500ms delay to flush, so we wait a bit longer to ensure data is available
+                setTimeout(() => {
+                    console.log('Refreshing product list after receiving items (first refresh)...');
+                    
+                    // Always make a direct API call to refresh products and update global allProducts
+                    $.ajax({
+                        url: '/api/inventory/products', // Fast endpoint - no special params needed
+                        method: 'GET',
+                        cache: false, // Prevent browser caching
+                        success: function(products) {
+                            console.log(`Refreshed ${products.length} products from API`);
+                            
+                            // Log quantities for received products to verify updates
+                            const receivedProductIds = receivedItems.map(item => String(item.productId));
+                            const receivedProducts = products.filter(p => receivedProductIds.includes(String(p._id)));
+                            if (receivedProducts.length > 0) {
+                                console.log('📊 Received products quantities after refresh:', 
+                                    receivedProducts.map(p => ({ 
+                                        name: p.name, 
+                                        id: p._id, 
+                                        quantity: p.quantity,
+                                        batchSummaryQty: p.batchSummary ? p.batchSummary.totalQuantity : 'N/A',
+                                        stock: p.stock,
+                                        receivedDate: p.receivedDate 
+                                    }))
+                                );
+                            }
+                            
+                            // Process products the same way loadProducts does
+                            products.forEach((item) => {
+                                item.price = parseFloat(item.price).toFixed(2);
+                            });
+                            
+                            // CRITICAL: Update allProducts BEFORE calling loadProductList
+                            // Update allProducts - try multiple ways
+                            if (typeof allProducts !== 'undefined') {
+                                // Direct assignment (if in same scope)
+                                allProducts = [...products];
+                                console.log('Updated allProducts array (direct)');
+                            }
+                            
+                            // Always update window.allProducts if available
+                            if (typeof window !== 'undefined') {
+                                window.allProducts = [...products];
+                                console.log('Updated window.allProducts array');
+                            }
+                            
+                            // IMPORTANT: Force a small delay to ensure allProducts is updated in all scopes
+                            setTimeout(() => {
+                                // Update product list table and POS product pane
+                                console.log('Attempting to refresh UI...');
+                                console.log('  - loadProductList available:', typeof loadProductList !== 'undefined');
+                                console.log('  - loadProducts available:', typeof loadProducts !== 'undefined');
+                                console.log('  - window.loadProductList available:', typeof window.loadProductList !== 'undefined');
+                                
+                                // Call loadProductList directly to update the product list table
+                                // This uses allProducts which we just updated
+                                if (typeof loadProductList === 'function') {
+                                    console.log('✅ Calling loadProductList() to update product list table...');
+                                    try {
+                                        loadProductList();
+                                        console.log('✅ loadProductList() called successfully');
+                                    } catch (e) {
+                                        console.error('❌ Error calling loadProductList():', e);
+                                    }
+                                } else if (typeof window.loadProductList === 'function') {
+                                    console.log('✅ Calling window.loadProductList() to update product list table...');
+                                    try {
+                                        window.loadProductList();
+                                        console.log('✅ window.loadProductList() called successfully');
+                                    } catch (e) {
+                                        console.error('❌ Error calling window.loadProductList():', e);
+                                    }
+            } else {
+                                    console.warn('⚠️ loadProductList() not available - product list table may not update');
+                                }
+                                
+                                // Re-render POS product pane by calling loadProducts which rebuilds the product cards
+                                // Note: loadProducts() will also call loadProductList() internally, so this should refresh both
+                                if (typeof loadProducts === 'function') {
+                                    console.log('✅ Calling loadProducts() to refresh POS product pane and product list...');
+                                    try {
+                                        loadProducts(0, true); // Force database reload for fresh quantities
+                                        console.log('✅ loadProducts() called successfully');
+                                    } catch (e) {
+                                        console.error('❌ Error calling loadProducts():', e);
+                                    }
+                                } else {
+                                    // Fallback: trigger the event (debounced by pos.js)
+                                    // Don't trigger if we already triggered recently to prevent loops
+                                    if (!window.lastProductsUpdateTrigger || (Date.now() - window.lastProductsUpdateTrigger) > 5000) {
+                                        window.lastProductsUpdateTrigger = Date.now();
+                                        console.log('⚠️ loadProducts() not available - triggering productsUpdated event...');
+                                        // Use a longer delay to avoid immediate trigger loops and let debouncing work
+                                        setTimeout(() => {
+                                            $(document).trigger('productsUpdated');
+                                        }, 2000); // Increased delay to allow debouncing to work properly
+                                    } else {
+                                        console.log('⚠️ Skipping productsUpdated trigger - too soon after last trigger');
+                                    }
+                                }
+                            }, 100); // Small delay to ensure allProducts is updated in all scopes
+                        },
+                        error: function(err) {
+                            console.error('Failed to refresh products:', err);
+                        }
+                    });
+                }, 800); // 800ms delay to allow backend update (500ms) + flush time to complete
+                
+                // Second refresh after a longer delay to ensure backend has fully completed
+                setTimeout(() => {
+                    console.log('Refreshing product list after receiving items (second refresh - ensuring sync)...');
+                    
+                    // Force a complete reload from the API - loadProducts() always fetches fresh data
+                    if (typeof loadProducts === 'function') {
+                        console.log('Calling loadProducts() for final refresh...');
+                        loadProducts(0, true); // Force database reload for fresh quantities
+                    } else {
+                        // Fallback: direct API call
+                        $.ajax({
+                            url: '/api/inventory/products', // Fast endpoint
+                            method: 'GET',
+                            cache: false,
+                            success: function(products) {
+                                console.log(`Second refresh: ${products.length} products from API`);
+                                
+                                products.forEach((item) => {
+                                    item.price = parseFloat(item.price).toFixed(2);
+                                });
+                                
+                                if (typeof allProducts !== 'undefined') {
+                                    allProducts = [...products];
+                                }
+                                if (typeof window !== 'undefined') {
+                                    window.allProducts = [...products];
+                                }
+                                
+                                // Update product list table
+                                if (typeof loadProductList === 'function') {
+                                    console.log('✅ Second refresh: Calling loadProductList()...');
+                                    loadProductList();
+                                } else if (typeof window.loadProductList === 'function') {
+                                    console.log('✅ Second refresh: Calling window.loadProductList()...');
+                                    window.loadProductList();
+                                }
+                                
+                                // Refresh POS product pane - loadProducts() will also call loadProductList() internally
+                                if (typeof loadProducts === 'function') {
+                                    console.log('✅ Second refresh: Calling loadProducts()...');
+                                    loadProducts(0, true); // Force database reload for fresh quantities
+                                } else {
+                                    // Fallback: trigger the event (debounced by pos.js)
+                                    // Don't trigger if we already triggered recently to prevent loops
+                                    if (!window.lastProductsUpdateTrigger || (Date.now() - window.lastProductsUpdateTrigger) > 5000) {
+                                        window.lastProductsUpdateTrigger = Date.now();
+                                        setTimeout(() => {
+                                            $(document).trigger('productsUpdated');
+                                        }, 2000); // Increased delay to allow debouncing to work properly
+                                    } else {
+                                        console.log('⚠️ Skipping productsUpdated trigger (second refresh) - too soon after last trigger');
+                                    }
+                                }
+                            },
+                            error: function(err) {
+                                console.error('Failed to refresh products (second attempt):', err);
+                            }
+                        });
+                    }
+                }, 6000); // 6 second delay for second refresh
+                
+                // Also trigger a recalculation for the received products to fix any existing discrepancies
+                // Note: This is a safety check - the product quantity is already recalculated during receive items
+                // Increased delay to 7 seconds to ensure batches are fully written to disk
+                setTimeout(() => {
+                    const productIds = receivedItems.map(item => item.productId).filter(Boolean);
+                    if (productIds.length > 0) {
+                        console.log(`🔄 Triggering quantity recalculation for ${productIds.length} product(s):`, productIds);
+                        $.ajax({
+                            url: '/api/purchase-orders/recalculate-product-quantities',
+                            method: 'POST',
+                            contentType: 'application/json',
+                            data: JSON.stringify({ productIds: productIds }),
+                            success: function(response) {
+                                if (response.success) {
+                                    console.log(`✅ Recalculation complete: ${response.updated} products updated, ${response.errors} errors, ${response.total} total`);
+                                    // Always trigger refresh after recalculation, even if updated === 0
+                                    // This ensures the UI shows the latest quantities
+                                    if (!window.lastProductsUpdateTrigger || (Date.now() - window.lastProductsUpdateTrigger) > 3000) {
+                                        window.lastProductsUpdateTrigger = Date.now();
+                                        console.log('🔄 Triggering productsUpdated event after recalculation...');
+                                        setTimeout(() => {
+                                            $(document).trigger('productsUpdated');
+                                        }, 1000); // Short delay to allow backend to finish
+                                    } else {
+                                        console.log('⚠️ Skipping productsUpdated trigger (after recalculation) - too soon after last trigger');
+                                    }
+                                }
+                            },
+                            error: function(err) {
+                                console.warn('Failed to trigger quantity recalculation:', err);
+                                // Even on error, trigger refresh to get latest data
+                                if (!window.lastProductsUpdateTrigger || (Date.now() - window.lastProductsUpdateTrigger) > 3000) {
+                                    window.lastProductsUpdateTrigger = Date.now();
+                                    setTimeout(() => {
+                                        $(document).trigger('productsUpdated');
+                                    }, 1000);
+                                }
+                            }
+                        });
+                    } else {
+                        console.warn('No product IDs found in receivedItems for recalculation');
+                        // Still trigger refresh even if no product IDs
+                        if (!window.lastProductsUpdateTrigger || (Date.now() - window.lastProductsUpdateTrigger) > 3000) {
+                            window.lastProductsUpdateTrigger = Date.now();
+                            setTimeout(() => {
+                                $(document).trigger('productsUpdated');
+                            }, 2000);
+                        }
+                    }
+                }, 7000); // Wait 7 seconds after receiving to ensure batch updates are fully committed before recalculation
             } else {
                     this.showSaveError(response.message || 'Failed to receive items');
                 }

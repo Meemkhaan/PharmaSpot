@@ -12,6 +12,7 @@ class PONotifications {
             showDraftAlerts: true,
             showOverdueAlerts: true,
             showExpiryAlerts: true,
+            showLowStockAlerts: true, // Separate setting for low stock alerts
             autoRefresh: true,
             refreshInterval: 120000 // 2 minutes (reduced frequency)
         };
@@ -21,10 +22,16 @@ class PONotifications {
     }
 
     init() {
+        console.log('=== PO NOTIFICATIONS INIT ===');
         this.loadSettings();
         this.setupEventListeners();
         this.startAutoRefresh();
-        this.checkForNotifications();
+        
+        // Delay initial check to ensure API and Notiflix are ready
+        setTimeout(() => {
+            console.log('=== INITIAL NOTIFICATION CHECK (DELAYED) ===');
+            this.checkForNotifications();
+        }, 5000); // Increased delay to 5 seconds to ensure Notiflix is loaded
     }
 
     setupEventListeners() {
@@ -102,13 +109,21 @@ class PONotifications {
     }
 
     async checkForNotifications() {
-        if (!this.settings.enabled || this.isChecking) {
+        if (!this.settings.enabled) {
+            console.log('Notifications disabled, skipping check');
+            return;
+        }
+        
+        if (this.isChecking) {
+            console.log('Notification check already in progress, skipping');
             return;
         }
 
         this.isChecking = true;
+        console.log('=== CHECKING FOR NOTIFICATIONS ===');
         try {
             const notifications = await this.generateNotifications();
+            console.log('Generated notifications:', notifications.length);
             this.updateNotificationDisplay(notifications);
         } catch (error) {
             console.error('Failed to check for notifications:', error);
@@ -206,21 +221,8 @@ class PONotifications {
                 });
             }
 
-            // Check for low stock items that need reordering
-            if (this.settings.showExpiryAlerts) {
-                const lowStockProducts = await this.getLowStockProducts();
-                if (lowStockProducts.length > 0) {
-                    notifications.push({
-                        id: 'low-stock-items',
-                        type: 'warning',
-                        title: 'Low Stock Alert',
-                        message: `${lowStockProducts.length} product(s) are below reorder point and need restocking.`,
-                        count: lowStockProducts.length,
-                        action: 'Generate Auto-Draft',
-                        data: { lowStock: true }
-                    });
-                }
-            }
+            // Note: Low stock notifications are handled by the existing system in pos.js
+            // This module only handles PO-specific notifications (draft, overdue, etc.)
 
         } catch (error) {
             console.error('Error generating notifications:', error);
@@ -229,19 +231,6 @@ class PONotifications {
         return notifications;
     }
 
-    async getLowStockProducts() {
-        try {
-            const products = await $.get('/api/inventory/products');
-            return products.filter(product => {
-                const quantity = parseInt(product.quantity) || 0;
-                const reorderPoint = parseInt(product.reorderPoint) || parseInt(product.minStock) || 5;
-                return quantity <= reorderPoint;
-            });
-        } catch (error) {
-            console.error('Failed to get low stock products:', error);
-            return [];
-        }
-    }
 
     updateNotificationDisplay(notifications) {
         console.log('=== PONOTIFICATIONS UPDATE DISPLAY ===');
@@ -252,6 +241,21 @@ class PONotifications {
         this.notifications = notifications;
         this.updateNotificationBadge();
         this.updateNotificationPanel();
+        
+        // Also update the PO notification badge in the nav bar
+        this.updatePONavBadge(notifications);
+    }
+    
+    updatePONavBadge(notifications) {
+        const badge = $('#poNotificationBadge');
+        if (badge.length) {
+            const totalCount = notifications.reduce((sum, notif) => sum + (notif.count || 0), 0);
+            if (totalCount > 0) {
+                badge.text(totalCount).show();
+            } else {
+                badge.hide();
+            }
+        }
     }
 
     updateNotificationBadge() {
@@ -456,7 +460,18 @@ class PONotifications {
 
 // Initialize notifications when DOM is ready
 $(document).ready(function() {
+    console.log('=== INITIALIZING PO NOTIFICATIONS ===');
     window.poNotifications = new PONotifications();
+    
+    // Also check after a short delay to ensure everything is loaded
+    setTimeout(() => {
+        console.log('=== DELAYED NOTIFICATION CHECK ===');
+        if (window.poNotifications) {
+            window.poNotifications.checkForNotifications();
+        }
+    }, 3000);
+    
+    console.log('✅ PO Notifications initialized (handles PO-specific notifications only).');
 });
 
 // Export for use in other modules

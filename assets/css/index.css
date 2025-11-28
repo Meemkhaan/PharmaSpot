@@ -780,3 +780,14 @@
     font-size: 0.75rem;
     padding: 0.25rem 0.5rem;
 }
+
+/* Auto-Draft Management - Locked Supplier Select */
+.supplier-locked {
+    background-color: #f8f9fa !important;
+    cursor: not-allowed !important;
+    opacity: 0.8;
+}
+
+.supplier-locked:disabled {
+    background-color: #e9ecef !important;
+}

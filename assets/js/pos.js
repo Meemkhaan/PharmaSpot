@@ -20,6 +20,8 @@ let cart = [];
 let index = 0;
 let allUsers = [];
 let allProducts = [];
+// Expose to window for access from other modules
+window.allProducts = allProducts;
 let allCategories = [];
 let allTransactions = [];
 let sold = [];
@@ -1923,11 +1925,13 @@ if (auth == undefined) {
       $(".p_one").hide();
     }
 
-    function loadProducts(retryCount = 0) {
+    function loadProducts(retryCount = 0, forceRefresh = false) {
+      // Fast path: no special parameters needed - database is already updated by decrementInventory
       $.ajax({
         url: api + "inventory/products",
         method: "GET",
-        timeout: 15000, // 15 seconds to allow for backend 8-second fallback + processing
+        cache: false, // Prevent browser caching
+        timeout: 5000, // 5 seconds should be plenty for the fast endpoint
         success: function (data) {
           // Handle empty array (might be timeout response)
           if (!data || (Array.isArray(data) && data.length === 0 && retryCount === 0)) {
@@ -1940,8 +1944,24 @@ if (auth == undefined) {
         data.forEach((item) => {
           item.price = parseFloat(item.price).toFixed(2);
         });
+        
+        // Debug: Log sample products to verify batchSummary enhancement
+        if (data.length > 0) {
+          const sampleProducts = data.slice(0, 5).map(p => ({
+            id: p._id,
+            name: p.name,
+            quantity: p.quantity,
+            quantityType: typeof p.quantity,
+            hasBatchSummary: !!p.batchSummary,
+            batchSummaryQty: p.batchSummary?.totalQuantity,
+            batchSummaryType: typeof p.batchSummary?.totalQuantity
+          }));
+          console.log('📦 Products loaded from API (sample):', sampleProducts);
+        }
 
         allProducts = [...data];
+        // Keep window.allProducts in sync
+        window.allProducts = allProducts;
 
         // Update loss tiles immediately after products load
         try {
@@ -1993,12 +2013,51 @@ if (auth == undefined) {
         } catch (e) { }
 
         loadProductList();
+        
+        // Expose loadProductList globally for access from other modules
+        window.loadProductList = loadProductList;
+        
+        // Debounce mechanism to prevent rapid-fire refreshes
+        let productsUpdateTimeout = null;
+        let isRefreshingProducts = false;
+        
+        // Listen for productsUpdated event to refresh product list
+        $(document).on('productsUpdated', function() {
+            // Clear any pending refresh
+            if (productsUpdateTimeout) {
+                clearTimeout(productsUpdateTimeout);
+            }
+            
+            // Debounce: wait 1 second before refreshing to batch multiple events and prevent loops
+            productsUpdateTimeout = setTimeout(() => {
+                // Prevent concurrent refreshes
+                if (isRefreshingProducts) {
+                    console.log('⚠️ Products refresh already in progress - skipping duplicate refresh');
+                    return;
+                }
+                
+                isRefreshingProducts = true;
+                console.log('Products updated event received - reloading products from API...');
+                
+                // Reload products from API to get fresh data with updated quantities
+                loadProducts();
+                
+                // Reset flag after a longer delay to allow the refresh to complete and prevent rapid re-triggers
+                setTimeout(() => {
+                    isRefreshingProducts = false;
+                }, 5000); // Increased to 5 seconds to prevent rapid re-triggers
+            }, 2000); // Increased to 2 second debounce to prevent infinite loops
+        });
 
         let delay = 0;
         let expiredCount = 0;
+        let lowStockCount = 0;
+        let noStockCount = 0;
+        
         allProducts.forEach((product) => {
           const productExpiryRaw = getCanonicalExpiry(product);
 
+          // Check expiry notifications
           if (!isExpired(productExpiryRaw)) {
             const diffDays = daysToExpire(productExpiryRaw);
 
@@ -2011,6 +2070,27 @@ if (auth == undefined) {
           } else {
             expiredCount++;
           }
+          
+          // Check stock notifications (only for products with stock tracking enabled)
+          if (product.stock == 1) {
+            const quantity = parseInt(product.quantity) || 0;
+            const reorderPoint = parseInt(product.reorderPoint) || parseInt(product.minStock) || 5;
+            const stockStatus = getStockStatus(quantity, reorderPoint);
+            
+            if (stockStatus === 0) {
+              // No stock
+              noStockCount++;
+              notiflix.Notify.failure(
+                `${product.name} is out of stock!`,
+              );
+            } else if (stockStatus === -1) {
+              // Low stock
+              lowStockCount++;
+              notiflix.Notify.warning(
+                `${product.name} is low on stock (${quantity} left, reorder point: ${reorderPoint})`,
+              );
+            }
+          }
         });
 
         //Show notification if there are any expired goods.
@@ -2022,9 +2102,23 @@ if (auth == undefined) {
           } expired. Please restock!`,
         );
         }
+        
+        // Show summary notification for low/no stock if there are many
+        if (noStockCount > 5) {
+          notiflix.Notify.failure(
+            `${noStockCount} products are out of stock! Please restock immediately.`,
+          );
+        } else if (lowStockCount > 5) {
+          notiflix.Notify.warning(
+            `${lowStockCount} products are low on stock. Consider reordering.`,
+        );
+        }
 
        
         $("#parent").text("");
+        
+        console.log('🔄 loadProducts() - Rebuilding POS product pane with', data.length, 'products');
+        console.log('   Sample product quantities:', data.slice(0, 3).map(p => ({ name: p.name, qty: p.quantity, stock: p.stock })));
 
         data.forEach((item) => {
           if (!categories.includes(item.category)) {
@@ -2032,7 +2126,18 @@ if (auth == undefined) {
           }
           const itemExpiryRaw = getCanonicalExpiry(item);
           let item_isExpired = isExpired(itemExpiryRaw);
-          let item_stockStatus = getStockStatus(item.quantity,item.minStock);
+          // Priority: Use batchSummary.totalQuantity if available (same as edit form)
+          // This ensures consistency with the edit form which calculates from batches
+          let itemQuantity = 0;
+          if (item.batchSummary && 
+              typeof item.batchSummary.totalQuantity === 'number' && 
+              item.batchSummary.totalQuantity >= 0) {
+            itemQuantity = item.batchSummary.totalQuantity;
+          } else {
+            // Fallback to stored quantity
+            itemQuantity = Number(item.quantity) || 0;
+          }
+          let item_stockStatus = getStockStatus(itemQuantity, item.minStock);
           if(item.img==="")
           {
             item_img = default_item_img;
@@ -2046,7 +2151,7 @@ if (auth == undefined) {
 
           let item_info = `<div class="col-lg-2 box ${item.category}"
                                 onclick="$(this).addToCart(${item._id}, ${
-                                  item.quantity
+                                  itemQuantity
                                 }, ${item.stock})">
                             <div class="widget-panel widget-style-2 " title="${item.name}">                    
                             <div id="image"><img src="${item_img}" id="product_img" alt=""></div>                    
@@ -2063,8 +2168,8 @@ if (auth == undefined) {
                                           item.barcode || item._id
                                         }</span>
                                         <span class="${item_stockStatus<1?'text-danger':''}"><span class="stock">STOCK </span><span class="count">${
-                                          (item.stock == 1 || (item.stock > 1 && item.quantity)) 
-                                            ? item.quantity
+                                          (item.stock == 1 || (item.stock > 1 && itemQuantity)) 
+                                            ? itemQuantity
                                             : "N/A"
                                         }</span></span></div>
                                         <span class="text-success text-center"><b data-plugin="counterup">${
@@ -3180,7 +3285,19 @@ if (auth == undefined) {
                     </tr>`;
       }
 
+      // Calculate subtotal, tax, and total
+      subTotal = 0;
+      cart.forEach((item) => {
+        subTotal += parseFloat(item.price) * parseFloat(item.quantity);
+      });
+      
+      // Calculate discount
+      const discountValue = parseFloat(discount) || 0;
+      
+      // Calculate VAT if tax is enabled
       if (settings.charge_tax) {
+        const vatPercentage = parseFloat(settings.percentage) || 0;
+        totalVat = (subTotal * vatPercentage) / 100;
         tax_row = `<tr>
                     <td>VAT(${validator.unescape(settings.percentage)})% </td>
                     <td>:</td>
@@ -3188,7 +3305,21 @@ if (auth == undefined) {
                       parseFloat(totalVat).toFixed(2),
                     )}</td>
                 </tr>`;
+      } else {
+        totalVat = 0;
+        tax_row = "";
       }
+      
+      // Calculate order total
+      orderTotal = subTotal + totalVat - discountValue;
+      
+      console.log('💰 Calculated totals:', {
+        subTotal: subTotal,
+        totalVat: totalVat,
+        discount: discountValue,
+        orderTotal: orderTotal,
+        cartLength: cart.length
+      });
 
       if (status == 0) {
         if ($("#customer").val() == 0 && $("#refNumber").val() == "") {
@@ -3278,9 +3409,9 @@ if (auth == undefined) {
                 <td>Discount</td>
                 <td>:</td>
                 <td class="text-right">${
-                  discount > 0
+                  discountValue > 0
                     ? validator.unescape(settings.symbol) +
-                      moneyFormat(parseFloat(discount).toFixed(2))
+                      moneyFormat(parseFloat(discountValue).toFixed(2))
                     : ""
                 }</td>
             </tr>
@@ -3291,7 +3422,7 @@ if (auth == undefined) {
                 <td class="text-right">
                     <h5>${validator.unescape(settings.symbol)} ${moneyFormat(
                       parseFloat(orderTotal).toFixed(2),
-                    )}</h3>
+                    )}</h5>
                 </td>
             </tr>
             ${payment == 0 ? "" : payment}
@@ -3320,7 +3451,7 @@ if (auth == undefined) {
       let data = {
         order: orderNumber,
         ref_number: refNumber,
-        discount: discount,
+        discount: discountValue,
         customer: customer,
         status: status,
         subtotal: parseFloat(subTotal).toFixed(2),
@@ -3339,6 +3470,15 @@ if (auth == undefined) {
         user: user.fullname,
         user_id: user._id,
       };
+      
+      console.log('💰 Final order data:', {
+        order: data.order,
+        subtotal: data.subtotal,
+        tax: data.tax,
+        discount: data.discount,
+        total: data.total,
+        itemsCount: data.items.length
+      });
 
       const transactionUrl = api + "new";
       console.log('🚀 Sending transaction to:', transactionUrl);
@@ -3359,6 +3499,14 @@ if (auth == undefined) {
         qty: item.qty
       })));
 
+      // Log receipt before sending
+      console.log('📄 Receipt before AJAX call:', {
+        receipt: receipt,
+        type: typeof receipt,
+        length: receipt ? receipt.length : 0,
+        isEmpty: receipt ? receipt.trim() === '' : true
+      });
+
       $.ajax({
         url: transactionUrl,
         type: method,
@@ -3369,11 +3517,65 @@ if (auth == undefined) {
         success: function (response) {
           console.log('✅ Transaction created successfully');
           console.log('Response:', response);
+          console.log('📄 Receipt in success callback:', {
+            receipt: receipt,
+            type: typeof receipt,
+            length: receipt ? receipt.length : 0
+          });
           
           cart = [];
           // Check if receipt is valid before sanitizing
-          if (!receipt || typeof receipt !== 'string') {
-            console.error('❌ Receipt is not valid:', receipt);
+          if (!receipt || typeof receipt !== 'string' || receipt.trim() === '') {
+            console.error('❌ Receipt is not valid:', {
+              receipt: receipt,
+              type: typeof receipt,
+              length: receipt ? receipt.length : 0,
+              isEmpty: receipt ? receipt.trim() === '' : true
+            });
+            
+            // Try to regenerate receipt from response data
+            console.log('Attempting to regenerate receipt from transaction data...');
+            if (response && (response.transactionId || response.order || response._id)) {
+              const transactionId = response.transactionId || response.order || response._id;
+              // Reload transactions and use viewTransaction to generate receipt
+              loadTransactions();
+              // Wait a bit for transactions to load, then find and display the receipt
+              setTimeout(() => {
+                const transactionIndex = allTransactions.findIndex(t => 
+                  t._id == transactionId || 
+                  t.order == transactionId ||
+                  String(t._id) === String(transactionId) ||
+                  String(t.order) === String(transactionId)
+                );
+                if (transactionIndex !== -1) {
+                  $.fn.viewTransaction(transactionIndex);
+                  if (status == 0) {
+                    notiflix.Report.success(
+                      "Order Held Successfully!",
+                      `Order has been held with reference: ${refNumber}`,
+                      "Ok"
+                    );
+                    $("#dueModal").modal("hide");
+                  } else {
+                    $("#orderModal").modal("show");
+                  }
+                } else {
+                  console.error('Transaction not found in allTransactions:', {
+                    transactionId: transactionId,
+                    allTransactionsLength: allTransactions.length,
+                    allTransactionIds: allTransactions.map(t => ({ _id: t._id, order: t.order }))
+                  });
+                  notiflix.Report.failure(
+                    "Receipt Error",
+                    "Transaction created but receipt could not be generated. Transaction ID: " + transactionId,
+                    "Ok"
+                  );
+                }
+                $(".loading").hide();
+              }, 500); // Wait 500ms for transactions to load
+              return;
+            }
+            
             notiflix.Report.failure(
               "Receipt Error",
               "Failed to generate receipt. Please try again.",
@@ -3385,18 +3587,31 @@ if (auth == undefined) {
           
           // Sanitize receipt but allow images
           try {
-            receipt = DOMPurify.sanitize(receipt, { 
+            const sanitizedReceipt = DOMPurify.sanitize(receipt, { 
               ALLOW_UNKNOWN_PROTOCOLS: true,
-              ALLOW_TAGS: ['div', 'p', 'span', 'br', 'hr', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'h5', 'h3', 'b', 'img'],
+              ALLOW_TAGS: ['div', 'p', 'span', 'br', 'hr', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'h5', 'h3', 'b', 'img', 'strong', 'left'],
               ALLOW_ATTR: ['style', 'src', 'alt', 'width', 'class', 'colspan', 'onerror']
             });
+            receipt = sanitizedReceipt;
+            console.log('✅ Receipt sanitized successfully, length:', receipt.length);
           } catch (sanitizeError) {
             console.error('❌ Error sanitizing receipt:', sanitizeError);
             // Continue with unsanitized receipt if sanitization fails
           }
           
+          // Set receipt HTML
           $("#viewTransaction").html("");
           $("#viewTransaction").html(receipt);
+          console.log('✅ Receipt HTML set in viewTransaction element');
+          console.log('📄 Receipt preview (first 200 chars):', receipt.substring(0, 200));
+          
+          // Always clear cart and reset UI first
+          cart = [];
+          // Force refresh to get fresh quantities after checkout
+          loadProducts(0, true);
+          loadCustomers();
+          $(".loading").hide();
+          $("#paymentModel").modal("hide");
           
           // Show different behavior for hold orders vs completed orders
           if (status == 0) {
@@ -3409,42 +3624,44 @@ if (auth == undefined) {
             $("#dueModal").modal("hide");
           } else {
             // Completed order - show receipt modal
+            console.log('Showing receipt modal for completed order (status:', status, ')');
+            console.log('Order modal element exists:', $("#orderModal").length > 0);
+            console.log('ViewTransaction element exists:', $("#viewTransaction").length > 0);
+            console.log('ViewTransaction content length:', $("#viewTransaction").html().length);
+            
+            // Force show modal
+            setTimeout(() => {
           $("#orderModal").modal("show");
+              console.log('✅ Receipt modal shown');
+            }, 100);
           }
           
-          loadProducts();
-          loadCustomers();
-          $(".loading").hide();
-          $("#paymentModel").modal("hide");
+          // Refresh hold orders and customer orders
+          try {
           $(this).getHoldOrders();
           $(this).getCustomerOrders();
           $(this).renderTable(cart);
+          } catch (e) {
+            console.warn('Error refreshing orders:', e);
+          }
           
           // Reset button states
           $("#holdOrderBtn").prop("disabled", false).html('<i class="fa fa-hand-paper-o"></i> Hold Order');
-          $("#confirmPayment").prop("disabled", false).html('<i class="fa fa-check"></i> Confirm Payment');
         },
-
-        error: function (xhr, status, error) {
-          console.error('❌ Transaction creation failed');
-          console.error('Status:', status);
-          console.error('Error:', error);
-          console.error('Response:', xhr.responseText);
-          console.error('Status code:', xhr.status);
-          
+        error: function(xhr, status, error) {
+          console.error('❌ Transaction creation failed:', {
+            status: status,
+            error: error,
+            responseText: xhr.responseText,
+            statusCode: xhr.status
+          });
           $(".loading").hide();
-          $("#dueModal").modal("toggle");
-          
-          // Reset button states
-          $("#holdOrderBtn").prop("disabled", false).html('<i class="fa fa-hand-paper-o"></i> Hold Order');
-          $("#confirmPayment").prop("disabled", false).html('<i class="fa fa-check"></i> Confirm Payment');
-          
           notiflix.Report.failure(
-            "Something went wrong!",
-            "Please refresh this page and try again",
-            "Ok",
+            "Transaction Error",
+            "Failed to create transaction: " + (error || status || "Unknown error"),
+            "Ok"
           );
-        },
+        }
       });
 
       $("#refNumber").val("");
@@ -3900,6 +4117,19 @@ if (auth == undefined) {
       // Apply default supplier setting if no supplier is selected
       if (settings && settings.defaultSupplier && !$("#supplier").val()) {
         $("#supplier").val(settings.defaultSupplier);
+      }
+
+      // Add designatedSupplierId field if supplier is selected (for product-supplier linking)
+      const supplierId = $("#supplier").val();
+      if (supplierId) {
+        // Remove any existing designatedSupplierId hidden field
+        $("#saveProduct input[name='designatedSupplierId']").remove();
+        // Add new hidden field with supplier ID
+        $("<input>").attr({
+          type: "hidden",
+          name: "designatedSupplierId",
+          value: supplierId
+        }).appendTo("#saveProduct");
       }
 
       $(this).attr("action", api + "inventory/product");
@@ -6200,15 +6430,60 @@ if (auth == undefined) {
 
       $(".perms").show();
 
-      $("#user_id").val(allUsers[index]._id);
-      $("#fullname").val(allUsers[index].fullname);
-      $("#username").val(validator.unescape(allUsers[index].username));
-      $("#password").attr("placeholder", "New Password");
-    
+      const user = allUsers[index];
+      const isAdmin = user._id == 1 || (user.role && user.role.toLowerCase() === "admin");
+      
+      $("#user_id").val(user._id);
+      $("#fullname").val(user.fullname || "");
+      $("#username").val(validator.unescape(user.username || ""));
+      $("#userEmail").val(user.email || "");
+      $("#userRole").val(user.role || "cashier");
+      $("#password").val("");
+      $("#password").attr("placeholder", "Leave blank to keep current password");
+      $("#pass").val("");
+      $("#passwordRequired").hide();
+      $("#passRequired").hide();
+      $("#passwordHelp").text("Leave blank to keep current password");
+      $("#userModalTitle").text("Edit User: " + user.fullname);
 
+      // Reset password strength indicator
+      $("#passwordStrengthBar").hide();
+      $("#passwordStrengthText").text("");
+
+      // Handle settings permission - only visible/editable for admin users
+      const $settingsPerm = $("#perm_settings").closest(".form-group");
+      if (isAdmin) {
+        $settingsPerm.show();
+        // Admin must always have settings permission
+        $("#perm_settings").prop("checked", true).prop("disabled", false);
+      } else {
+        $settingsPerm.hide();
+        // Non-admin users cannot have settings permission
+        $("#perm_settings").prop("checked", false).prop("disabled", true);
+      }
+
+      // Handle role change - update settings permission visibility
+      $("#userRole").off("change.settingsPerm").on("change.settingsPerm", function() {
+        const selectedRole = $(this).val();
+        const isAdminRole = selectedRole === "admin" || user._id == 1;
+        
+        if (isAdminRole) {
+          $settingsPerm.show();
+          $("#perm_settings").prop("checked", true).prop("disabled", false);
+        } else {
+          $settingsPerm.hide();
+          $("#perm_settings").prop("checked", false).prop("disabled", true);
+        }
+      });
+
+      // Set other permissions
       for (perm of permissions) {
+        if (perm === "perm_settings") {
+          // Settings permission handled above
+          continue;
+        }
         var el = "#" + perm;
-        if (allUsers[index][perm] == 1) {
+        if (user[perm] == 1) {
           $(el).prop("checked", true);
         } else {
           $(el).prop("checked", false);
@@ -6271,6 +6546,12 @@ if (auth == undefined) {
         // Open modal
         $('#productBatchesModal').modal('show');
         
+        // First, get the product data to check if it has stock (for legacy stock detection)
+        let productData = null;
+        if (typeof allProducts !== 'undefined' && Array.isArray(allProducts)) {
+            productData = allProducts.find(p => String(p._id) === String(productId));
+        }
+        
         // Fetch batches from API
         $.ajax({
             url: '/api/purchase-orders/batches/by-product/' + productId,
@@ -6278,12 +6559,32 @@ if (auth == undefined) {
             timeout: 10000, // 10 second timeout (increased from 5s to match backend)
             success: function (response) {
                 console.log('Batches response:', response);
+                console.log('Batches response.success:', response.success);
+                console.log('Batches response.batches:', response.batches);
+                console.log('Batches response.batches length:', response.batches ? response.batches.length : 'null/undefined');
+                console.log('Batches response.batches is array:', Array.isArray(response.batches));
                 
                 const tbody = $('#batchesTableBody');
                 tbody.empty();
                 
                 if (!response.success || !response.batches || response.batches.length === 0) {
-                    tbody.html('<tr><td colspan="9" class="text-center text-info"><i class="fa fa-info-circle"></i> No batches found for this product.</td></tr>');
+                    console.warn('⚠️ No batches found - response.success:', response.success, 'batches:', response.batches);
+                    // Check if product has quantity (legacy stock without batches)
+                    const productQuantity = productData && productData.quantity ? Number(productData.quantity) : 0;
+                    const productBatchSummaryQty = productData && productData.batchSummary && productData.batchSummary.totalQuantity ? Number(productData.batchSummary.totalQuantity) : 0;
+                    const hasStock = productQuantity > 0 || productBatchSummaryQty > 0;
+                    
+                    if (hasStock) {
+                        // Product has stock but no batches - this is legacy stock
+                        const stockQty = productBatchSummaryQty > 0 ? productBatchSummaryQty : productQuantity;
+                        tbody.html(`<tr><td colspan="9" class="text-center text-warning">
+                            <i class="fa fa-exclamation-triangle"></i> No batches found for this product, but it has ${stockQty} units in stock.<br>
+                            <small class="text-muted">This appears to be legacy stock. To track by batches, receive items through a Purchase Order.</small>
+                        </td></tr>`);
+                    } else {
+                        // No stock and no batches
+                        tbody.html('<tr><td colspan="9" class="text-center text-info"><i class="fa fa-info-circle"></i> No batches found for this product.</td></tr>');
+                    }
                     $('#totalBatchesCount').text('0');
                     $('#totalBatchesQuantity').text('0');
                     $('#totalBatchesValue').text('$0.00');
@@ -6423,6 +6724,135 @@ if (auth == undefined) {
     $("#usersModal").on("click", function () {
       loadUserList();
     });
+
+    // New User button
+    $("#newUserBtn").on("click", function () {
+      $("#Users").modal("hide");
+      resetUserForm();
+      $("#userModalTitle").text("Add New User");
+      $("#passwordRequired").show();
+      $("#passRequired").show();
+      $("#passwordHelp").text("Password must be at least 6 characters");
+      
+      // Handle role change for new users - show/hide settings permission
+      $("#userRole").off("change.settingsPerm").on("change.settingsPerm", function() {
+        const selectedRole = $(this).val();
+        const isAdminRole = selectedRole === "admin";
+        const $settingsPerm = $("#perm_settings").closest(".form-group");
+        
+        if (isAdminRole) {
+          $settingsPerm.show();
+          $("#perm_settings").prop("checked", true).prop("disabled", false);
+        } else {
+          $settingsPerm.hide();
+          $("#perm_settings").prop("checked", false).prop("disabled", true);
+        }
+      });
+      
+      $("#userModal").modal("show");
+    });
+
+    // Refresh User List button
+    $("#refreshUserList").on("click", function () {
+      const $btn = $(this);
+      $btn.prop("disabled", true).html('<i class="fa fa-spinner fa-spin"></i> Refreshing...');
+      loadUserList();
+      setTimeout(function() {
+        $btn.prop("disabled", false).html('<i class="fa fa-refresh"></i> Refresh');
+      }, 1000);
+    });
+
+    // Password strength indicator
+    $("#password").on("keyup", function() {
+      const password = $(this).val();
+      if (password.length > 0) {
+        let strength = 0;
+        let strengthText = "";
+        let strengthColor = "";
+
+        if (password.length >= 6) strength++;
+        if (password.length >= 8) strength++;
+        if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
+        if (/[0-9]/.test(password)) strength++;
+        if (/[^A-Za-z0-9]/.test(password)) strength++;
+
+        const strengthPercent = (strength / 5) * 100;
+
+        if (strength <= 2) {
+          strengthText = "Weak";
+          strengthColor = "danger";
+        } else if (strength <= 3) {
+          strengthText = "Medium";
+          strengthColor = "warning";
+        } else {
+          strengthText = "Strong";
+          strengthColor = "success";
+        }
+
+        $("#passwordStrengthBar").show();
+        $("#passwordStrengthBar .progress-bar")
+          .css("width", strengthPercent + "%")
+          .removeClass("progress-bar-danger progress-bar-warning progress-bar-success")
+          .addClass("progress-bar-" + strengthColor);
+        $("#passwordStrengthText").text("Password strength: " + strengthText).removeClass("text-danger text-warning text-success").addClass("text-" + strengthColor);
+      } else {
+        $("#passwordStrengthBar").hide();
+        $("#passwordStrengthText").text("");
+      }
+    });
+
+    // Password match validation
+    $("#pass").on("keyup", function() {
+      const password = $("#password").val();
+      const passConfirm = $(this).val();
+      if (passConfirm.length > 0 && password !== passConfirm) {
+        $("#passMatchError").show();
+      } else {
+        $("#passMatchError").hide();
+      }
+    });
+
+    $("#password").on("keyup", function() {
+      const password = $(this).val();
+      const passConfirm = $("#pass").val();
+      if (passConfirm.length > 0 && password !== passConfirm) {
+        $("#passMatchError").show();
+      } else {
+        $("#passMatchError").hide();
+      }
+    });
+
+    // Reset user form
+    function resetUserForm() {
+      $("#saveUser")[0].reset();
+      $("#user_id").val("");
+      $("#passwordRequired").show();
+      $("#passRequired").show();
+      $("#passwordHelp").text("Password must be at least 6 characters");
+      $("#passwordStrengthBar").hide();
+      $("#passwordStrengthText").text("");
+      $("#passMatchError").hide();
+      $(".perms input[type='checkbox']").prop("checked", false);
+      
+      // Hide settings permission by default (only shown for admin role)
+      const $settingsPerm = $("#perm_settings").closest(".form-group");
+      $settingsPerm.hide();
+      $("#perm_settings").prop("checked", false).prop("disabled", true);
+      
+      // Handle role change for new users
+      $("#userRole").off("change.settingsPerm").on("change.settingsPerm", function() {
+        const selectedRole = $(this).val();
+        const isAdminRole = selectedRole === "admin";
+        
+        if (isAdminRole) {
+          $settingsPerm.show();
+          $("#perm_settings").prop("checked", true).prop("disabled", false);
+        } else {
+          $settingsPerm.hide();
+          $("#perm_settings").prop("checked", false).prop("disabled", true);
+        }
+      });
+    }
 
     $("#categoryModal").on("click", function () {
       loadCategoryList();
@@ -6677,7 +7107,16 @@ if (auth == undefined) {
            <td>${product.barcode || product._id}</td>
            <td>${product.name}</td>
            <td>${validator.unescape(settings.symbol)}${product.price}</td>
-           <td>${(product.stock == 1 || (product.stock > 1 && product.quantity)) ? product.quantity : "N/A"}</td>
+           <td>${(() => {
+             const productQuantity = Number(product.quantity) || 0;
+             if (product.stock == 1 || (product.stock > 1 && productQuantity)) {
+               return productQuantity;
+             } else if (product.quantity !== undefined && product.quantity !== null) {
+               return productQuantity;
+             } else {
+               return "-";
+             }
+           })()}</td>
            <td>${category.length > 0 ? category[0].name : ""}</td>
          </tr>`;
        });
@@ -6840,61 +7279,142 @@ if (auth == undefined) {
       let counter = 0;
       let user_list = "";
       $("#user_list").empty();
-      $("#userList").DataTable().destroy();
+      
+      // Destroy existing DataTable if it exists
+      if ($.fn.DataTable.isDataTable("#userList")) {
+        $("#userList").DataTable().destroy();
+      }
 
       $.get(api + "users/all", function (users) {
         allUsers = [...users];
 
         users.forEach((user, index) => {
           state = [];
-          let class_name = "";
+          let statusBadge = "";
+          let lastLoginText = "";
+          let loginTime = "";
 
           if (user.status != "") {
             state = user.status.split("_");
             login_status = state[0];
             login_time = state[1];
+            loginTime = login_time || "";
 
-            switch (login) {
-              case "Logged In":
-                class_name = "btn-default";
-
-                break;
-              case "Logged Out":
-                class_name = "btn-light";
-                break;
+            if (login_status === "Logged In") {
+              statusBadge = '<span class="badge badge-success">Logged In</span>';
+            } else if (login_status === "Logged Out") {
+              statusBadge = '<span class="badge badge-secondary">Logged Out</span>';
             }
+          } else {
+            statusBadge = '<span class="badge badge-light">Never Logged In</span>';
+          }
+
+          // Format last login time
+          if (user.lastLogin) {
+            const lastLoginDate = new Date(user.lastLogin);
+            lastLoginText = moment(lastLoginDate).format('DD-MMM-YYYY HH:mm');
+          } else if (loginTime) {
+            try {
+              const loginDate = new Date(loginTime);
+              lastLoginText = moment(loginDate).format('DD-MMM-YYYY HH:mm');
+            } catch (e) {
+              lastLoginText = loginTime;
+            }
+          } else {
+            lastLoginText = "-";
+          }
+
+          // Get permissions summary
+          const permissions = [];
+          if (user.perm_products) permissions.push("Products");
+          if (user.perm_categories) permissions.push("Categories");
+          if (user.perm_manufacturers) permissions.push("Manufacturers");
+          if (user.perm_suppliers) permissions.push("Suppliers");
+          if (user.perm_transactions) permissions.push("Transactions");
+          if (user.perm_users) permissions.push("Users");
+          if (user.perm_settings) permissions.push("Settings");
+          const permissionsText = permissions.length > 0 ? permissions.join(", ") : "No permissions";
+
+          // Get role badge
+          const role = user.role || "cashier";
+          let roleBadge = "";
+          switch(role.toLowerCase()) {
+            case "admin":
+              roleBadge = '<span class="badge badge-danger">Admin</span>';
+              break;
+            case "manager":
+              roleBadge = '<span class="badge badge-warning">Manager</span>';
+              break;
+            case "cashier":
+              roleBadge = '<span class="badge badge-info">Cashier</span>';
+              break;
+            default:
+              roleBadge = '<span class="badge badge-secondary">' + role + '</span>';
           }
 
           counter++;
-          user_list += `<tr>
-            <td>${user.fullname}</td>
-            <td>${user.username}</td>
-            <td class="${class_name}">${
-              state.length > 0 ? login_status : ""
-            } <br><small> ${state.length > 0 ? login_time : ""}</small></td>
+          // Add special styling for admin user
+          const isAdmin = user._id == 1;
+          const rowClass = isAdmin ? 'table-warning' : '';
+          const adminIcon = isAdmin ? '<i class="fa fa-shield text-danger" title="System Administrator"></i> ' : '';
+          
+          user_list += `<tr class="${rowClass}">
+            <td>${adminIcon}<strong>${user.fullname || "-"}</strong></td>
+            <td>${user.username || "-"}</td>
+            <td>${user.email || "-"}</td>
+            <td>${roleBadge}</td>
+            <td>${statusBadge}</td>
+            <td><small>${lastLoginText}</small></td>
+            <td><small title="${permissionsText}">${permissions.length} permission${permissions.length !== 1 ? 's' : ''}</small></td>
             <td>${
-              user._id == 1
-                ? '<span class="btn-group"><button class="btn btn-dark"><i class="fa fa-edit"></i></button><button class="btn btn-dark"><i class="fa fa-trash"></i></button></span>'
-                : '<span class="btn-group"><button onClick="$(this).editUser(' +
-                  index +
-                  ')" class="btn btn-warning"><i class="fa fa-edit"></i></button><button onClick="$(this).deleteUser(' +
-                  user._id +
-                  ')" class="btn btn-danger"><i class="fa fa-trash"></i></button></span>'
+              isAdmin
+                ? '<span class="btn-group"><button class="btn btn-sm btn-warning" onClick="$(this).editUser(' + index + ')" title="Edit Admin User"><i class="fa fa-edit"></i></button><button class="btn btn-sm btn-dark" disabled title="Cannot delete system administrator"><i class="fa fa-trash"></i></button></span>'
+                : '<span class="btn-group"><button class="btn btn-sm btn-warning" onClick="$(this).editUser(' + index + ')" title="Edit"><i class="fa fa-edit"></i></button><button class="btn btn-sm btn-danger" onClick="$(this).deleteUser(' + user._id + ')" title="Delete"><i class="fa fa-trash"></i></button></span>'
             }</td></tr>`;
 
           if (counter == users.length) {
             $("#user_list").html(user_list);
 
-            $("#userList").DataTable({
-              order: [[1, "desc"]],
+            // Initialize DataTable with search and filter
+            const table = $("#userList").DataTable({
+              order: [[0, "asc"]],
               autoWidth: false,
               info: true,
               JQueryUI: true,
               ordering: true,
-              paging: false,
+              paging: true,
+              pageLength: 10,
+              lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]],
+              language: {
+                search: "Search:",
+                lengthMenu: "Show _MENU_ users",
+                info: "Showing _START_ to _END_ of _TOTAL_ users",
+                infoEmpty: "No users found",
+                infoFiltered: "(filtered from _MAX_ total users)"
+              }
+            });
+
+            // Custom search handler
+            $("#userSearchInput").on("keyup", function() {
+              table.search(this.value).draw();
+            });
+
+            // Status filter handler
+            $("#userStatusFilter").on("change", function() {
+              const filterValue = this.value;
+              if (filterValue === "") {
+                table.column(4).search("").draw();
+              } else {
+                table.column(4).search(filterValue).draw();
+              }
             });
           }
         });
+      }).fail(function(xhr, status, error) {
+        console.error("Failed to load users:", error);
+        if (typeof notiflix !== 'undefined') {
+          notiflix.Notify.failure('Failed to load users. Please check server connection.');
+        }
       });
     }
 
@@ -6904,6 +7424,19 @@ if (auth == undefined) {
       let counter = 0;
       $("#product_list").empty();
       $("#productList").DataTable().destroy();
+      
+      console.log('📋 loadProductList() called - updating product list table with', products.length, 'products');
+      // Debug: Log sample product quantities
+      if (products.length > 0) {
+        const sampleProducts = products.slice(0, 3).map(p => ({ 
+          name: p.name, 
+          quantity: p.quantity, 
+          quantityType: typeof p.quantity,
+          stock: p.stock,
+          stockType: typeof p.stock
+        }));
+        console.log('📊 Sample product data in loadProductList:', sampleProducts);
+      }
 
       products.forEach((product, index) => {
         counter++;
@@ -6981,7 +7514,28 @@ if (auth == undefined) {
               ${product.actualPrice ? `<div><small>Purchase: ${validator.unescape(settings.symbol)}${product.actualPrice}</small></div>`: ""}
               <div><strong>Sell: ${validator.unescape(settings.symbol)}${product.price}</strong></div>
             </td>
-            <td>${(product.stock == 1 || (product.stock > 1 && product.quantity)) ? product.quantity : "N/A"}
+            <td>${(() => {
+              // Priority: Use batchSummary.totalQuantity if available (same as edit form)
+              // This ensures consistency with the edit form which calculates from batches
+              let productQuantity = 0;
+              if (product.batchSummary && 
+                  typeof product.batchSummary.totalQuantity === 'number' && 
+                  product.batchSummary.totalQuantity >= 0) {
+                productQuantity = product.batchSummary.totalQuantity;
+              } else {
+                // Fallback to stored quantity
+                productQuantity = Number(product.quantity) || 0;
+              }
+              
+              // Use same logic as POS pane: show quantity if stock is enabled, or if stock > 1 and quantity exists
+              if (product.stock == 1 || (product.stock > 1 && productQuantity)) {
+                return productQuantity;
+              } else if (product.quantity !== undefined && product.quantity !== null) {
+                return productQuantity;
+              } else {
+                return "-";
+              }
+            })()}
             ${product.stockAlert}
             </td>
             <td>${expiryDisplay}</td>
@@ -7169,42 +7723,98 @@ if (auth == undefined) {
       e.preventDefault();
       let formData = $(this).serializeObject();
 
-      if (formData.password != formData.pass) {
-        notiflix.Report.warning("Oops!", "Passwords do not match!", "Ok");
+      // Validate required fields
+      if (!formData.fullname || formData.fullname.trim() === "") {
+        notiflix.Report.warning("Validation Error", "Full name is required!", "Ok");
+        return;
       }
 
-      if (
-        bcrypt.compare(formData.password, user.password) ||
-        bcrypt.compare(formData.password, allUsers[user_index].password)
-      ) {
-        $.ajax({
-          url: api + "users/post",
-          type: "POST",
-          data: JSON.stringify(formData),
-          contentType: "application/json; charset=utf-8",
-          cache: false,
-          processData: false,
-          success: function (data) {
-            if (ownUserEdit) {
-              ipcRenderer.send("app-reload", "");
-            } else {
-              $("#userModal").modal("hide");
-
-              loadUserList();
-
-              $("#Users").modal("show");
-              notiflix.Report.success("Great!", "User details saved!", "Ok");
-            }
-          },
-          error: function (jqXHR,textStatus, errorThrown) {
-            notiflix.Report.failure(
-              jqXHR.responseJSON.error,
-              jqXHR.responseJSON.message,
-              "Ok",
-            );
-          },
-        });
+      if (!formData.username || formData.username.trim() === "") {
+        notiflix.Report.warning("Validation Error", "Username is required!", "Ok");
+        return;
       }
+
+      // Validate email if provided
+      if (formData.email && formData.email.trim() !== "") {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(formData.email)) {
+          notiflix.Report.warning("Validation Error", "Invalid email address format!", "Ok");
+          return;
+        }
+      }
+
+      // Check if this is a new user or edit
+      const isNewUser = !formData.id || formData.id === "";
+
+      // Validate password
+      if (isNewUser) {
+        if (!formData.password || formData.password.trim() === "") {
+          notiflix.Report.warning("Validation Error", "Password is required for new users!", "Ok");
+          return;
+        }
+        if (formData.password.length < 6) {
+          notiflix.Report.warning("Validation Error", "Password must be at least 6 characters long!", "Ok");
+          return;
+        }
+      }
+
+      // Check password match if password is provided
+      if (formData.password && formData.password.trim() !== "") {
+        if (formData.password !== formData.pass) {
+          notiflix.Report.warning("Validation Error", "Passwords do not match!", "Ok");
+          return;
+        }
+        if (formData.password.length < 6) {
+          notiflix.Report.warning("Validation Error", "Password must be at least 6 characters long!", "Ok");
+          return;
+        }
+      }
+
+      // Set default role if not provided
+      if (!formData.role) {
+        formData.role = "cashier";
+      }
+
+      // Show loading indicator
+      const $submitBtn = $(this).find('button[type="submit"]');
+      const originalText = $submitBtn.html();
+      $submitBtn.prop("disabled", true).html('<i class="fa fa-spinner fa-spin"></i> Saving...');
+
+      $.ajax({
+        url: api + "users/post",
+        type: "POST",
+        data: JSON.stringify(formData),
+        contentType: "application/json; charset=utf-8",
+        cache: false,
+        processData: false,
+        success: function (data) {
+          $submitBtn.prop("disabled", false).html(originalText);
+          
+          if (ownUserEdit) {
+            ipcRenderer.send("app-reload", "");
+          } else {
+            $("#userModal").modal("hide");
+            resetUserForm();
+            loadUserList();
+            $("#Users").modal("show");
+            
+            const message = isNewUser ? "User created successfully!" : "User updated successfully!";
+            notiflix.Report.success("Success!", message, "Ok");
+          }
+        },
+        error: function (jqXHR, textStatus, errorThrown) {
+          $submitBtn.prop("disabled", false).html(originalText);
+          
+          const errorMsg = jqXHR.responseJSON && jqXHR.responseJSON.message 
+            ? jqXHR.responseJSON.message 
+            : "An error occurred while saving the user.";
+          const errorTitle = jqXHR.responseJSON && jqXHR.responseJSON.error 
+            ? jqXHR.responseJSON.error 
+            : "Error";
+          
+          notiflix.Report.failure(errorTitle, errorMsg, "Ok");
+        },
+      });
     });
 
     $("#app").on("change", function () {
@@ -7226,21 +7836,95 @@ if (auth == undefined) {
     $("#cashier").on("click", function () {
       ownUserEdit = true;
 
+      // Hide permissions section for own profile editing
+      $(".perms").hide();
+      
+      // Find current user in allUsers array
+      const currentUserIndex = allUsers.findIndex(u => u._id == user._id);
+      const currentUser = currentUserIndex >= 0 ? allUsers[currentUserIndex] : user;
+      const isSystemAdmin = currentUser._id == 1;
+      const isAdminRole = currentUser.role && currentUser.role.toLowerCase() === "admin";
+
       $("#userModal").modal("show");
+      $("#userModalTitle").html('<i class="fa fa-user"></i> My Profile');
 
-      $("#user_id").val(user._id);
-      $("#fullname").val(user.fullname);
-      $("#username").val(user.username);
-      $("#password").attr("placeholder", "New Password");
-
-      for (perm of permissions) {
-        var el = "#" + perm;
-        if (allUsers[index][perm] == 1) {
-          $(el).prop("checked", true);
-        } else {
-          $(el).prop("checked", false);
-        }
+      $("#user_id").val(currentUser._id);
+      $("#fullname").val(currentUser.fullname || "");
+      $("#username").val(validator.unescape(currentUser.username || ""));
+      $("#userEmail").val(currentUser.email || "");
+      
+      // CRITICAL: System admin (ID: 1) cannot change their role
+      if (isSystemAdmin) {
+        $("#userRole").val("admin").prop("disabled", true);
+        $("#userRole").after('<small class="form-text text-warning"><i class="fa fa-lock"></i> System Administrator role cannot be changed</small>');
+      } else {
+        $("#userRole").val(currentUser.role || "cashier").prop("disabled", false);
+        $("#userRole").next(".form-text").remove();
       }
+      
+      $("#password").val("");
+      $("#password").attr("placeholder", "Leave blank to keep current password");
+      $("#pass").val("");
+      $("#passwordRequired").hide();
+      $("#passRequired").hide();
+      $("#passwordHelp").text("Leave blank to keep current password");
+      
+      // Reset password strength indicator
+      $("#passwordStrengthBar").hide();
+      $("#passwordStrengthText").text("");
+      $("#passMatchError").hide();
+      
+      // Show user info summary
+      const lastLogin = currentUser.lastLogin 
+        ? moment(new Date(currentUser.lastLogin)).format('DD-MMM-YYYY HH:mm')
+        : (currentUser.status && currentUser.status.split("_")[1] 
+          ? moment(new Date(currentUser.status.split("_")[1])).format('DD-MMM-YYYY HH:mm')
+          : "Never");
+      
+      const roleBadge = isAdminRole || isSystemAdmin 
+        ? '<span class="badge badge-danger">Admin</span>'
+        : (currentUser.role === "manager" 
+          ? '<span class="badge badge-warning">Manager</span>'
+          : '<span class="badge badge-info">Cashier</span>');
+      
+      // Add info display above form
+      if (!$("#profileInfo").length) {
+        $("#saveUser").before(`
+          <div id="profileInfo" class="alert alert-info">
+            <div class="row">
+              <div class="col-md-6">
+                <strong><i class="fa fa-user"></i> Role:</strong> ${roleBadge}<br>
+                <strong><i class="fa fa-envelope"></i> Email:</strong> ${currentUser.email || "Not set"}<br>
+              </div>
+              <div class="col-md-6">
+                <strong><i class="fa fa-clock-o"></i> Last Login:</strong> ${lastLogin}<br>
+                <strong><i class="fa fa-calendar"></i> Account Created:</strong> ${currentUser.createdAt ? moment(new Date(currentUser.createdAt)).format('DD-MMM-YYYY') : "Unknown"}
+              </div>
+            </div>
+          </div>
+        `);
+      } else {
+        $("#profileInfo").html(`
+          <div class="row">
+            <div class="col-md-6">
+              <strong><i class="fa fa-user"></i> Role:</strong> ${roleBadge}<br>
+              <strong><i class="fa fa-envelope"></i> Email:</strong> ${currentUser.email || "Not set"}<br>
+            </div>
+            <div class="col-md-6">
+              <strong><i class="fa fa-clock-o"></i> Last Login:</strong> ${lastLogin}<br>
+              <strong><i class="fa fa-calendar"></i> Account Created:</strong> ${currentUser.createdAt ? moment(new Date(currentUser.createdAt)).format('DD-MMM-YYYY') : "Unknown"}
+            </div>
+          </div>
+        `);
+      }
+    });
+    
+    // Clean up profile info when modal is closed
+    $("#userModal").on("hidden.bs.modal", function () {
+      $("#profileInfo").remove();
+      ownUserEdit = false;
+      // Re-enable role dropdown if it was disabled
+      $("#userRole").prop("disabled", false).next(".form-text").remove();
     });
 
     $("#add-user").on("click", function () {
@@ -7449,7 +8133,7 @@ function loadTransactions() {
 
         const transDate = trans.date instanceof Date ? trans.date : new Date(trans.date);
         const dateTimestamp = transDate.getTime();
-        
+
         transaction_list += `<tr class="transaction-row" data-status="${isPaid ? 'paid' : 'unpaid'}">
                                 <td><strong>${trans.order}</strong></td>
                                 <td class="nobr" data-order="${dateTimestamp}">
@@ -7722,7 +8406,7 @@ function loadSoldProducts() {
 
     const hasProduct = product.length > 0;
     const stockCell = hasProduct
-      ? ((product[0].stock == 1 || (product[0].stock > 1 && product[0].quantity)) ? product[0].quantity : "N/A")
+      ? (product[0].stock == 1 ? (product[0].quantity || 0) : (product[0].quantity !== undefined && product[0].quantity !== null ? product[0].quantity : "-"))
       : "";
 
     const salesVal = item.sales || (item.qty * parseFloat(item.price));
@@ -7910,7 +8594,7 @@ $.fn.viewTransaction = function (index) {
         contactParts2.push("Vat No: " + validator.unescape(settings.tax));
       }
       const contactLine2 = contactParts2.length > 0 ? contactParts2.join(", ") + "<br>" : "";
-
+      
       receipt = `<div style="font-size: 10px">                            
         <p style="text-align: center;">
         ${logoHtml}
