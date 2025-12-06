@@ -47,8 +47,20 @@ const template = [
           },
         ],
       },
-      { label: "Backup" },
-      { label: "Restore" },
+      {
+        label: "Backup",
+        click: () => handleClick("backupRestoreModal")
+      },
+      {
+        label: "Restore",
+        click: () => {
+          handleClick("backupRestoreModal");
+          // Switch to restore tab after modal opens
+          setTimeout(() => {
+            $("#restore-tab").tab("show");
+          }, 300);
+        }
+      },
       {
         label: "Logout",
         click: () => handleClick("log-out"),

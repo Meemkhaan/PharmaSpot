@@ -8187,6 +8187,275 @@ if (auth == undefined) {
     $("#logoname").show(500);
   });
 
+  // ==================== Backup & Restore Functionality ====================
+  
+  // Load backup list when restore tab is shown
+  $("#restore-tab").on("shown.bs.tab", function() {
+    loadBackupList();
+  });
+  
+  // Load backup list when modal is shown
+  $("#backupRestoreModal").on("shown.bs.modal", function() {
+    loadBackupList();
+  });
+  
+  // Function to load list of available backups
+  function loadBackupList() {
+    $("#backupList").html('<div class="text-center p-3"><i class="fa fa-spinner fa-spin"></i> Loading backups...</div>');
+    
+    $.get(api + "backup-restore/status", function(data) {
+      if (data.success && data.backups && data.backups.length > 0) {
+        let backupHtml = "";
+        data.backups.forEach(function(backup, index) {
+          const sizeMB = (backup.size / 1024 / 1024).toFixed(2);
+          const createdDate = moment(backup.created).format('DD-MMM-YYYY HH:mm');
+          
+          backupHtml += `
+            <div class="list-group-item">
+              <div class="d-flex justify-content-between align-items-center">
+                <div>
+                  <h6 class="mb-1"><i class="fa fa-file-archive-o"></i> ${backup.filename}</h6>
+                  <small class="text-muted">
+                    Size: ${sizeMB} MB | Created: ${createdDate}
+                  </small>
+                </div>
+                <div>
+                  <button class="btn btn-sm btn-primary restoreBackupBtn" data-filename="${backup.filename}" title="Restore this backup">
+                    <i class="fa fa-upload"></i> Restore
+                  </button>
+                  <button class="btn btn-sm btn-danger deleteBackupBtn" data-filename="${backup.filename}" title="Delete this backup">
+                    <i class="fa fa-trash"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+        });
+        $("#backupList").html(backupHtml);
+      } else {
+        $("#backupList").html('<div class="alert alert-info text-center">No backups found. Create a backup first.</div>');
+      }
+    }).fail(function(xhr, status, error) {
+      console.error("Failed to load backups:", error);
+      $("#backupList").html('<div class="alert alert-danger text-center">Failed to load backups. Please try again.</div>');
+    });
+  }
+  
+  // Create backup button
+  $("#createBackupBtn").on("click", function() {
+    const $btn = $(this);
+    const backupName = $("#backupName").val().trim();
+    const originalText = $btn.html();
+    
+    $btn.prop("disabled", true).html('<i class="fa fa-spinner fa-spin"></i> Creating backup...');
+    $("#backupProgress").show();
+    $("#backupResult").empty();
+    
+    $.ajax({
+      url: api + "backup-restore/backup",
+      type: "POST",
+      contentType: "application/json",
+      data: JSON.stringify({ name: backupName || undefined }),
+      success: function(data) {
+        $btn.prop("disabled", false).html(originalText);
+        $("#backupProgress").hide();
+        
+        if (data.success) {
+          $("#backupResult").html(`
+            <div class="alert alert-success">
+              <i class="fa fa-check-circle"></i> <strong>Backup created successfully!</strong><br>
+              File: ${data.backup.filename}<br>
+              Size: ${data.backup.sizeMB} MB<br>
+              Location: ${data.backup.path}
+            </div>
+          `);
+          $("#backupName").val("");
+          
+          // Refresh backup list if on restore tab
+          if ($("#restore-tab").hasClass("active")) {
+            loadBackupList();
+          }
+          
+          if (typeof notiflix !== 'undefined') {
+            notiflix.Notify.success('Backup created successfully!');
+          }
+        }
+      },
+      error: function(xhr, status, error) {
+        $btn.prop("disabled", false).html(originalText);
+        $("#backupProgress").hide();
+        
+        const errorMsg = xhr.responseJSON && xhr.responseJSON.message 
+          ? xhr.responseJSON.message 
+          : "Failed to create backup. Please try again.";
+        
+        $("#backupResult").html(`
+          <div class="alert alert-danger">
+            <i class="fa fa-exclamation-circle"></i> <strong>Error:</strong> ${errorMsg}
+          </div>
+        `);
+        
+        if (typeof notiflix !== 'undefined') {
+          notiflix.Notify.failure('Failed to create backup');
+        }
+      }
+    });
+  });
+  
+  // Restore backup button (delegated event handler)
+  $(document).on("click", ".restoreBackupBtn", function() {
+    const filename = $(this).data("filename");
+    
+    if (!filename) {
+      if (typeof notiflix !== 'undefined') {
+        notiflix.Report.warning("Error", "Backup filename not found.", "Ok");
+      }
+      return;
+    }
+    
+    // Confirm restore action
+    const confirmMessage = `Are you sure you want to restore from "${filename}"?\n\nThis will replace all current data. A safety backup will be created automatically before restore.`;
+    
+    if (typeof notiflix !== 'undefined') {
+      notiflix.Confirm.show(
+        "Confirm Restore",
+        confirmMessage,
+        "Yes, Restore",
+        "Cancel",
+        function() {
+          performRestore(filename);
+        }
+      );
+    } else {
+      if (confirm(confirmMessage)) {
+        performRestore(filename);
+      }
+    }
+  });
+  
+  // Perform restore
+  function performRestore(filename) {
+    $("#restoreProgress").show();
+    $("#restoreResult").empty();
+    
+    $.ajax({
+      url: api + "backup-restore/restore",
+      type: "POST",
+      contentType: "application/json",
+      data: JSON.stringify({ filename: filename }),
+      success: function(data) {
+        $("#restoreProgress").hide();
+        
+        if (data.success) {
+          $("#restoreResult").html(`
+            <div class="alert alert-success">
+              <i class="fa fa-check-circle"></i> <strong>Backup restored successfully!</strong><br>
+              Please restart the application for changes to take effect.<br>
+              <small>Safety backup created: ${data.safetyBackup}</small>
+            </div>
+          `);
+          
+          if (typeof notiflix !== 'undefined') {
+            notiflix.Report.success(
+              "Restore Successful",
+              "Backup restored successfully. Please restart the application.",
+              "Ok",
+              function() {
+                // Optionally reload the app
+                if (typeof ipcRenderer !== 'undefined') {
+                  ipcRenderer.send("app-reload", "");
+                } else {
+                  location.reload();
+                }
+              }
+            );
+          }
+        }
+      },
+      error: function(xhr, status, error) {
+        $("#restoreProgress").hide();
+        
+        const errorMsg = xhr.responseJSON && xhr.responseJSON.message 
+          ? xhr.responseJSON.message 
+          : "Failed to restore backup. Please try again.";
+        
+        $("#restoreResult").html(`
+          <div class="alert alert-danger">
+            <i class="fa fa-exclamation-circle"></i> <strong>Error:</strong> ${errorMsg}
+          </div>
+        `);
+        
+        if (typeof notiflix !== 'undefined') {
+          notiflix.Notify.failure('Failed to restore backup');
+        }
+      }
+    });
+  }
+  
+  // Delete backup button (delegated event handler)
+  $(document).on("click", ".deleteBackupBtn", function() {
+    const filename = $(this).data("filename");
+    const $item = $(this).closest(".list-group-item");
+    
+    if (!filename) {
+      return;
+    }
+    
+    const confirmMessage = `Are you sure you want to delete "${filename}"?`;
+    
+    if (typeof notiflix !== 'undefined') {
+      notiflix.Confirm.show(
+        "Confirm Delete",
+        confirmMessage,
+        "Yes, Delete",
+        "Cancel",
+        function() {
+          $.ajax({
+            url: api + "backup-restore/backup/" + encodeURIComponent(filename),
+            type: "DELETE",
+            success: function(data) {
+              if (data.success) {
+                $item.fadeOut(300, function() {
+                  $(this).remove();
+                  // Reload list if empty
+                  if ($("#backupList .list-group-item").length === 0) {
+                    loadBackupList();
+                  }
+                });
+                
+                if (typeof notiflix !== 'undefined') {
+                  notiflix.Notify.success('Backup deleted successfully');
+                }
+              }
+            },
+            error: function(xhr, status, error) {
+              const errorMsg = xhr.responseJSON && xhr.responseJSON.message 
+                ? xhr.responseJSON.message 
+                : "Failed to delete backup.";
+              
+              if (typeof notiflix !== 'undefined') {
+                notiflix.Notify.failure(errorMsg);
+              }
+            }
+          });
+        }
+      );
+    } else {
+      if (confirm(confirmMessage)) {
+        $.ajax({
+          url: api + "backup-restore/backup/" + encodeURIComponent(filename),
+          type: "DELETE",
+          success: function(data) {
+            if (data.success) {
+              $item.remove();
+              loadBackupList();
+            }
+          }
+        });
+      }
+    }
+  });
+
   $("#rmv_img").on("click", function () {
     $("#remove_img").val("1");
     // $("#img").val('');

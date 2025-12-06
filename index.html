@@ -2496,6 +2496,97 @@
                 </div>
             </div>
         </div>
+        
+        <!-- Backup and Restore Modal -->
+        <div id="backupRestoreModal" class="modal fade bs-example-modal-lg" tabindex="-1" role="dialog" aria-labelledby="backupRestoreModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <div class="header-actions d-flex justify-content-between align-items-center w-100">
+                            <h4 class="modal-title" id="backupRestoreModalLabel">
+                                <i class="fa fa-database"></i> Backup & Restore
+                            </h4>
+                            <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
+                        </div>
+                    </div>
+                    <div class="modal-body">
+                        <ul class="nav nav-tabs" role="tablist">
+                            <li class="nav-item">
+                                <a class="nav-link active" id="backup-tab" data-toggle="tab" href="#backup-panel" role="tab">
+                                    <i class="fa fa-download"></i> Create Backup
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" id="restore-tab" data-toggle="tab" href="#restore-panel" role="tab">
+                                    <i class="fa fa-upload"></i> Restore Backup
+                                </a>
+                            </li>
+                        </ul>
+                        
+                        <div class="tab-content mt-3">
+                            <!-- Backup Panel -->
+                            <div class="tab-pane fade show active" id="backup-panel" role="tabpanel">
+                                <div class="alert alert-info">
+                                    <i class="fa fa-info-circle"></i> 
+                                    <strong>Backup includes:</strong> All databases (users, products, transactions, etc.), settings, and uploaded files.
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="backupName">Backup Name (optional):</label>
+                                    <input type="text" class="form-control" id="backupName" placeholder="Leave empty for auto-generated name">
+                                    <small class="form-text text-muted">If left empty, a timestamp-based name will be used.</small>
+                                </div>
+                                
+                                <button type="button" id="createBackupBtn" class="btn btn-success btn-block">
+                                    <i class="fa fa-download"></i> Create Backup Now
+                                </button>
+                                
+                                <div id="backupProgress" class="mt-3" style="display: none;">
+                                    <div class="progress">
+                                        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%">
+                                            Creating backup...
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div id="backupResult" class="mt-3"></div>
+                            </div>
+                            
+                            <!-- Restore Panel -->
+                            <div class="tab-pane fade" id="restore-panel" role="tabpanel">
+                                <div class="alert alert-warning">
+                                    <i class="fa fa-exclamation-triangle"></i> 
+                                    <strong>Warning:</strong> Restoring a backup will replace all current data. A safety backup will be created automatically before restore.
+                                </div>
+                                
+                                <div id="backupListContainer">
+                                    <h5>Available Backups:</h5>
+                                    <div id="backupList" class="list-group" style="max-height: 300px; overflow-y: auto;">
+                                        <div class="text-center p-3">
+                                            <i class="fa fa-spinner fa-spin"></i> Loading backups...
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div id="restoreProgress" class="mt-3" style="display: none;">
+                                    <div class="progress">
+                                        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%">
+                                            Restoring backup...
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div id="restoreResult" class="mt-3"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <div id="holdOrdersModal" class="modal fade bs-example-modal-lg" tabindex="-1" role="dialog" aria-labelledby="myLargeModalLabel" aria-hidden="true">
             <div class="modal-dialog modal-lg">
                 <div class="modal-content">

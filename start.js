@@ -59,6 +59,23 @@ app.on("browser-window-created", (_, window) => {
 
 app.whenReady().then(() => {
     createWindow();
+    
+    // Check for updates automatically on startup (only in production)
+    if (isPackaged) {
+        // Wait a bit for the app to fully load before checking updates
+        setTimeout(() => {
+            console.log("[Auto-Updater] Checking for updates on startup...");
+            menuController.checkForUpdates();
+        }, 5000); // Check after 5 seconds
+        
+        // Set up periodic update checks (every 4 hours)
+        setInterval(() => {
+            if (isPackaged && mainWindow && !mainWindow.isDestroyed()) {
+                console.log("[Auto-Updater] Periodic update check...");
+                menuController.checkForUpdates();
+            }
+        }, 4 * 60 * 60 * 1000); // 4 hours
+    }
 });
 
 app.on("window-all-closed", () => {

@@ -108,6 +108,7 @@ app.use("/api/suppliers", require("./api/suppliers"));
 app.use("/api/purchase-orders", require("./api/purchase-orders"));
 app.use("/api/settings", require("./api/settings"));
 app.use("/api/users", require("./api/users"));
+app.use("/api/backup-restore", require("./api/backup-restore"));
 app.use("/api", require("./api/transactions"));
 
 server.listen(PORT, () => {
