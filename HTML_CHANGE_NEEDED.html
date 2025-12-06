@@ -1,0 +1,37 @@
+<!-- 
+  RBAC INTEGRATION - EXACT HTML CHANGE NEEDED
+  
+  File: index.html
+  Location: Around line 2793-2795
+  
+  FIND THIS:
+-->
+
+<script src="assets/dist/js/bundle.min.js"></script>
+<script src="assets/js/utils.js"></script>
+<script src="assets/js/purchase-orders.js"></script>
+
+<!-- 
+  REPLACE WITH THIS:
+-->
+
+<script src="assets/dist/js/bundle.min.js"></script>
+<script src="assets/js/utils.js"></script>
+<!-- RBAC System -->
+<script src="assets/js/rbac-helper.js"></script>
+<script src="assets/js/rbac-init.js"></script>
+<!-- End RBAC System -->
+<script src="assets/js/purchase-orders.js"></script>
+
+<!--
+  That's it! Save the file and reload the application.
+  
+  The RBAC system will automatically:
+  - Intercept user login
+  - Apply permissions to UI
+  - Hide/show menu items based on role
+  - Add role badges
+  
+  Test by logging in as admin/admin and checking the browser console
+  for [RBAC] messages.
+-->

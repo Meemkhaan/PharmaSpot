@@ -27,10 +27,42 @@ if (!process.env.APPNAME) {
 const PORT = process.env.PORT || 0;
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 1000, // 1000 requests per window (increased for local app)
+    max: 10000, // 10000 requests per window (very high for local app)
     message: {
         error: "Too Many Requests",
         message: "Rate limit exceeded. Please try again later."
+    },
+    // Skip rate limiting for static files and common paths
+    skip: function (req) {
+        // Skip rate limiting for:
+        // - Static file requests (assets, images, etc.)
+        // - Root path requests
+        // - Development mode
+        if (process.env.NODE_ENV === 'dev') {
+            return true; // Disable rate limiting in development
+        }
+        
+        // Skip static file extensions
+        const staticExtensions = ['.js', '.css', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.woff', '.woff2', '.ttf', '.eot'];
+        const path = req.path.toLowerCase();
+        if (staticExtensions.some(ext => path.endsWith(ext))) {
+            return true;
+        }
+        
+        // Skip root and common static paths
+        if (path === '/' || path.startsWith('/assets/') || path.startsWith('/uploads/')) {
+            return true;
+        }
+        
+        return false;
+    },
+    // Use IP-based tracking, but be lenient
+    keyGenerator: function (req) {
+        // For localhost, use a single key to avoid per-IP limits
+        if (req.ip === '::1' || req.ip === '127.0.0.1' || req.ip === '::ffff:127.0.0.1') {
+            return 'localhost';
+        }
+        return req.ip;
     }
 });
 
@@ -38,7 +70,6 @@ console.log("Server started");
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
-app.use(limiter);
 
 app.all("/*", function (req, res, next) {
     res.header("Access-Control-Allow-Origin", "*");
@@ -54,17 +85,20 @@ app.all("/*", function (req, res, next) {
     }
 });
 
-// Serve static files (CSS, JS, images, etc.)
+// Serve static files (CSS, JS, images, etc.) - NO rate limiting
 app.use(express.static(__dirname));
 
-// Serve uploaded files (logos, product images, etc.)
+// Serve uploaded files (logos, product images, etc.) - NO rate limiting
 const uploadsPath = path.join(process.env.APPDATA || require('os').homedir(), process.env.APPNAME || pkg.name, "uploads");
 app.use("/uploads", express.static(uploadsPath));
 
 app.get("/", function (req, res) {
-    // Serve the main HTML file
+    // Serve the main HTML file - NO rate limiting
     res.sendFile(path.join(__dirname, "index.html"));
 });
+
+// Apply rate limiting ONLY to API routes (not static files)
+app.use("/api", limiter);
 
 app.use("/api/inventory", require("./api/inventory"));
 app.use("/api/customers", require("./api/customers"));

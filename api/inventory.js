@@ -12,6 +12,13 @@ process.on('uncaughtException', (error) => {
     // Don't exit the process, just log the error
 });
 const bodyParser = require("body-parser");
+
+// RBAC Middleware
+const { 
+    loadUser, 
+    requirePermission, 
+    PERMISSIONS 
+} = require('./rbac-middleware');
 const Datastore = require("@seald-io/nedb");
 const async = require("async");
 const sanitizeFilename = require('sanitize-filename');
@@ -1042,8 +1049,9 @@ app.get("/products-full", function (req, res) {
 /**
  * POST endpoint: Create a single product (form submission from UI).
  * Accepts multipart/form-data (for optional image upload) and standard fields.
+ * Requires: products.create permission
  */
-app.post("/product", function (req, res) {
+app.post("/product", requirePermission(PERMISSIONS.PRODUCTS_CREATE), function (req, res) {
     upload(req, res, function (err) {
         if (err) {
             console.error("Upload error:", err);
@@ -1544,12 +1552,13 @@ app.get("/product/:productId", function (req, res) {
 
 /**
  * POST endpoint: Create or update a product.
+ * Requires: products.create or products.edit permission
  *
  * @param {Object} req request object with product data in the body.
  * @param {Object} res response object.
  * @returns {void}
  */
-app.post("/product", function (req, res) {
+app.post("/product", requirePermission(PERMISSIONS.PRODUCTS_CREATE), function (req, res) {
     upload(req, res, function (err) {
 
         if (err) {
@@ -1705,12 +1714,13 @@ app.post("/product", function (req, res) {
 
 /**
  * DELETE endpoint: Delete a product by product ID.
+ * Requires: products.delete permission
  *
  * @param {Object} req request object with product ID as a parameter.
  * @param {Object} res response object.
  * @returns {void}
  */
-app.delete("/product/:productId", function (req, res) {
+app.delete("/product/:productId", requirePermission(PERMISSIONS.PRODUCTS_DELETE), function (req, res) {
     inventoryDB.remove(
         {
             _id: parseInt(req.params.productId),
@@ -1742,7 +1752,7 @@ app.delete("/product/:productId", function (req, res) {
  * @param {Object} res response object.
  * @returns {void}
  */
-app.post("/bulk-import", csvUpload.single('csvFile'), function (req, res) {
+app.post("/bulk-import", requirePermission(PERMISSIONS.PRODUCTS_IMPORT), csvUpload.single('csvFile'), function (req, res) {
     console.log("Bulk import endpoint called");
     console.log("Request body:", req.body);
     console.log("Request file:", req.file);
@@ -2560,12 +2570,13 @@ app.post("/bulk-import", csvUpload.single('csvFile'), function (req, res) {
 
 /**
  * POST endpoint: Bulk remove products by IDs.
+ * Requires: products.delete permission
  *
  * @param {Object} req request object with product IDs array in the body.
  * @param {Object} res response object.
  * @returns {void}
  */
-app.post("/bulk-remove", function (req, res) {
+app.post("/bulk-remove", requirePermission(PERMISSIONS.PRODUCTS_DELETE), function (req, res) {
     try {
         console.log("Bulk remove endpoint called");
         console.log("Request body:", req.body);

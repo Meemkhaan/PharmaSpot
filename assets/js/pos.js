@@ -6450,6 +6450,25 @@ if (auth == undefined) {
       $("#passwordStrengthBar").hide();
       $("#passwordStrengthText").text("");
 
+      // Enable all permission checkboxes first (except settings which is handled separately)
+      $(".perms input[type='checkbox']").each(function() {
+        const $checkbox = $(this);
+        const checkboxId = $checkbox.attr('id');
+        if (checkboxId !== 'perm_settings') {
+          $checkbox.prop("disabled", false)
+                    .removeAttr("readonly")
+                    .css("pointer-events", "auto")
+                    .css("opacity", "1");
+          console.log("[editUser] Enabled checkbox:", checkboxId);
+        }
+      });
+      
+      // Add click handlers to verify checkboxes are working
+      $(".perms input[type='checkbox']").off("click.permissionDebug").on("click.permissionDebug", function() {
+        const $cb = $(this);
+        console.log("[Permission Checkbox] Clicked:", $cb.attr('id'), "New state:", $cb.is(":checked"));
+      });
+
       // Handle settings permission - only visible/editable for admin users
       const $settingsPerm = $("#perm_settings").closest(".form-group");
       if (isAdmin) {
@@ -6484,9 +6503,9 @@ if (auth == undefined) {
         }
         var el = "#" + perm;
         if (user[perm] == 1) {
-          $(el).prop("checked", true);
+          $(el).prop("checked", true).prop("disabled", false);
         } else {
-          $(el).prop("checked", false);
+          $(el).prop("checked", false).prop("disabled", false);
         }
       }
 
@@ -6832,7 +6851,26 @@ if (auth == undefined) {
       $("#passwordStrengthBar").hide();
       $("#passwordStrengthText").text("");
       $("#passMatchError").hide();
-      $(".perms input[type='checkbox']").prop("checked", false);
+      
+      // Enable and uncheck all permission checkboxes (except settings which is handled separately)
+      $(".perms input[type='checkbox']").each(function() {
+        const $checkbox = $(this);
+        const checkboxId = $checkbox.attr('id');
+        if (checkboxId !== 'perm_settings') {
+          $checkbox.prop("checked", false)
+                    .prop("disabled", false)
+                    .removeAttr("readonly")
+                    .css("pointer-events", "auto")
+                    .css("opacity", "1");
+          console.log("[resetUserForm] Enabled checkbox:", checkboxId);
+        }
+      });
+      
+      // Add click handlers to verify checkboxes are working
+      $(".perms input[type='checkbox']").off("click.permissionDebug").on("click.permissionDebug", function() {
+        const $cb = $(this);
+        console.log("[Permission Checkbox] Clicked:", $cb.attr('id'), "New state:", $cb.is(":checked"));
+      });
       
       // Hide settings permission by default (only shown for admin role)
       const $settingsPerm = $("#perm_settings").closest(".form-group");
@@ -7286,97 +7324,32 @@ if (auth == undefined) {
       }
 
       $.get(api + "users/all", function (users) {
+        console.log("[loadUserList] Received response:", users);
+        
+        // Ensure users is an array
+        if (!users || !Array.isArray(users)) {
+          console.warn("[loadUserList] Response is not an array, converting to array:", users);
+          users = [];
+        }
+        
+        console.log(`[loadUserList] Processing ${users.length} user(s)`);
         allUsers = [...users];
 
-        users.forEach((user, index) => {
-          state = [];
-          let statusBadge = "";
-          let lastLoginText = "";
-          let loginTime = "";
-
-          if (user.status != "") {
-            state = user.status.split("_");
-            login_status = state[0];
-            login_time = state[1];
-            loginTime = login_time || "";
-
-            if (login_status === "Logged In") {
-              statusBadge = '<span class="badge badge-success">Logged In</span>';
-            } else if (login_status === "Logged Out") {
-              statusBadge = '<span class="badge badge-secondary">Logged Out</span>';
+        // If no users found, try to initialize admin user
+        if (users.length === 0) {
+          console.log("[loadUserList] No users found, initializing admin user...");
+          $.get(api + "users/check", function (checkData) {
+            // After checking/initializing, reload the user list
+            setTimeout(function() {
+              loadUserList();
+            }, 500);
+          }).fail(function() {
+            // Even if check fails, show empty table
+            $("#user_list").html('<tr><td colspan="8" class="text-center">No users found. Please initialize the admin user.</td></tr>');
+            if ($.fn.DataTable.isDataTable("#userList")) {
+              $("#userList").DataTable().destroy();
             }
-          } else {
-            statusBadge = '<span class="badge badge-light">Never Logged In</span>';
-          }
-
-          // Format last login time
-          if (user.lastLogin) {
-            const lastLoginDate = new Date(user.lastLogin);
-            lastLoginText = moment(lastLoginDate).format('DD-MMM-YYYY HH:mm');
-          } else if (loginTime) {
-            try {
-              const loginDate = new Date(loginTime);
-              lastLoginText = moment(loginDate).format('DD-MMM-YYYY HH:mm');
-            } catch (e) {
-              lastLoginText = loginTime;
-            }
-          } else {
-            lastLoginText = "-";
-          }
-
-          // Get permissions summary
-          const permissions = [];
-          if (user.perm_products) permissions.push("Products");
-          if (user.perm_categories) permissions.push("Categories");
-          if (user.perm_manufacturers) permissions.push("Manufacturers");
-          if (user.perm_suppliers) permissions.push("Suppliers");
-          if (user.perm_transactions) permissions.push("Transactions");
-          if (user.perm_users) permissions.push("Users");
-          if (user.perm_settings) permissions.push("Settings");
-          const permissionsText = permissions.length > 0 ? permissions.join(", ") : "No permissions";
-
-          // Get role badge
-          const role = user.role || "cashier";
-          let roleBadge = "";
-          switch(role.toLowerCase()) {
-            case "admin":
-              roleBadge = '<span class="badge badge-danger">Admin</span>';
-              break;
-            case "manager":
-              roleBadge = '<span class="badge badge-warning">Manager</span>';
-              break;
-            case "cashier":
-              roleBadge = '<span class="badge badge-info">Cashier</span>';
-              break;
-            default:
-              roleBadge = '<span class="badge badge-secondary">' + role + '</span>';
-          }
-
-          counter++;
-          // Add special styling for admin user
-          const isAdmin = user._id == 1;
-          const rowClass = isAdmin ? 'table-warning' : '';
-          const adminIcon = isAdmin ? '<i class="fa fa-shield text-danger" title="System Administrator"></i> ' : '';
-          
-          user_list += `<tr class="${rowClass}">
-            <td>${adminIcon}<strong>${user.fullname || "-"}</strong></td>
-            <td>${user.username || "-"}</td>
-            <td>${user.email || "-"}</td>
-            <td>${roleBadge}</td>
-            <td>${statusBadge}</td>
-            <td><small>${lastLoginText}</small></td>
-            <td><small title="${permissionsText}">${permissions.length} permission${permissions.length !== 1 ? 's' : ''}</small></td>
-            <td>${
-              isAdmin
-                ? '<span class="btn-group"><button class="btn btn-sm btn-warning" onClick="$(this).editUser(' + index + ')" title="Edit Admin User"><i class="fa fa-edit"></i></button><button class="btn btn-sm btn-dark" disabled title="Cannot delete system administrator"><i class="fa fa-trash"></i></button></span>'
-                : '<span class="btn-group"><button class="btn btn-sm btn-warning" onClick="$(this).editUser(' + index + ')" title="Edit"><i class="fa fa-edit"></i></button><button class="btn btn-sm btn-danger" onClick="$(this).deleteUser(' + user._id + ')" title="Delete"><i class="fa fa-trash"></i></button></span>'
-            }</td></tr>`;
-
-          if (counter == users.length) {
-            $("#user_list").html(user_list);
-
-            // Initialize DataTable with search and filter
-            const table = $("#userList").DataTable({
+            $("#userList").DataTable({
               order: [[0, "asc"]],
               autoWidth: false,
               info: true,
@@ -7393,25 +7366,166 @@ if (auth == undefined) {
                 infoFiltered: "(filtered from _MAX_ total users)"
               }
             });
+          });
+          return;
+        }
 
-            // Custom search handler
-            $("#userSearchInput").on("keyup", function() {
-              table.search(this.value).draw();
-            });
+        // Process each user and build the table HTML
+        users.forEach((user, index) => {
+          try {
+            state = [];
+            let statusBadge = "";
+            let lastLoginText = "";
+            let loginTime = "";
 
-            // Status filter handler
-            $("#userStatusFilter").on("change", function() {
-              const filterValue = this.value;
-              if (filterValue === "") {
-                table.column(4).search("").draw();
-              } else {
-                table.column(4).search(filterValue).draw();
+            if (user.status != "") {
+              state = user.status.split("_");
+              login_status = state[0];
+              login_time = state[1];
+              loginTime = login_time || "";
+
+              if (login_status === "Logged In") {
+                statusBadge = '<span class="badge badge-success">Logged In</span>';
+              } else if (login_status === "Logged Out") {
+                statusBadge = '<span class="badge badge-secondary">Logged Out</span>';
               }
-            });
+            } else {
+              statusBadge = '<span class="badge badge-light">Never Logged In</span>';
+            }
+
+            // Format last login time
+            if (user.lastLogin) {
+              const lastLoginDate = new Date(user.lastLogin);
+              lastLoginText = moment(lastLoginDate).format('DD-MMM-YYYY HH:mm');
+            } else if (loginTime) {
+              try {
+                const loginDate = new Date(loginTime);
+                lastLoginText = moment(loginDate).format('DD-MMM-YYYY HH:mm');
+              } catch (e) {
+                lastLoginText = loginTime;
+              }
+            } else {
+              lastLoginText = "-";
+            }
+
+            // Get permissions summary
+            const permissions = [];
+            if (user.perm_products) permissions.push("Products");
+            if (user.perm_categories) permissions.push("Categories");
+            if (user.perm_manufacturers) permissions.push("Manufacturers");
+            if (user.perm_suppliers) permissions.push("Suppliers");
+            if (user.perm_transactions) permissions.push("Transactions");
+            if (user.perm_users) permissions.push("Users");
+            if (user.perm_settings) permissions.push("Settings");
+            const permissionsText = permissions.length > 0 ? permissions.join(", ") : "No permissions";
+
+            // Get role badge
+            const role = user.role || "cashier";
+            let roleBadge = "";
+            switch(role.toLowerCase()) {
+              case "admin":
+                roleBadge = '<span class="badge badge-danger">Admin</span>';
+                break;
+              case "manager":
+                roleBadge = '<span class="badge badge-warning">Manager</span>';
+                break;
+              case "cashier":
+                roleBadge = '<span class="badge badge-info">Cashier</span>';
+                break;
+              default:
+                roleBadge = '<span class="badge badge-secondary">' + role + '</span>';
+            }
+
+            counter++;
+            // Add special styling for admin user
+            const isAdmin = user._id == 1;
+            const rowClass = isAdmin ? 'table-warning' : '';
+            const adminIcon = isAdmin ? '<i class="fa fa-shield text-danger" title="System Administrator"></i> ' : '';
+            
+            user_list += `<tr class="${rowClass}">
+              <td>${adminIcon}<strong>${user.fullname || "-"}</strong></td>
+              <td>${user.username || "-"}</td>
+              <td>${user.email || "-"}</td>
+              <td>${roleBadge}</td>
+              <td>${statusBadge}</td>
+              <td><small>${lastLoginText}</small></td>
+              <td><small title="${permissionsText}">${permissions.length} permission${permissions.length !== 1 ? 's' : ''}</small></td>
+              <td>${
+                isAdmin
+                  ? '<span class="btn-group"><button class="btn btn-sm btn-warning" onClick="$(this).editUser(' + index + ')" title="Edit Admin User"><i class="fa fa-edit"></i></button><button class="btn btn-sm btn-dark" disabled title="Cannot delete system administrator"><i class="fa fa-trash"></i></button></span>'
+                  : '<span class="btn-group"><button class="btn btn-sm btn-warning" onClick="$(this).editUser(' + index + ')" title="Edit"><i class="fa fa-edit"></i></button><button class="btn btn-sm btn-danger" onClick="$(this).deleteUser(' + user._id + ')" title="Delete"><i class="fa fa-trash"></i></button></span>'
+              }</td></tr>`;
+          } catch (userError) {
+            console.error(`[loadUserList] Error processing user at index ${index}:`, userError, user);
+          }
+        });
+
+        // After processing all users, update the table and initialize DataTable
+        console.log(`[loadUserList] Processed ${counter} of ${users.length} users`);
+        $("#user_list").html(user_list || '<tr><td colspan="8" class="text-center">No users to display</td></tr>');
+
+        // Initialize DataTable with search and filter
+        const table = $("#userList").DataTable({
+          order: [[0, "asc"]],
+          autoWidth: false,
+          info: true,
+          JQueryUI: true,
+          ordering: true,
+          paging: true,
+          pageLength: 10,
+          lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]],
+          language: {
+            search: "Search:",
+            lengthMenu: "Show _MENU_ users",
+            info: "Showing _START_ to _END_ of _TOTAL_ users",
+            infoEmpty: "No users found",
+            infoFiltered: "(filtered from _MAX_ total users)"
+          }
+        });
+
+        // Custom search handler
+        $("#userSearchInput").off("keyup").on("keyup", function() {
+          table.search(this.value).draw();
+        });
+
+        // Status filter handler
+        $("#userStatusFilter").off("change").on("change", function() {
+          const filterValue = this.value;
+          if (filterValue === "") {
+            table.column(4).search("").draw();
+          } else {
+            table.column(4).search(filterValue).draw();
           }
         });
       }).fail(function(xhr, status, error) {
-        console.error("Failed to load users:", error);
+        console.error("[loadUserList] Failed to load users:", error);
+        console.error("[loadUserList] Status:", status);
+        console.error("[loadUserList] Response:", xhr.responseText);
+        console.error("[loadUserList] Status Code:", xhr.status);
+        
+        // Show error message in the table
+        $("#user_list").html('<tr><td colspan="8" class="text-center text-danger">Error loading users. Check console for details.</td></tr>');
+        if ($.fn.DataTable.isDataTable("#userList")) {
+          $("#userList").DataTable().destroy();
+        }
+        $("#userList").DataTable({
+          order: [[0, "asc"]],
+          autoWidth: false,
+          info: true,
+          JQueryUI: true,
+          ordering: true,
+          paging: true,
+          pageLength: 10,
+          lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]],
+          language: {
+            search: "Search:",
+            lengthMenu: "Show _MENU_ users",
+            info: "Showing _START_ to _END_ of _TOTAL_ users",
+            infoEmpty: "No users found",
+            infoFiltered: "(filtered from _MAX_ total users)"
+          }
+        });
+        
         if (typeof notiflix !== 'undefined') {
           notiflix.Notify.failure('Failed to load users. Please check server connection.');
         }
@@ -7775,6 +7889,45 @@ if (auth == undefined) {
         formData.role = "cashier";
       }
 
+      // Add logged-in user ID to request so backend can verify permissions
+      // The backend needs to know who is making the request
+      if (typeof user !== 'undefined' && user && user._id) {
+        formData.currentUserId = user._id;
+        formData.userId = user._id; // Also set userId for loadUser middleware
+      }
+
+      // Process permission checkboxes - explicitly set all permissions
+      // This ensures unchecked checkboxes are sent as 0, not omitted
+      const permissionFields = [
+        "perm_products",
+        "perm_categories",
+        "perm_manufacturers",
+        "perm_suppliers",
+        "perm_transactions",
+        "perm_users",
+        "perm_settings"
+      ];
+      
+      permissionFields.forEach(function(perm) {
+        const $checkbox = $("#" + perm);
+        if ($checkbox.length) {
+          // Check if checkbox is checked and not disabled
+          if ($checkbox.is(":checked") && !$checkbox.prop("disabled")) {
+            formData[perm] = "on"; // Backend will convert "on" to 1
+          } else {
+            // Explicitly set to 0 for unchecked checkboxes
+            // This ensures permissions are always updated, even when unchecked
+            formData[perm] = 0;
+          }
+        } else {
+          // Checkbox doesn't exist, default to 0
+          formData[perm] = 0;
+        }
+      });
+
+      // Debug: Log permission data (can be removed in production if needed)
+      // console.log("[saveUser] Permission data:", formData);
+
       // Show loading indicator
       const $submitBtn = $(this).find('button[type="submit"]');
       const originalText = $submitBtn.html();
@@ -7933,6 +8086,26 @@ if (auth == undefined) {
       }
 
       $("#saveUser").get(0).reset();
+      
+      // Ensure all permission checkboxes are enabled (except settings)
+      $(".perms input[type='checkbox']").each(function() {
+        const $checkbox = $(this);
+        const checkboxId = $checkbox.attr('id');
+        if (checkboxId !== 'perm_settings') {
+          $checkbox.prop("disabled", false)
+                    .removeAttr("readonly")
+                    .css("pointer-events", "auto")
+                    .css("opacity", "1");
+          console.log("[add-user] Enabled checkbox:", checkboxId);
+        }
+      });
+      
+      // Add click handlers to verify checkboxes are working
+      $(".perms input[type='checkbox']").off("click.permissionDebug").on("click.permissionDebug", function() {
+        const $cb = $(this);
+        console.log("[Permission Checkbox] Clicked:", $cb.attr('id'), "New state:", $cb.is(":checked"));
+      });
+      
       $("#userModal").modal("show");
     });
 

@@ -3,9 +3,21 @@ const server = require("http").Server(app);
 const bodyParser = require("body-parser");
 const Datastore = require("@seald-io/nedb");
 const bcrypt = require("bcrypt");
-const saltRounds = 10;
+// Use fewer salt rounds in development for faster password hashing
+// Production should use 10+ rounds for security
+const saltRounds = process.env.NODE_ENV === 'dev' ? 8 : 10;
 const validator = require("validator");
 const path = require("path");
+const fs = require("fs");
+
+// RBAC Middleware
+const { 
+    loadUser, 
+    requirePermission, 
+    requireAdmin,
+    PERMISSIONS 
+} = require('./rbac-middleware');
+const { isSystemAdmin, canModifyUser } = require('./rbac-config');
 const dbPath = path.join(
     process.env.APPDATA,
     process.env.APPNAME,
@@ -14,16 +26,106 @@ const dbPath = path.join(
     "users.db",
 );
 
+// Ensure database directory exists
+const dbDir = path.dirname(dbPath);
+if (!fs.existsSync(dbDir)) {
+    try {
+        fs.mkdirSync(dbDir, { recursive: true });
+        console.log('Created users database directory:', dbDir);
+    } catch (mkdirErr) {
+        console.error('Could not create database directory:', mkdirErr);
+    }
+}
+
 app.use(bodyParser.json());
+
+// Load user from request for RBAC (applies to all routes)
+app.use(loadUser);
 
 module.exports = app;
 
 let usersDB = new Datastore({
     filename: dbPath,
     autoload: true,
+    onload: function(err) {
+        if (err) {
+            console.error('Users database load error:', err);
+            if (err.code === 'ENOENT') {
+                console.log('Users database file missing - will be created on first write');
+            } else {
+                // Other error (like rename error with .db~ files) - try to reload manually
+                console.warn('⚠️ Users DB autoload failed, attempting manual reload...');
+                const fs = require('fs');
+                
+                // Clean up orphaned temporary files if they exist
+                const tempDbPath = dbPath + '~';
+                if (fs.existsSync(tempDbPath)) {
+                    try {
+                        fs.unlinkSync(tempDbPath);
+                        console.log('   Removed orphaned temporary database file');
+                    } catch (unlinkErr) {
+                        console.warn('   Could not remove temporary file:', unlinkErr.message);
+                    }
+                }
+                
+                if (fs.existsSync(dbPath)) {
+                    console.log('   Database file exists, forcing reload...');
+                    usersDB.loadDatabase(function(reloadErr) {
+                        if (reloadErr) {
+                            console.error('   Manual reload failed:', reloadErr);
+                            // Mark as ready anyway - queries will work or fail gracefully
+                        } else {
+                            console.log('   ✅ Users database manually reloaded successfully');
+                        }
+                    });
+                } else {
+                    console.log('   Database file does not exist - will be created on first write');
+                }
+            }
+        } else {
+            if (process.env.NODE_ENV === 'dev') {
+                console.log('Users database loaded successfully');
+            }
+        }
+    }
 });
 
-usersDB.ensureIndex({ fieldName: "username", unique: true });
+// Verify database is actually loaded after a delay
+setTimeout(() => {
+    const tempDbPath = dbPath + '~';
+    
+    // Clean up any orphaned temporary files
+    if (fs.existsSync(tempDbPath)) {
+        try {
+            fs.unlinkSync(tempDbPath);
+            console.log('Cleaned up orphaned users database temporary file');
+        } catch (unlinkErr) {
+            // Ignore cleanup errors
+        }
+    }
+    
+    // Try to load database if file exists but wasn't loaded
+    if (fs.existsSync(dbPath)) {
+        usersDB.loadDatabase(function(loadErr) {
+            if (!loadErr) {
+                if (process.env.NODE_ENV === 'dev') {
+                    console.log('✅ Users database manually loaded successfully');
+                }
+            } else {
+                console.error('❌ Manual users DB load failed:', loadErr);
+            }
+        });
+    }
+}, 500);
+
+// Ensure index is created after database is ready
+setTimeout(() => {
+    try {
+        usersDB.ensureIndex({ fieldName: "username", unique: true });
+    } catch (indexErr) {
+        console.warn('Could not ensure username index:', indexErr.message);
+    }
+}, 1000);
 
 /**
  * GET endpoint: Get the welcome message for the Users API.
@@ -140,7 +242,7 @@ app.post("/login", function (req, res) {
  * @returns {void}
  */
 app.get("/all", function (req, res) {
-    usersDB.find({}).sort({ createdAt: -1, _id: -1 }).exec(function (err, docs) {
+    usersDB.find({}, function (err, docs) {
         if (err) {
             console.error("Error fetching users:", err);
             res.status(500).json({
@@ -150,8 +252,13 @@ app.get("/all", function (req, res) {
             return;
         }
         
-        // If sort didn't work, sort manually
-        if (docs && docs.length > 0) {
+        // Ensure docs is always an array (handle null/undefined cases)
+        if (!docs || !Array.isArray(docs)) {
+            docs = [];
+        }
+        
+        // Sort manually (more reliable than NeDB's sort)
+        if (docs.length > 0) {
             docs.sort((a, b) => {
                 // Sort by createdAt descending (newest first)
                 const dateA = a.createdAt ? new Date(a.createdAt).getTime() : (a._id || 0);
@@ -164,21 +271,35 @@ app.get("/all", function (req, res) {
             });
         }
         
+        // Always return an array (even if empty)
+        console.log(`[Users API] /all endpoint: Returning ${docs.length} user(s)`);
         res.send(docs);
     });
 });
 
 /**
  * DELETE endpoint: Delete a user by user ID.
+ * Requires: users.delete permission
+ * System admin (ID: 1) cannot be deleted
  *
  * @param {Object} req request object with user ID as a parameter.
  * @param {Object} res response object.
  * @returns {void}
  */
-app.delete("/user/:userId", function (req, res) {
+app.delete("/user/:userId", requirePermission(PERMISSIONS.USERS_DELETE), function (req, res) {
+    const targetUserId = parseInt(req.params.userId);
+    
+    // ID-based access control: System admin (ID: 1) cannot be deleted
+    if (isSystemAdmin(targetUserId)) {
+        return res.status(403).json({
+            error: "Forbidden",
+            message: "System administrator cannot be deleted.",
+        });
+    }
+    
     usersDB.remove(
         {
-            _id: parseInt(req.params.userId),
+            _id: targetUserId,
         },
         function (err, numRemoved) {
             if (err) {
@@ -196,12 +317,72 @@ app.delete("/user/:userId", function (req, res) {
 
 /**
  * POST endpoint: Create or update a user.
+ * Requires: users.create for new users, users.edit for updates
+ * System admin (ID: 1) is protected from role changes
  *
  * @param {Object} req request object with user data in the body.
  * @param {Object} res response object.
  * @returns {void}
  */
 app.post("/post", function (req, res) {
+    // Determine if this is a create or update operation
+    // Check if id is empty string, null, undefined, or 0
+    const isNewUser = !req.body.id || req.body.id === "" || req.body.id === "0" || req.body.id === 0;
+    const userId = isNewUser ? null : parseInt(req.body.id);
+    
+    // Check permissions based on operation type
+    const requiredPermission = isNewUser ? PERMISSIONS.USERS_CREATE : PERMISSIONS.USERS_EDIT;
+    
+    // The loadUser middleware should have already loaded req.user from currentUserId
+    // If not loaded, the request should have currentUserId in body for the middleware to pick up
+    if (!req.user) {
+        // User not loaded by middleware - check if currentUserId was provided
+        const loggedInUserId = req.body.currentUserId || req.body.userId;
+        if (!loggedInUserId) {
+            return res.status(401).json({
+                error: 'Unauthorized',
+                message: 'Authentication required. Please include your user ID (currentUserId) in the request.',
+            });
+        }
+        // If middleware didn't load it, it might be because the request body wasn't parsed yet
+        // In that case, we'll let the middleware handle it on the next request
+        // For now, return error to force frontend to send currentUserId properly
+        return res.status(401).json({
+            error: 'Unauthorized',
+            message: 'User authentication failed. Please log in again.',
+        });
+    }
+    
+    // Check permission (synchronous - fast, no database queries)
+    const { userHasPermission } = require('./rbac-config');
+    const hasPermission = userHasPermission(req.user, requiredPermission);
+    
+    if (!hasPermission) {
+        return res.status(403).json({
+            error: 'Forbidden',
+            message: `You do not have permission to ${isNewUser ? 'create' : 'edit'} users.`,
+            requiredPermission: requiredPermission,
+            userRole: req.user.role,
+            userPermUsers: req.user.perm_users
+        });
+    }
+    
+    // ID-based access control: Check if user can modify the target user (synchronous - fast)
+    if (!isNewUser) {
+        const canModify = canModifyUser(req.user, userId);
+        
+        if (!canModify) {
+            return res.status(403).json({
+                error: 'Forbidden',
+                message: 'You do not have permission to modify this user.',
+                userRole: req.user.role,
+                userPermUsers: req.user.perm_users,
+                targetUserId: userId
+            });
+        }
+    }
+    
+    // All permission checks passed, proceed with user update
     // Validate email if provided
     if (req.body.email && req.body.email.trim() !== "") {
         if (!validator.isEmail(req.body.email)) {
@@ -221,7 +402,7 @@ app.post("/post", function (req, res) {
     }
     
     // Check if password is required (new user) or optional (update)
-    const isNewUser = req.body.id === "";
+    // Note: isNewUser is already declared above at line 233
     if (isNewUser && (!req.body.password || req.body.password.trim() === "")) {
         return res.status(400).json({
             error: "Validation Error",
@@ -264,14 +445,25 @@ app.post("/post", function (req, res) {
         ];
 
         for (const perm of perms) {
-            if (!!req.body[perm]) {
-                req.body[perm] = req.body[perm] === "on" ? 1 : 0;
-            } else {
-                //create missing permission only with new users
-                if(req.body.id==="")
-                {
-                  req.body[perm] = 0;  
+            // Handle different input formats: "on", true, 1, 0, false, or undefined
+            if (req.body[perm] !== undefined && req.body[perm] !== null) {
+                // Convert various formats to 1 or 0
+                if (req.body[perm] === "on" || req.body[perm] === true || req.body[perm] === 1 || req.body[perm] === "1") {
+                    req.body[perm] = 1;
+                } else if (req.body[perm] === false || req.body[perm] === 0 || req.body[perm] === "0") {
+                    req.body[perm] = 0;
+                } else {
+                    // Default to 0 for any other value
+                    req.body[perm] = 0;
                 }
+            } else {
+                // If permission is not provided in request, set to 0 for new users
+                // For existing users updating, we'll keep existing value (don't set it here)
+                if (isNewUser) {
+                    req.body[perm] = 0;
+                }
+                // Note: For existing users, if perm is not in req.body, it won't be in User object
+                // and won't be updated (existing value preserved)
             }
         }
 
@@ -288,30 +480,40 @@ app.post("/post", function (req, res) {
         }
         
         // CRITICAL SECURITY: System Admin (ID: 1) Protection
-        const userId = parseInt(req.body.id);
-        const isSystemAdmin = userId === 1;
+        // Note: userId is already declared above at line 234
+        const targetUserId = userId !== null ? userId : (req.body.id ? parseInt(req.body.id) : null);
+        const isTargetSystemAdmin = targetUserId !== null && isSystemAdmin(targetUserId);
         
-        if (isSystemAdmin) {
+        if (isTargetSystemAdmin) {
             // System admin (ID: 1) CANNOT change their role or lose admin rights
             // Force role to "admin" and ensure all admin permissions
             User.role = "admin";
             User.perm_settings = 1;
             User.perm_users = 1; // System admin must be able to manage users
-            console.log(`[SECURITY] System Admin (ID: 1) role and permissions protected - forced to admin`);
+            // Only log in dev mode to reduce overhead
+            if (process.env.NODE_ENV === 'dev') {
+                console.log(`[SECURITY] System Admin (ID: 1) role and permissions protected - forced to admin`);
+            }
         }
         
         // CRITICAL: Settings permission is restricted to admin only
         // Only users with role "admin" or _id === 1 (system admin) can have settings permission
-        const isAdmin = User.role === "admin" || isSystemAdmin || (!req.body.id && User.role === "admin");
+        const isAdmin = User.role === "admin" || isTargetSystemAdmin || (!req.body.id && User.role === "admin");
         
         if (!isAdmin) {
             // Non-admin users cannot have settings permission - force it to 0
             User.perm_settings = 0;
-            console.log(`[User Update] Removed settings permission from non-admin user (ID: ${req.body.id || 'new'}, Role: ${User.role})`);
+            // Only log in dev mode to reduce overhead
+            if (process.env.NODE_ENV === 'dev') {
+                console.log(`[User Update] Removed settings permission from non-admin user (ID: ${req.body.id || 'new'}, Role: ${User.role})`);
+            }
         } else {
             // Admin users must always have settings permission
             User.perm_settings = 1;
-            console.log(`[User Update] Ensured settings permission for admin user (ID: ${req.body.id || 'new'}, Role: ${User.role})`);
+            // Only log in dev mode to reduce overhead
+            if (process.env.NODE_ENV === 'dev') {
+                console.log(`[User Update] Ensured settings permission for admin user (ID: ${req.body.id || 'new'}, Role: ${User.role})`);
+            }
         }
         
         // Function to proceed with user update
@@ -395,59 +597,70 @@ app.post("/post", function (req, res) {
             }
         };
         
-        // CRITICAL: Ensure at least one admin exists (only for updates, not new users)
-        if (!isSystemAdmin && userId) {
-            // Check if this user change would remove the last admin
-            usersDB.findOne({ _id: userId }, function (findErr, existingUser) {
-                if (findErr || !existingUser) {
-                    // User not found, proceed normally (will fail in update anyway)
-                    proceedWithUpdate();
-                    return;
-                }
-                
-                const wasAdmin = existingUser.role === "admin" || existingUser._id === 1;
-                const willBeAdmin = User.role === "admin";
-                
-                if (wasAdmin && !willBeAdmin) {
-                    // User is changing from admin to non-admin - check if there are other admins
-                    usersDB.find({ 
-                        $or: [
-                            { role: "admin" },
-                            { _id: 1 }
-                        ],
-                        _id: { $ne: userId }
-                    }, function (checkErr, otherAdmins) {
-                        if (checkErr) {
-                            console.error("Error checking for other admins:", checkErr);
-                            proceedWithUpdate();
-                            return;
-                        }
-                        
-                        const activeAdmins = (otherAdmins || []).filter(a => 
-                            a._id !== userId && (a.role === "admin" || a._id === 1)
-                        );
-                        
-                        if (activeAdmins.length === 0) {
-                            // This is the last admin - prevent role change
-                            console.error(`[SECURITY] BLOCKED: Cannot change last admin user (ID: ${userId}) to non-admin role`);
-                            return res.status(400).json({
-                                error: "Security Error",
-                                message: "Cannot change role: This is the last administrator. At least one admin user must exist. Please create another admin user first, or use the emergency admin recovery if you are locked out.",
-                            });
-                        }
-                        
-                        // Other admins exist, proceed with update
+        // CRITICAL: Ensure at least one admin exists (only for updates where role changes from admin to non-admin)
+        // Skip this check for new users, system admin, or when role is not changing
+        if (!isTargetSystemAdmin && targetUserId && !isNewUser) {
+            // Only check if role is being changed - if role is not in request, skip the check
+            const roleIsChanging = req.body.role !== undefined && req.body.role !== null;
+            
+            if (roleIsChanging) {
+                // Check if this user change would remove the last admin
+                usersDB.findOne({ _id: targetUserId }, function (findErr, existingUser) {
+                    if (findErr || !existingUser) {
+                        // User not found, proceed normally (will fail in update anyway)
                         proceedWithUpdate();
-                    });
-                } else {
-                    // Not removing admin, proceed normally
-                    proceedWithUpdate();
-                }
-            });
+                        return;
+                    }
+                    
+                    const wasAdmin = existingUser.role === "admin" || existingUser._id === 1;
+                    const willBeAdmin = User.role === "admin";
+                    
+                    // Only do expensive check if changing FROM admin TO non-admin
+                    if (wasAdmin && !willBeAdmin) {
+                        // User is changing from admin to non-admin - check if there are other admins
+                        usersDB.find({ 
+                            $or: [
+                                { role: "admin" },
+                                { _id: 1 }
+                            ],
+                            _id: { $ne: targetUserId }
+                        }, function (checkErr, otherAdmins) {
+                            if (checkErr) {
+                                console.error("Error checking for other admins:", checkErr);
+                                proceedWithUpdate();
+                                return;
+                            }
+                            
+                            const activeAdmins = (otherAdmins || []).filter(a => 
+                                a._id !== targetUserId && (a.role === "admin" || a._id === 1)
+                            );
+                            
+                            if (activeAdmins.length === 0) {
+                                // This is the last admin - prevent role change
+                                console.error(`[SECURITY] BLOCKED: Cannot change last admin user (ID: ${targetUserId}) to non-admin role`);
+                                return res.status(400).json({
+                                    error: "Security Error",
+                                    message: "Cannot change role: This is the last administrator. At least one admin user must exist. Please create another admin user first, or use the emergency admin recovery if you are locked out.",
+                                });
+                            }
+                            
+                            // Other admins exist, proceed with update
+                            proceedWithUpdate();
+                        });
+                    } else {
+                        // Not changing from admin to non-admin, proceed normally
+                        proceedWithUpdate();
+                    }
+                });
+            } else {
+                // Role is not changing, only permissions - proceed immediately without database check
+                proceedWithUpdate();
+            }
         } else {
-            // New user or system admin, proceed normally
+            // New user, system admin, or no target user ID - proceed normally
             proceedWithUpdate();
         }
+    }; // End of processUser function
     
     // Encrypt password if provided
     if (req.body.password && req.body.password.trim() !== "") {
